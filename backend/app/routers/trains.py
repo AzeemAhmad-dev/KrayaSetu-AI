@@ -1,8 +1,9 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from backend.app.database import get_db
 from backend.app.models.trains import Train, TrainSchedule, TrainMovement
+from backend.app.data.railradar import railradar_client
 
 router = APIRouter(tags=["Trains"])
 
@@ -129,3 +130,29 @@ def get_train_detail(train_number: str, db: Session = Depends(get_db)):
         "schedule": sched,
         "movement": movement_info
     }
+
+@router.get("/trains/{train_number}/live")
+async def get_train_live_telemetry(train_number: str, db: Session = Depends(get_db)):
+    """
+    Fetch live telemetry for a train from RailRadar API.
+    Falls back gracefully to simulated/COA telemetry if RailRadar is unreachable or unconfigured.
+    """
+    train = db.query(Train).filter(Train.train_number == train_number).first()
+    live_data = await railradar_client.get_live_train_status(train_number)
+    
+    movement = train.movement if train else None
+    return {
+        "train_number": train_number,
+        "train_name": train.train_name if train else train_number,
+        "telemetry_source": live_data.get("source", "SIMULATED_COA"),
+        "live_telemetry": live_data,
+        "db_movement": {
+            "current_location": movement.current_location if movement else None,
+            "current_track": movement.current_track if movement else None,
+            "current_km": movement.current_km if movement else 0.0,
+            "delay_minutes": movement.delay_minutes if movement else 0,
+            "delay_category": movement.delay_category if movement else "ON_TIME",
+            "status": movement.status if movement else "RUNNING"
+        } if movement else None
+    }
+

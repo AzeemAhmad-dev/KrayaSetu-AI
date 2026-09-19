@@ -37,6 +37,7 @@ export const api = {
   getTrains: (serviceType?: string) => request<any[]>(`/trains${serviceType ? `?service_type=${serviceType}` : ""}`),
   getTrainMovements: () => request<TrainMovementData[]>("/train-movements"),
   getTrainDetail: (number: string) => request<any>(`/trains/${number}`),
+  getTrainLive: (number: string) => request<any>(`/trains/${number}/live`),
 
   getFaults: (status?: string) => request<FaultObservationData[]>(`/maintenance/faults${status ? `?status=${status}` : ""}`),
   createFault: (data: any) => request<any>("/maintenance/faults", { method: "POST", body: JSON.stringify(data) }),
