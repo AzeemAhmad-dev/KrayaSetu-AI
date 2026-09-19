@@ -2,12 +2,12 @@ services:
   - type: web
     name: krayasetu-backend
     runtime: python
-    buildCommand: pip install -r backend/requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.12.0
+        value: 3.12.8
       - key: RAILRADAR_API_BASE_URL
         value: https://api.railradar.in/v1
       - key: RAILRADAR_TIMEOUT_SECONDS
-        value: "0.5"
+        value: "3.0"
