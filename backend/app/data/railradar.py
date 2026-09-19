@@ -1,6 +1,7 @@
+import time
 import httpx
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from backend.app.config import settings
 
 class RailRadarClient:
@@ -13,7 +14,9 @@ class RailRadarClient:
         self.base_url = (base_url or settings.RAILRADAR_API_BASE_URL).rstrip("/")
         self.api_key = api_key or settings.RAILRADAR_API_KEY
         timeout = timeout_seconds if timeout_seconds is not None else settings.RAILRADAR_TIMEOUT_SECONDS
-        self.timeout = httpx.Timeout(timeout)  # 500ms bounded timeout by default
+        self.timeout = httpx.Timeout(timeout)
+        self._train_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+        self._cache_ttl_seconds = 30.0
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {"Accept": "application/json"}
@@ -23,7 +26,7 @@ class RailRadarClient:
         return headers
 
     async def get_live_telemetry(self, block_section_id: str) -> Dict[str, Any]:
-        """Fetch live telemetry with a strict 500ms bound. Return fallback on failure."""
+        """Fetch live telemetry with a strict bound. Return fallback on failure."""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.get(
@@ -32,7 +35,7 @@ class RailRadarClient:
                 )
                 resp.raise_for_status()
                 return resp.json()
-        except (httpx.TimeoutException, httpx.RequestError):
+        except Exception:
             # Bounded enrichment fallback
             return {
                 "status": "FALLBACK",
@@ -43,9 +46,16 @@ class RailRadarClient:
     async def get_live_train_status(self, train_number: str) -> Dict[str, Any]:
         """
         Fetch real-time train tracking from RailRadar API (/v1/trains/{number}/live).
-        Returns delay, current section, segment progress, and next halt with bounded 500ms circuit breaker.
+        Returns delay, current section, segment progress, and next halt with circuit breaker.
         Falls back to local simulated/COA telemetry when offline or unresponsive.
+        Includes a 30s TTL cache for fast, rate-limit friendly dashboard rendering.
         """
+        now = time.time()
+        if train_number in self._train_cache:
+            cached_time, cached_data = self._train_cache[train_number]
+            if now - cached_time < self._cache_ttl_seconds:
+                return cached_data
+
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.get(
@@ -55,7 +65,7 @@ class RailRadarClient:
                 resp.raise_for_status()
                 raw_data = resp.json()
                 data = raw_data.get("data", raw_data) if isinstance(raw_data, dict) else {}
-                return {
+                result = {
                     "train_number": data.get("trainNumber", train_number),
                     "train_name": data.get("trainName"),
                     "status": data.get("status", "RUNNING"),
@@ -67,8 +77,10 @@ class RailRadarClient:
                     "source": "RAILRADAR_LIVE",
                     "raw": data
                 }
-        except (httpx.TimeoutException, httpx.RequestError):
-            return {
+                self._train_cache[train_number] = (now, result)
+                return result
+        except Exception:
+            fallback = {
                 "train_number": train_number,
                 "status": "FALLBACK_SIMULATED",
                 "source": "SIMULATED_COA",
@@ -76,5 +88,7 @@ class RailRadarClient:
                 "current_location": None,
                 "last_updated": None
             }
+            self._train_cache[train_number] = (now, fallback)
+            return fallback
 
 railradar_client = RailRadarClient()

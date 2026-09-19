@@ -21,6 +21,20 @@ async def test_railradar_timeout():
     assert res["status"] == "FALLBACK"
     assert res["occupancy"] == "unknown"
 
+def test_train_movements_live_telemetry_and_uuid_filtering():
+    response = client.get("/api/train-movements")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    for item in data:
+        tnum = item["train_number"]
+        # Ensure ghost UUID trains are filtered
+        assert not (len(tnum) == 36 and tnum.count("-") == 4), f"UUID ghost train found: {tnum}"
+        assert item["source_type"] in ["RAILRADAR_LIVE", "SIMULATED", "SYNTHETIC"]
+        assert isinstance(item["current_location"], str)
+        assert isinstance(item["delay_minutes"], int)
+
 def test_override_endpoint():
     response = client.post("/override", json={
         "work_id": "WP-9999",

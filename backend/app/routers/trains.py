@@ -1,6 +1,7 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from backend.app.database import get_db
 from backend.app.models.trains import Train, TrainSchedule, TrainMovement
 from backend.app.data.railradar import railradar_client
@@ -44,11 +45,106 @@ def get_trains(service_type: Optional[str] = None, db: Session = Depends(get_db)
     return results
 
 @router.get("/train-movements")
-def get_train_movements(db: Session = Depends(get_db)):
+async def get_train_movements(db: Session = Depends(get_db)):
     movements = db.query(TrainMovement).all()
+
+    # 1. Clean up UUID Ghost Trains: filter out synthetic trains whose train_number is a 36-char UUID string
+    filtered_movements = [
+        m for m in movements
+        if not (len(m.train_number) == 36 and m.train_number.count("-") == 4)
+    ]
+
+    # 2. Identify tracked primary passenger trains
+    TRACKED_PASSENGER_TRAINS = {
+        '12002', '12001', '20171', '20172', '12615', '12616', '12137', '18237', '11125'
+    }
+
+    trains_to_query = [
+        m.train_number for m in filtered_movements
+        if m.train_number in TRACKED_PASSENGER_TRAINS or (m.train_number.isdigit() and len(m.train_number) == 5)
+    ]
+
+    # 3. Concurrent background calls to railradar_client wrapped in asyncio.gather(..., return_exceptions=True)
+    live_telemetry_map: Dict[str, Dict[str, Any]] = {}
+    if trains_to_query:
+        tasks = [railradar_client.get_live_train_status(tnum) for tnum in trains_to_query]
+        query_results = await asyncio.gather(*tasks, return_exceptions=True)
+        for tnum, res in zip(trains_to_query, query_results):
+            if not isinstance(res, Exception) and isinstance(res, dict) and res.get("source") == "RAILRADAR_LIVE":
+                live_telemetry_map[tnum] = res
+
+    # 4. Build response: overlay live telemetry when available; gracefully fall back to SIMULATED
     results = []
-    for m in movements:
+    for m in filtered_movements:
         t = m.train
+        live = live_telemetry_map.get(m.train_number)
+
+        if live:
+            delay_minutes = live.get("delay_minutes", m.delay_minutes)
+
+            # Determine delay category
+            if delay_minutes <= 5:
+                delay_category = "ON_TIME"
+            elif delay_minutes <= 15:
+                delay_category = "MINOR"
+            elif delay_minutes <= 45:
+                delay_category = "MODERATE"
+            elif delay_minutes <= 90:
+                delay_category = "HEAVY"
+            else:
+                delay_category = "SEVERE"
+
+            # Parse location from live telemetry
+            loc_raw = live.get("current_location")
+            if isinstance(loc_raw, dict):
+                stn_name = loc_raw.get("stationName") or loc_raw.get("stationCode") or ""
+                stn_status = loc_raw.get("status", "")
+                if stn_status == "at-station":
+                    current_location = f"{stn_name} (At Station)"
+                elif stn_status == "in-transit":
+                    current_location = f"Approaching {stn_name}"
+                elif stn_name:
+                    current_location = f"{stn_name} ({stn_status})"
+                else:
+                    current_location = m.current_location
+                current_stn = loc_raw.get("stationCode") or m.current_station_code
+                current_km = float(loc_raw.get("distanceFromOriginKm") or m.current_km)
+                speed = float(loc_raw.get("speedKmh") or m.speed_kmph)
+            elif isinstance(loc_raw, str) and loc_raw:
+                current_location = loc_raw
+                current_stn = m.current_station_code
+                current_km = m.current_km
+                speed = m.speed_kmph
+            else:
+                current_location = m.current_location
+                current_stn = m.current_station_code
+                current_km = m.current_km
+                speed = m.speed_kmph
+
+            # Map status
+            raw_status = live.get("status")
+            if raw_status:
+                status_map = {
+                    "running": "RUNNING",
+                    "not-started": "SCHEDULED_HALT",
+                    "completed": "COMPLETED",
+                    "delayed": "DELAYED"
+                }
+                status = status_map.get(str(raw_status).lower(), str(raw_status).upper())
+            else:
+                status = m.status
+
+            source_type = "RAILRADAR_LIVE"
+        else:
+            current_location = m.current_location
+            current_stn = m.current_station_code
+            current_km = m.current_km
+            speed = m.speed_kmph
+            delay_minutes = m.delay_minutes
+            delay_category = m.delay_category
+            status = m.status
+            source_type = m.source_type or "SIMULATED"
+
         results.append({
             "train_number": m.train_number,
             "train_name": t.train_name if t else m.train_number,
@@ -58,24 +154,24 @@ def get_train_movements(db: Session = Depends(get_db)):
             "destination": t.destination if t else "Unknown",
             "direction": m.direction,
             "priority": t.priority if t else 3,
-            "current_location": m.current_location,
-            "current_station_code": m.current_station_code,
+            "current_location": current_location,
+            "current_station_code": current_stn,
             "current_section_id": m.current_section_id,
             "current_track": m.current_track,
-            "current_km": m.current_km,
-            "speed_kmph": m.speed_kmph,
+            "current_km": current_km,
+            "speed_kmph": speed,
             "scheduled_time": m.scheduled_time,
             "estimated_time": m.estimated_time,
-            "delay_minutes": m.delay_minutes,
-            "delay_category": m.delay_category,
-            "status": m.status,
+            "delay_minutes": delay_minutes,
+            "delay_category": delay_category,
+            "status": status,
             "hold_location": m.hold_location,
             "hold_reason": m.hold_reason,
             "hold_start_time": m.hold_start_time,
             "hold_end_time": m.hold_end_time,
             "cargo_type": t.cargo_type if t else None,
-            "source_type": m.source_type, # SIMULATED
-            "train_source_type": t.source_type if t else "REAL_PUBLIC", # REAL_PUBLIC or SYNTHETIC
+            "source_type": source_type,
+            "train_source_type": t.source_type if t else "REAL_PUBLIC",
             "updated_at": m.updated_at.isoformat() if m.updated_at else None
         })
     return results
