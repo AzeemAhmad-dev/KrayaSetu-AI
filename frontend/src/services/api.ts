@@ -8,7 +8,8 @@ import {
   EventLogData
 } from "../types";
 
-const API_BASE = "/api";
+const rawApiUrl = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "/api" : "http://localhost:8000")).trim().replace(/\/+$/, "");
+const API_BASE = rawApiUrl === "/api" || rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {

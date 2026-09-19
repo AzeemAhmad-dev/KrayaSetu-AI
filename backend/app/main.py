@@ -89,3 +89,16 @@ def health_check():
         "provenance_enforced": True
     }
 
+@app.get("/")
+def root_status():
+    return {
+        "status": "HEALTHY",
+        "service": settings.PROJECT_NAME,
+        "docs": "/docs",
+        "health": "/api/health"
+    }
+
+@app.get("/health")
+def root_health():
+    return health_check()
+
