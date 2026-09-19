@@ -96,7 +96,11 @@ const AppContent: React.FC = () => {
             {/* Station Master Workspace (SM-001) */}
             <Route
               path="/station-master"
-              element={<Navigate to={`/station-master/${localStorage.getItem("krayasetu_selected_station") || "RKMP"}`} replace />}
+              element={
+                <ProtectedRoute path="/station-master">
+                  <Navigate to={`/station-master/${localStorage.getItem("krayasetu_selected_station") || "RKMP"}`} replace />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/station-master/:stationCode"
@@ -174,6 +178,14 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/planner"
+              element={
+                <ProtectedRoute path="/block-planner">
+                  <BlockPlannerPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Inter-Department Coordination */}
             <Route
@@ -205,8 +217,20 @@ const AppContent: React.FC = () => {
               }
             />
             <Route
+              path="/scenarios"
+              element={
+                <ProtectedRoute path="/scenario-analysis">
+                  <ScenarioAnalysisPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/scenario-lab"
-              element={<Navigate to="/scenario-analysis" replace />}
+              element={
+                <ProtectedRoute path="/scenario-analysis">
+                  <ScenarioAnalysisPage />
+                </ProtectedRoute>
+              }
             />
 
             {/* Events Audit Log */}

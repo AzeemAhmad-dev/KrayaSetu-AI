@@ -327,14 +327,17 @@ export const DEMO_CREDENTIALS_LIST: DemoCredential[] = [
   { username: "COA-001", role: "Chief of Block Officer", workspace: "Master Control", password: "coa@demo", description: "Master network infrastructure, 5 corridors, major junctions & division boundaries" },
   { username: "COR-001", role: "Corridor Master", workspace: "Corridor Control", password: "cor@demo", description: "Corridor & section infrastructure, track arrangements, stations line string" },
   { username: "SM-001", role: "Station Master", workspace: "Station Master", password: "sm@demo", description: "Station schematic layout, physical platforms, loops, sidings & turnouts" },
-  { username: "PWAY-001", role: "Track / P.Way", workspace: "Track Infrastructure", password: "pway@demo", description: "Track network, 60kg rail profile, PSC sleepers, bridges & permanent way assets" },
+  { username: "PWAY-001", role: "Track / P.Way (SSE)", workspace: "Track Infrastructure", password: "pway@demo", description: "Track network, 60kg rail profile, PSC sleepers, bridges & permanent way assets" },
+  { username: "PWAY-002", role: "Track / P.Way (JE)", workspace: "Track Infrastructure", password: "pway@demo", description: "Civil Engineering Vidisha Section track maintenance & inspection rakes" },
   { username: "SNT-001", role: "Signal & S&T", workspace: "Signal & S&T Infrastructure", password: "snt@demo", description: "Electronic Interlocking (EI), signal locations, point machines & axle counters" },
-  { username: "TRD-001", role: "Traction / OHE", workspace: "Traction / OHE Infrastructure", password: "trd@demo", description: "25kV AC traction infrastructure, Traction Substations (TSS) & feeding zones" },
+  { username: "TRD-001", role: "Traction / OHE (DEE)", workspace: "Traction / OHE Infrastructure", password: "trd@demo", description: "25kV AC traction infrastructure, Traction Substations (TSS) & feeding zones" },
+  { username: "TRD-002", role: "Traction / OHE (Supervisor)", workspace: "Traction / OHE Infrastructure", password: "trd@demo", description: "OHE field asset supervision, pantograph clearance & breakdown response" },
   { username: "TRAIN-001", role: "Train Pilot", workspace: "Train Pilot Workspace", password: "train@demo", description: "En-route driver activity logging, visual track/OHE/signal observations & department routing" },
 ];
 
 interface AuthContextValue {
   user: UserAccount | null;
+  currentUser: UserAccount | null;
   isAuthenticated: boolean;
   login: (username: string, password: string) => { success: boolean; error?: string; defaultPath?: string; user?: UserAccount };
   logout: () => void;
@@ -363,7 +366,8 @@ const STORAGE_AUTH_USER = "krayasetu_auth_user";
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserAccount | null>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_AUTH_USER);
+      // Check sessionStorage first, then fallback to localStorage
+      const saved = sessionStorage.getItem(STORAGE_AUTH_USER) || localStorage.getItem(STORAGE_AUTH_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed?.username && DEMO_ACCOUNTS_REGISTRY[parsed.username]) {
@@ -373,8 +377,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn("Could not load auth user from storage", e);
     }
-    // Default fallback demo user if nothing in storage
-    return DEMO_ACCOUNTS_REGISTRY["COA-001"].user;
+    // Strictly initialize as null (unauthenticated by default; no hardcoded default user)
+    return null;
   });
 
   const login = (username: string, password: string): { success: boolean; error?: string; defaultPath?: string; user?: UserAccount } => {
@@ -394,14 +398,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const authenticatedUser = accountEntry.user;
     setUser(authenticatedUser);
-    localStorage.setItem(STORAGE_AUTH_USER, JSON.stringify(authenticatedUser));
+    try {
+      const userJson = JSON.stringify(authenticatedUser);
+      localStorage.setItem(STORAGE_AUTH_USER, userJson);
+      sessionStorage.setItem(STORAGE_AUTH_USER, userJson);
+    } catch (e) {
+      console.warn("Could not persist session to storage", e);
+    }
 
     return { success: true, defaultPath: authenticatedUser.defaultPath, user: authenticatedUser };
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem(STORAGE_AUTH_USER);
+    try {
+      localStorage.removeItem(STORAGE_AUTH_USER);
+      sessionStorage.removeItem(STORAGE_AUTH_USER);
+      localStorage.removeItem("krayasetu_selected_station");
+    } catch (e) {
+      console.warn("Could not remove session from storage", e);
+    }
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
   };
 
   const hasPermission = (perm: keyof RolePermissions): boolean => {
@@ -417,9 +436,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const universalDemoPaths = [
       "/operations-control",
       "/block-planner",
+      "/planner",
       "/coordination",
       "/maintenance",
       "/scenario-analysis",
+      "/scenarios",
       "/events",
       "/control",
       "/corridors",
@@ -446,22 +467,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sidebarLinks: user.sidebarLinks,
       }
     : {
-        id: "CHIEF_BLOCK_OFFICER",
-        name: "Chief of Block Officer",
-        department: "Operating Department (Master Control)",
+        id: "GUEST",
+        name: "Guest",
+        department: "None",
         division: "Bhopal Division (BPL)",
         zone: "West Central Railway (WCR)",
-        tagline: "Master Control",
-        badgeColor: "bg-purple-100 text-purple-900 border-purple-300",
-        defaultPath: "/control",
-        allowedPaths: ["/control"],
+        tagline: "Unauthenticated",
+        badgeColor: "bg-slate-100 text-slate-700 border-slate-300",
+        defaultPath: "/login",
+        allowedPaths: ["/login"],
         permissions: {
-          canApproveTrafficBlocks: true,
-          canRequestBlocks: true,
-          canOverrideDelays: true,
-          canDispatchTrains: true,
-          canRunScenarios: true,
-          canSanctionBudgets: true,
+          canApproveTrafficBlocks: false,
+          canRequestBlocks: false,
+          canOverrideDelays: false,
+          canDispatchTrains: false,
+          canRunScenarios: false,
+          canSanctionBudgets: false,
         },
         sidebarLinks: [],
       };
@@ -470,6 +491,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
+        currentUser: user,
         isAuthenticated: !!user,
         login,
         logout,

@@ -19,7 +19,7 @@ import logoImg from "../assets/logo.jpg";
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated, currentRole } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -27,6 +27,13 @@ export const LoginPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [autofilledUser, setAutofilledUser] = useState<string | null>(null);
   const [showStationModal, setShowStationModal] = useState(false);
+
+  // If already authenticated, redirect to the user's role workspace
+  React.useEffect(() => {
+    if (isAuthenticated && currentRole.defaultPath && currentRole.defaultPath !== "/login") {
+      navigate(currentRole.defaultPath, { replace: true });
+    }
+  }, [isAuthenticated, currentRole, navigate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +73,22 @@ export const LoginPage: React.FC = () => {
     setError(null);
     setAutofilledUser(u);
     setTimeout(() => setAutofilledUser(null), 2500);
+  };
+
+  const handleQuickLogin = (u: string, p: string) => {
+    setUsername(u);
+    setPassword(p);
+    setError(null);
+    const result = login(u, p);
+    if (result.success && result.defaultPath) {
+      if (result.user?.roleKey === "STATION_MASTER" || u.trim().toUpperCase() === "SM-001") {
+        setShowStationModal(true);
+      } else {
+        navigate(result.defaultPath);
+      }
+    } else {
+      setError(result.error || "Authentication failed.");
+    }
   };
 
   return (
@@ -238,13 +261,25 @@ export const LoginPage: React.FC = () => {
                         {cred.description}
                       </td>
                       <td className="p-2.5 pr-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleQuickFill(cred.username, cred.password)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-[#0b2545] hover:text-white text-slate-700 font-mono text-[11px] font-bold rounded border border-slate-300 transition-colors cursor-pointer"
-                        >
-                          Fill Credentials
-                        </button>
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickFill(cred.username, cred.password)}
+                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-semibold rounded border border-slate-300 transition-colors cursor-pointer"
+                            title="Fill form inputs without submitting"
+                          >
+                            Fill
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickLogin(cred.username, cred.password)}
+                            className="px-2.5 py-1 bg-[#0b2545] hover:bg-[#134074] text-white font-mono text-[11px] font-bold rounded border border-sky-900 shadow-sm transition-colors cursor-pointer flex items-center space-x-1"
+                            title={`Instantly login as ${cred.username}`}
+                          >
+                            <span>Login</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
