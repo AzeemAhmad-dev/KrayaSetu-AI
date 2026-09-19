@@ -1,14 +1,14 @@
-﻿import random
+import random
 from typing import Tuple
 
 def compute_delay_category(delay_minutes: int) -> str:
     if delay_minutes <= 5:
         return "ON_TIME"
-    elif delay_minutes <= 25:
+    elif delay_minutes <= 15:
         return "MINOR"
-    elif delay_minutes <= 60:
+    elif delay_minutes <= 45:
         return "MODERATE"
-    elif delay_minutes <= 180:
+    elif delay_minutes <= 90:
         return "HEAVY"
     else:
         return "SEVERE"

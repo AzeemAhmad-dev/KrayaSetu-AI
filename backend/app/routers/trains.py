@@ -8,6 +8,46 @@ from backend.app.data.railradar import railradar_client
 
 router = APIRouter(tags=["Trains"])
 
+def compute_dynamic_estimated_time(scheduled_time: Optional[str], delay_minutes: int) -> str:
+    """
+    Dynamically computes estimated_time from scheduled_time (HH:MM format) and delay_minutes.
+    Uses standard integer minute arithmetic with modulo 1440 to properly handle midnight crossovers.
+    """
+    if not scheduled_time:
+        return "12:00"
+    try:
+        parts = scheduled_time.strip().split(":")
+        if len(parts) >= 2:
+            hours = int(parts[0])
+            minutes = int(parts[1])
+            total_minutes = (hours * 60 + minutes + int(delay_minutes)) % 1440
+            return f"{total_minutes // 60:02d}:{total_minutes % 60:02d}"
+    except (ValueError, TypeError):
+        pass
+    return scheduled_time
+
+
+def compute_dynamic_delay_category(delay_minutes: int) -> str:
+    """
+    Recomputes delay_category from delay_minutes based on standard railway thresholds:
+    - delay <= 5: ON_TIME
+    - 5 < delay <= 15: MINOR
+    - 15 < delay <= 45: MODERATE
+    - 45 < delay <= 90: HEAVY
+    - delay > 90: SEVERE
+    """
+    d = int(delay_minutes)
+    if d <= 5:
+        return "ON_TIME"
+    elif d <= 15:
+        return "MINOR"
+    elif d <= 45:
+        return "MODERATE"
+    elif d <= 90:
+        return "HEAVY"
+    return "SEVERE"
+
+
 @router.get("/trains")
 def get_trains(service_type: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(Train)
@@ -18,6 +58,10 @@ def get_trains(service_type: Optional[str] = None, db: Session = Depends(get_db)
     results = []
     for t in trains:
         m = t.movement
+        delay_mins = m.delay_minutes if m else 0
+        sched_time = m.scheduled_time if m else "12:00"
+        est_time = compute_dynamic_estimated_time(sched_time, delay_mins)
+        delay_cat = compute_dynamic_delay_category(delay_mins)
         results.append({
             "train_number": t.train_number,
             "train_id": t.train_id,
@@ -33,10 +77,10 @@ def get_trains(service_type: Optional[str] = None, db: Session = Depends(get_db)
             "current_location": m.current_location if m else "Unknown",
             "current_track": m.current_track if m else "DOWN_MAIN",
             "current_km": m.current_km if m else 0.0,
-            "scheduled_time": m.scheduled_time if m else "12:00",
-            "estimated_time": m.estimated_time if m else "12:00",
-            "delay_minutes": m.delay_minutes if m else 0,
-            "delay_category": m.delay_category if m else "ON_TIME",
+            "scheduled_time": sched_time,
+            "estimated_time": est_time,
+            "delay_minutes": delay_mins,
+            "delay_category": delay_cat,
             "status": m.status if m else "RUNNING",
             "hold_location": m.hold_location if m else None,
             "hold_reason": m.hold_reason if m else None,
@@ -81,18 +125,6 @@ async def get_train_movements(db: Session = Depends(get_db)):
 
         if live:
             delay_minutes = live.get("delay_minutes", m.delay_minutes)
-
-            # Determine delay category
-            if delay_minutes <= 5:
-                delay_category = "ON_TIME"
-            elif delay_minutes <= 15:
-                delay_category = "MINOR"
-            elif delay_minutes <= 45:
-                delay_category = "MODERATE"
-            elif delay_minutes <= 90:
-                delay_category = "HEAVY"
-            else:
-                delay_category = "SEVERE"
 
             # Parse location from live telemetry
             loc_raw = live.get("current_location")
@@ -140,10 +172,13 @@ async def get_train_movements(db: Session = Depends(get_db)):
             current_stn = m.current_station_code
             current_km = m.current_km
             speed = m.speed_kmph
-            delay_minutes = m.delay_minutes
-            delay_category = m.delay_category
+            delay_minutes = m.delay_minutes or 0
             status = m.status
             source_type = m.source_type or "SIMULATED"
+
+        # Dynamically calculate estimated arrival time and delay category
+        delay_category = compute_dynamic_delay_category(delay_minutes)
+        estimated_time = compute_dynamic_estimated_time(m.scheduled_time, delay_minutes)
 
         results.append({
             "train_number": m.train_number,
@@ -161,7 +196,7 @@ async def get_train_movements(db: Session = Depends(get_db)):
             "current_km": current_km,
             "speed_kmph": speed,
             "scheduled_time": m.scheduled_time,
-            "estimated_time": m.estimated_time,
+            "estimated_time": estimated_time,
             "delay_minutes": delay_minutes,
             "delay_category": delay_category,
             "status": status,
@@ -196,15 +231,19 @@ def get_train_detail(train_number: str, db: Session = Depends(get_db)):
     ]
 
     m = train.movement
+    delay_mins = m.delay_minutes if m else 0
+    sched_time = m.scheduled_time if m else None
+    est_time = compute_dynamic_estimated_time(sched_time, delay_mins) if sched_time else None
+    delay_cat = compute_dynamic_delay_category(delay_mins)
     movement_info = {
         "current_location": m.current_location if m else None,
         "current_track": m.current_track if m else None,
         "current_km": m.current_km if m else 0.0,
         "speed_kmph": m.speed_kmph if m else 0.0,
-        "scheduled_time": m.scheduled_time if m else None,
-        "estimated_time": m.estimated_time if m else None,
-        "delay_minutes": m.delay_minutes if m else 0,
-        "delay_category": m.delay_category if m else "ON_TIME",
+        "scheduled_time": sched_time,
+        "estimated_time": est_time,
+        "delay_minutes": delay_mins,
+        "delay_category": delay_cat,
         "status": m.status if m else "RUNNING",
         "hold_location": m.hold_location if m else None,
         "hold_reason": m.hold_reason if m else None,
@@ -237,6 +276,10 @@ async def get_train_live_telemetry(train_number: str, db: Session = Depends(get_
     live_data = await railradar_client.get_live_train_status(train_number)
     
     movement = train.movement if train else None
+    db_delay = movement.delay_minutes if movement else 0
+    db_sched = movement.scheduled_time if movement else None
+    db_est = compute_dynamic_estimated_time(db_sched, db_delay) if db_sched else None
+    db_cat = compute_dynamic_delay_category(db_delay)
     return {
         "train_number": train_number,
         "train_name": train.train_name if train else train_number,
@@ -246,8 +289,10 @@ async def get_train_live_telemetry(train_number: str, db: Session = Depends(get_
             "current_location": movement.current_location if movement else None,
             "current_track": movement.current_track if movement else None,
             "current_km": movement.current_km if movement else 0.0,
-            "delay_minutes": movement.delay_minutes if movement else 0,
-            "delay_category": movement.delay_category if movement else "ON_TIME",
+            "scheduled_time": db_sched,
+            "estimated_time": db_est,
+            "delay_minutes": db_delay,
+            "delay_category": db_cat,
             "status": movement.status if movement else "RUNNING"
         } if movement else None
     }

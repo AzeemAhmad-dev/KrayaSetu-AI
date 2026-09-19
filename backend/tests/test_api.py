@@ -33,7 +33,30 @@ def test_train_movements_live_telemetry_and_uuid_filtering():
         assert not (len(tnum) == 36 and tnum.count("-") == 4), f"UUID ghost train found: {tnum}"
         assert item["source_type"] in ["RAILRADAR_LIVE", "SIMULATED", "SYNTHETIC"]
         assert isinstance(item["current_location"], str)
-        assert isinstance(item["delay_minutes"], int)
+        delay = item["delay_minutes"]
+        assert isinstance(delay, int)
+
+        # Check delay category consistency
+        cat = item["delay_category"]
+        if delay <= 5:
+            assert cat == "ON_TIME"
+        elif delay <= 15:
+            assert cat == "MINOR"
+        elif delay <= 45:
+            assert cat == "MODERATE"
+        elif delay <= 90:
+            assert cat == "HEAVY"
+        else:
+            assert cat == "SEVERE"
+
+        # Check estimated time arithmetic consistency
+        sched = item["scheduled_time"]
+        est = item["estimated_time"]
+        if sched and ":" in sched:
+            sh, sm = map(int, sched.split(":")[:2])
+            expected_total = (sh * 60 + sm + delay) % 1440
+            expected_est = f"{expected_total // 60:02d}:{expected_total % 60:02d}"
+            assert est == expected_est, f"Mismatch for train {tnum}: sched={sched}, delay={delay}, est={est}, expected={expected_est}"
 
 def test_override_endpoint():
     response = client.post("/override", json={
