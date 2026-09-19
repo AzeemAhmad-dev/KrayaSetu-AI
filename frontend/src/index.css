@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --railway-blue: #0284c7;
+    --railway-navy: #0f172a;
+    --railway-accent: #0369a1;
+    --railway-light: #f8fafc;
+    --railway-border: #e2e8f0;
+    --railway-steel: #1e293b;
+    --railway-sleeper: #64748b;
+    --railway-ballast: #f1f5f9;
+    --railway-platform: #f8fafc;
+    --railway-hazard: #eab308;
+    --railway-signal-green: #059669;
+    --railway-signal-yellow: #d97706;
+    --railway-signal-red: #dc2626;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    line-height: 1.55;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "calt", "liga";
+  }
+
+  /* Universal font family for all UI controls */
+  button, input, select, textarea, optgroup, label {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* SVG text elements must NEVER fall back to serif or Times New Roman */
+  svg text, svg tspan {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Clear hierarchical typography */
+  /* Major Headings: Inter Weight 700 / 800 */
+  h1 {
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -0.025em;
+    line-height: 1.25;
+    font-weight: 700;
+  }
+  h2 {
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -0.02em;
+    line-height: 1.28;
+    font-weight: 700;
+  }
+  /* Section Headings: Inter Weight 600 */
+  h3 {
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -0.015em;
+    line-height: 1.35;
+    font-weight: 600;
+  }
+  h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+    font-weight: 600;
+  }
+
+  /* Technical / Monospace: JetBrains Mono strictly for technical codes, numeric chainages, IDs */
+  code, pre, .font-mono, [data-font="mono"], svg text.tech-mono, svg text[data-font="mono"] {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    letter-spacing: -0.015em;
+    font-feature-settings: "zero", "tnum";
+  }
+}
+
+@layer utilities {
+  /* Prevent microscopic text globally across badges, pills, and secondary telemetry */
+  .text-\[8px\],
+  .text-\[8\.5px\],
+  .text-\[9px\],
+  .text-\[9\.5px\],
+  .text-\[10px\] {
+    font-size: 0.75rem !important; /* 12px minimum comfortable UI size */
+    line-height: 1.05rem !important;
+  }
+
+  .text-\[11px\] {
+    font-size: 0.8125rem !important; /* 13px */
+    line-height: 1.15rem !important;
+  }
+}
+
+/* Custom crisp railway control scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Railway track schematic styling */
+.track-line {
+  stroke-dasharray: 4 2;
+}

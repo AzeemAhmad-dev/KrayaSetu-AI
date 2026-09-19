@@ -1,0 +1,248 @@
+{
+  "departments": [
+    {
+      "id": "PWAY",
+      "name": "Permanent Way (Engineering)",
+      "description": "Maintenance of rails, sleepers, ballast, turnouts, track geometry and structural integrity.",
+      "work_types": [
+        {
+          "id": "RAIL_RENEWAL",
+          "name": "Through Rail Renewal (TRR)",
+          "mode": "FULL_BLOCK",
+          "protection": "TRAFFIC_BLOCK",
+          "default_duration_mins": 180,
+          "requires_power_isolation": false,
+          "requires_track_occupation": true,
+          "equipment": [
+            "CSM_TAMPER",
+            "TRACK_GANG"
+          ]
+        },
+        {
+          "id": "TAMPER_PACKING",
+          "name": "Tamping and Track Packing",
+          "mode": "FULL_BLOCK",
+          "protection": "TRAFFIC_BLOCK",
+          "default_duration_mins": 150,
+          "requires_power_isolation": false,
+          "requires_track_occupation": true,
+          "equipment": [
+            "CSM_TAMPER"
+          ]
+        },
+        {
+          "id": "DEEP_SCREENING",
+          "name": "Deep Ballast Screening",
+          "mode": "FULL_BLOCK",
+          "protection": "TRAFFIC_BLOCK",
+          "default_duration_mins": 240,
+          "requires_power_isolation": false,
+          "requires_track_occupation": true,
+          "equipment": [
+            "BCM",
+            "CSM_TAMPER"
+          ]
+        },
+        {
+          "id": "USFD_TESTING",
+          "name": "Ultrasonic Flaw Detection (USFD)",
+          "mode": "GAP_WORK",
+          "protection": "TRAFFIC_CAUTION",
+          "default_duration_mins": 90,
+          "requires_power_isolation": false,
+          "requires_track_occupation": false,
+          "equipment": [
+            "USFD_EQUIPMENT",
+            "TRACK_GANG"
+          ]
+        },
+        {
+          "id": "TURNOUT_OVERHAUL",
+          "name": "Points & Crossing Overhaul",
+          "mode": "FULL_BLOCK",
+          "protection": "TRAFFIC_BLOCK",
+          "default_duration_mins": 210,
+          "requires_power_isolation": false,
+          "requires_track_occupation": true,
+          "equipment": [
+            "UNIMAT",
+            "TRACK_GANG"
+          ]
+        },
+        {
+          "id": "RAIL_FRACTURE_REPAIR",
+          "name": "Emergency Rail Fracture Clamping/Welding",
+          "mode": "EMERGENCY",
+          "protection": "EMERGENCY_PROTECTION",
+          "default_duration_mins": 90,
+          "requires_power_isolation": false,
+          "requires_track_occupation": true,
+          "equipment": [
+            "TRACK_GANG"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TRD",
+      "name": "Traction Distribution (OHE / Electrical)",
+      "description": "Maintenance of 25kV AC overhead contact & catenary wire, isolators, cantilevers, and sub-stations.",
+      "work_types": [
+        {
+          "id": "OHE_ADJUSTMENT",
+          "name": "OHE Catenary & Contact Wire Adjustment",
+          "mode": "FULL_BLOCK",
+          "protection": "TRAFFIC_AND_POWER_ISOLATION",
+          "default_duration_mins": 120,
+          "requires_power_isolation": true,
+          "requires_track_occupation": true,
+          "equipment": [
+            "TOWER_WAGON"
+          ]
+        },
+        {
+          "id": "INSULATOR_REPLACEMENT",
+          "name": "Section Insulator & Bracket Replacement",
+          "mode": "SHORT_BLOCK",
+          "protection": "TRAFFIC_AND_POWER_ISOLATION",
+          "default_duration_mins": 75,
+          "requires_power_isolation": true,
+          "requires_track_occupation": true,
+          "equipment": [
+            "TOWER_WAGON"
+          ]
+        },
+        {
+          "id": "TREE_TRIMMING_OHE",
+          "name": "Tree Branch Trimming near Live OHE",
+          "mode": "SHORT_BLOCK",
+          "protection": "POWER_ISOLATION",
+          "default_duration_mins": 60,
+          "requires_power_isolation": true,
+          "requires_track_occupation": false,
+          "equipment": [
+            "TRD_GANG"
+          ]
+        },
+        {
+          "id": "OHE_WIRE_PARTING_EMG",
+          "name": "Contact Wire Parting Restoration",
+          "mode": "EMERGENCY",
+          "protection": "EMERGENCY_PROTECTION",
+          "default_duration_mins": 180,
+          "requires_power_isolation": true,
+          "requires_track_occupation": true,
+          "equipment": [
+            "TOWER_WAGON",
+            "TRD_GANG"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SNT",
+      "name": "Signal & Telecommunication (S&T)",
+      "description": "Maintenance of point machines, track circuits, axle counters, signals, and electronic interlocking.",
+      "work_types": [
+        {
+          "id": "POINT_MACHINE_MAINT",
+          "name": "Point Machine Cleaning & Overhaul",
+          "mode": "SHORT_BLOCK",
+          "protection": "TRAFFIC_BLOCK",
+          "default_duration_mins": 60,
+          "requires_power_isolation": false,
+          "requires_track_occupation": true,
+          "equipment": [
+            "SNT_GANG"
+          ]
+        },
+        {
+          "id": "AXLE_COUNTER_TEST",
+          "name": "Axle Counter BPAC Testing & Tuning",
+          "mode": "GAP_WORK",
+          "protection": "TRAFFIC_CAUTION",
+          "default_duration_mins": 45,
+          "requires_power_isolation": false,
+          "requires_track_occupation": false,
+          "equipment": [
+            "SNT_GANG"
+          ]
+        },
+        {
+          "id": "SIGNAL_CABLE_MEGGERING",
+          "name": "Signal Cable Insulation Testing",
+          "mode": "GAP_WORK",
+          "protection": "NO_SPECIAL_PROTECTION",
+          "default_duration_mins": 60,
+          "requires_power_isolation": false,
+          "requires_track_occupation": false,
+          "equipment": [
+            "SNT_GANG"
+          ]
+        },
+        {
+          "id": "SIGNAL_FAILURE_EMG",
+          "name": "Signal Red Lock / Blank Restoration",
+          "mode": "EMERGENCY",
+          "protection": "EMERGENCY_PROTECTION",
+          "default_duration_mins": 60,
+          "requires_power_isolation": false,
+          "requires_track_occupation": true,
+          "equipment": [
+            "SNT_GANG"
+          ]
+        }
+      ]
+    }
+  ],
+  "equipment_registry": [
+    {
+      "id": "CSM_01",
+      "type": "CSM_TAMPER",
+      "name": "Plasser 09-32 CSM Tamper #812",
+      "base_station": "BPL",
+      "assigned_department": "PWAY",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "UNIMAT_01",
+      "type": "UNIMAT",
+      "name": "Points Tamper Unimat 08-275 #404",
+      "base_station": "BINA",
+      "assigned_department": "PWAY",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "BCM_01",
+      "type": "BCM",
+      "name": "Ballast Cleaning Machine BCM-80 #11",
+      "base_station": "ET",
+      "assigned_department": "PWAY",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "TW_BPL_01",
+      "type": "TOWER_WAGON",
+      "name": "8-Wheeler DETC Tower Wagon #09",
+      "base_station": "BPL",
+      "assigned_department": "TRD",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "TW_BINA_01",
+      "type": "TOWER_WAGON",
+      "name": "8-Wheeler DETC Tower Wagon #14",
+      "base_station": "BINA",
+      "assigned_department": "TRD",
+      "status": "AVAILABLE"
+    },
+    {
+      "id": "USFD_01",
+      "type": "USFD_EQUIPMENT",
+      "name": "Digital Rail Tester EEC-DRT #03",
+      "base_station": "BHS",
+      "assigned_department": "PWAY",
+      "status": "AVAILABLE"
+    }
+  ]
+}

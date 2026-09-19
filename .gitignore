@@ -1,0 +1,82 @@
+# ==============================================================================
+# Production-Grade .gitignore for KrayaSetu AI (SIH26027)
+# ==============================================================================
+
+# --- Python & Virtual Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+backend/venv/
+JYOTI_REFERENCE/.venv/
+*.egg-info/
+dist/
+build/
+develop-eggs/
+eggs/
+.eggs/
+parts/
+var/
+sdist/
+wheels/
+*.egg
+MANIFEST
+
+# --- Testing & Code Quality ---
+.pytest_cache/
+backend/.pytest_cache/
+JYOTI_REFERENCE/.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.nox/
+.tox/
+.hypothesis/
+test-results/
+
+# --- Node & Frontend ---
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Database Journals & Locks ---
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite3-journal
+
+# --- Backups & Temporary Artifacts ---
+*.bak
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+*.log
+scratch/
+
+# --- Operating System & IDE Artifacts ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+.vscode/
+.idea/
+
+# --- External Reference Folder & Unrelated Downloads ---
+JYOTI_REFERENCE/
+*.pdf
