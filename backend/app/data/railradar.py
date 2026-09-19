@@ -53,9 +53,20 @@ class RailRadarClient:
                     headers=self._get_headers()
                 )
                 resp.raise_for_status()
-                data = resp.json()
-                data["source"] = "RAILRADAR_LIVE"
-                return data
+                raw_data = resp.json()
+                data = raw_data.get("data", raw_data) if isinstance(raw_data, dict) else {}
+                return {
+                    "train_number": data.get("trainNumber", train_number),
+                    "train_name": data.get("trainName"),
+                    "status": data.get("status", "RUNNING"),
+                    "delay_minutes": data.get("delayMinutes", 0),
+                    "current_location": data.get("currentLocation"),
+                    "next_halt": data.get("nextHalt"),
+                    "is_live": data.get("isLive", True),
+                    "last_updated": data.get("lastUpdatedAt"),
+                    "source": "RAILRADAR_LIVE",
+                    "raw": data
+                }
         except (httpx.TimeoutException, httpx.RequestError):
             return {
                 "train_number": train_number,

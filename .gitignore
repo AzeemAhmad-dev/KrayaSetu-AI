@@ -2,6 +2,15 @@
 # Production-Grade .gitignore for KrayaSetu AI (SIH26027)
 # ==============================================================================
 
+# --- Environment Variables (Secrets) ---
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+frontend/.env.local
+!*.example
+
 # --- Python & Virtual Environments ---
 __pycache__/
 *.py[cod]
