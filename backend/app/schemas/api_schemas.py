@@ -95,6 +95,10 @@ class BlockProposalRequest(BaseModel):
     task_id: Optional[str] = None
     bundled_tasks: Optional[List[str]] = None
     departments: Optional[List[str]] = None
+    block_type: Optional[str] = "PLANNED"
+    planning_origin: Optional[str] = None
+    planning_date: Optional[str] = None
+    execution_date: Optional[str] = None
     corridor_id: str
     section_id: Optional[str] = None
     track_name: str = "DOWN_MAIN"
@@ -106,6 +110,7 @@ class BlockProposalRequest(BaseModel):
     power_isolation_required: bool = False
     assigned_machine: Optional[str] = None
     proposed_by: str = "P.Way Section Engineer"
+    auto_submit: bool = False
 
 class BlockApprovalRequest(BaseModel):
     block_id: str
@@ -121,9 +126,14 @@ class BlockActionRequest(BaseModel):
     reason: Optional[str] = None
 
 class ProposalFromScheduleRequest(BaseModel):
+    block_id: Optional[str] = None
     task_id: Optional[str] = None
     bundled_tasks: Optional[List[str]] = None
     departments: Optional[List[str]] = None
+    block_type: Optional[str] = "PLANNED"
+    planning_origin: Optional[str] = None
+    planning_date: Optional[str] = None
+    execution_date: Optional[str] = None
     corridor_id: str
     section_id: Optional[str] = None
     track_name: str = "DOWN_MAIN"
@@ -143,10 +153,11 @@ class ScenarioApplyRequest(BaseModel):
     scenario_id: str # NORMAL, HEAVY_DELAY, FREIGHT_HEAVY, MAINTENANCE_DISRUPTION, BLOCK_CONFLICT
 
 class OptimizeRequest(BaseModel):
-    corridor_id: Optional[str] = "CORR-01"
+    corridor_id: Optional[str] = None
     target_tasks: Optional[List[str]] = None
     time_window_start: str = "10:00"
     time_window_end: str = "18:00"
+    execution_date: Optional[str] = None
     allow_bundling: bool = True
     max_time_seconds: float = 8.0
     tasks: Optional[List[Dict[str, Any]]] = None
@@ -165,4 +176,13 @@ class CrewBase(BaseModel):
     contact_supervisor: Optional[str] = None
     max_duty_hours: int = 8
     active: bool = True
+
+class TaskStatusUpdateRequest(BaseModel):
+    status: str
+    actor: Optional[str] = None
+    notes: Optional[str] = None
+
+class TaskCompleteRequest(BaseModel):
+    completed_by: Optional[str] = None
+    notes: Optional[str] = None
 

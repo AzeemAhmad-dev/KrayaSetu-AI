@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { api } from "../services/api";
 import { BlockData, TrainMovementData, ScenarioData } from "../types";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
+import { formatDistanceKm } from "../utils/formatDistance";
 import {
   Clock,
   Train,
@@ -111,7 +112,7 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
 
   const loadData = async (fetchScenarios = false) => {
     try {
-      const promises: Promise<any>[] = [api.getTrainMovements(), api.getBlocks()];
+      const promises: Promise<any>[] = [api.getTrainMovements(), api.getBlocks(undefined, undefined, undefined, undefined, undefined, true)];
       if (fetchScenarios) {
         promises.push(
           api.getScenarios().catch((err) => {
@@ -162,7 +163,7 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
       // Re-fetch operational telemetry immediately so KPI cards and lists refresh
       const [movRes, blkRes] = await Promise.all([
         api.getTrainMovements(),
-        api.getBlocks(),
+        api.getBlocks(undefined, undefined, undefined, undefined, undefined, true),
       ]);
       setMovements(movRes || []);
       setBlocks(blkRes || []);
@@ -525,7 +526,7 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
                 </div>
 
                 <div className="text-[11px] text-slate-600 font-medium">
-                  Track {b.track_name} (KM {b.location_km}) · Slot: {b.requested_start_time}–{b.requested_end_time}
+                  Track {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time}
                 </div>
 
                 <p className="text-[11px] text-slate-600 leading-snug">

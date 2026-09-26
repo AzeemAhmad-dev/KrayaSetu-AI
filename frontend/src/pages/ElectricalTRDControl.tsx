@@ -9,10 +9,13 @@ import {
   GitBranch,
   Calendar,
   CalendarRange,
-  AlertTriangle
+  AlertTriangle,
+  History,
+  Clock
 } from "lucide-react";
 import { DepartmentTaskSection } from "../components/department/DepartmentTaskSection";
 import { DepartmentProblemSection } from "../components/department/DepartmentProblemSection";
+import { DepartmentActivityLog } from "../components/department/DepartmentActivityLog";
 import { api } from "../services/api";
 import { BlockData } from "../types";
 import { RoleBlockTable } from "../components/blocks/RoleBlockTable";
@@ -20,11 +23,11 @@ import { RoleBlockTable } from "../components/blocks/RoleBlockTable";
 export const ElectricalTRDControl: React.FC = () => {
   // Navigation State: Infrastructure workspace (main) vs dedicated Department Control workspace
   const [activeWorkspace, setActiveWorkspace] = useState<"infrastructure" | "control">("infrastructure");
-  const [controlTab, setControlTab] = useState<"monthly" | "weekly" | "issues">("monthly");
+  const [controlTab, setControlTab] = useState<"current" | "monthly" | "weekly" | "issues" | "activity">("current");
   const [blocks, setBlocks] = useState<BlockData[]>([]);
 
   React.useEffect(() => {
-    api.getBlocks(undefined, undefined, "TRD")
+    api.getBlocks(undefined, undefined, "TRD", undefined, undefined, true)
       .then(setBlocks)
       .catch((err) => console.error("Failed to load TRD blocks", err));
   }, []);
@@ -342,13 +345,23 @@ export const ElectricalTRDControl: React.FC = () => {
                 <span className="text-sm font-black text-slate-900 uppercase">OHE / Traction Control</span>
                 <span className="text-slate-300">/</span>
                 <span className="text-xs font-mono font-bold text-[#0b2545] uppercase">
-                  {controlTab === "monthly" ? "Monthly" : controlTab === "weekly" ? "Weekly" : "Issue Log"}
+                  {controlTab === "current" ? "Current / Due Now" : controlTab === "monthly" ? "Monthly" : controlTab === "weekly" ? "Weekly" : controlTab === "issues" ? "Issue Log" : "Activity Log"}
                 </span>
               </div>
 
               {/* Visual hierarchy tree */}
               <div className="hidden md:flex items-center space-x-2 text-[11px] font-mono text-slate-500 bg-slate-50 px-3 py-1 rounded-lg border border-slate-200">
                 <span className="font-bold text-slate-800">OHE / Traction Control</span>
+                <span className="text-slate-400">├──</span>
+                <button
+                  type="button"
+                  onClick={() => setControlTab("current")}
+                  className={`cursor-pointer transition-colors ${
+                    controlTab === "current" ? "font-bold text-amber-700 underline" : "hover:text-slate-900"
+                  }`}
+                >
+                  Current / Due Now
+                </button>
                 <span className="text-slate-400">├──</span>
                 <button
                   type="button"
@@ -369,7 +382,7 @@ export const ElectricalTRDControl: React.FC = () => {
                 >
                   Weekly
                 </button>
-                <span className="text-slate-400">└──</span>
+                <span className="text-slate-400">├──</span>
                 <button
                   type="button"
                   onClick={() => setControlTab("issues")}
@@ -379,11 +392,34 @@ export const ElectricalTRDControl: React.FC = () => {
                 >
                   Issue Log
                 </button>
+                <span className="text-slate-400">└──</span>
+                <button
+                  type="button"
+                  onClick={() => setControlTab("activity")}
+                  className={`cursor-pointer transition-colors ${
+                    controlTab === "activity" ? "font-bold text-amber-700 underline" : "hover:text-slate-900"
+                  }`}
+                >
+                  Activity Log
+                </button>
               </div>
             </div>
 
             {/* Sub-navigation buttons */}
             <div className="flex items-center space-x-2 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setControlTab("current")}
+                className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer ${
+                  controlTab === "current"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>Current / Due Now</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setControlTab("monthly")}
@@ -422,8 +458,34 @@ export const ElectricalTRDControl: React.FC = () => {
                 <AlertTriangle className={`w-4 h-4 ${controlTab === "issues" ? "text-white" : "text-red-600"}`} />
                 <span>Issue Log</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setControlTab("activity")}
+                className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer ${
+                  controlTab === "activity"
+                    ? "bg-amber-700 text-white shadow-xs"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                }`}
+              >
+                <History className={`w-4 h-4 ${controlTab === "activity" ? "text-white" : "text-amber-600"}`} />
+                <span>Activity Log</span>
+              </button>
             </div>
           </div>
+
+          {/* Sub-tab 0: Current / Due Now Tasks */}
+          {controlTab === "current" && (
+            <div className="space-y-4">
+              <DepartmentTaskSection
+                department="TRD"
+                departmentName="Traction / OHE"
+                cadence="CURRENT"
+                storageKey="krayasetu_trd_current_tasks"
+                accentColor="amber"
+              />
+            </div>
+          )}
 
           {/* Sub-tab 1: Monthly Power Block Schedule & Tasks */}
           {controlTab === "monthly" && (
@@ -472,6 +534,15 @@ export const ElectricalTRDControl: React.FC = () => {
               accentColor="amber"
               categories={TRD_PROBLEM_CATEGORIES}
               locationOptions={TRD_LOCATION_OPTIONS}
+            />
+          )}
+
+          {/* Sub-tab 4: Activity Log */}
+          {controlTab === "activity" && (
+            <DepartmentActivityLog
+              department="TRD"
+              departmentName="Traction / OHE"
+              accentColor="amber"
             />
           )}
         </div>

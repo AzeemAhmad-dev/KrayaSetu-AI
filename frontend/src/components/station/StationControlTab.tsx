@@ -25,6 +25,8 @@ import { RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "../../context/AuthContext";
+import { formatDistanceKm, formatKmBadge, formatKmValue } from "../../utils/formatDistance";
+import { isWeeklyBlock, isMonthlyBlock } from "../../utils/plannedBlocksHelper";
 
 interface StationControlTabProps {
   stationCode: string;
@@ -39,8 +41,8 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
 }) => {
   const { user } = useAuth();
 
-  // Sub-section state inside Block Workspace: Weekly Blocks | Monthly Blocks | Issue / Block Request
-  const [activeSection, setActiveSection] = useState<"weekly" | "monthly" | "requests">("weekly");
+  // Sub-section state inside Block Workspace: Weekly Blocks | Monthly Blocks | Issue / Block Request | Completed Tasks
+  const [activeSection, setActiveSection] = useState<"weekly" | "monthly" | "requests" | "completed">("weekly");
 
   // Storage keys scoped strictly by stationCode to support every Station Master station
   const monthlyStorageKey = `krayasetu_sm_${stationCode.toLowerCase()}_monthly_blocks`;
@@ -51,6 +53,8 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [requestServerError, setRequestServerError] = useState<string | null>(null);
   const [requestServerSuccess, setRequestServerSuccess] = useState<string | null>(null);
+  const [stationCompletedTasks, setStationCompletedTasks] = useState<any[]>([]);
+  const [loadingCompletedTasks, setLoadingCompletedTasks] = useState(false);
 
   // 1. Monthly Blocks (Strictly EMPTY by default — View Only)
   const [monthlyBlocks, setMonthlyBlocks] = useState<StationBlock[]>(() => {
@@ -72,7 +76,7 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
   const loadBackendBlocks = async () => {
     setLoadingBackendBlocks(true);
     try {
-      const data = await api.getBlocks();
+      const data = await api.getBlocks(undefined, undefined, undefined, undefined, undefined, true);
       setBackendBlocks(data);
     } catch (e) {
       console.warn("Could not load backend blocks for StationControlTab", e);
@@ -81,9 +85,22 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
     }
   };
 
+  const loadStationCompletedTasks = async () => {
+    setLoadingCompletedTasks(true);
+    try {
+      const data = await api.getCompletedTasks({ station_code: stationUpper });
+      setStationCompletedTasks(data || []);
+    } catch (err) {
+      console.warn("Could not load station completed tasks", err);
+    } finally {
+      setLoadingCompletedTasks(false);
+    }
+  };
+
   useEffect(() => {
     loadBackendBlocks();
-  }, []);
+    loadStationCompletedTasks();
+  }, [stationCode]);
 
   const stationUpper = stationCode.toUpperCase();
   const isBlockInVicinity = (b: BlockData) => {
@@ -101,8 +118,11 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
     return false;
   };
 
-  const vicinityBlocks = backendBlocks.filter(isBlockInVicinity);
-  const scopedBlocks = scopeFilter === "vicinity" ? vicinityBlocks : backendBlocks;
+  const operationalBackendBlocks = backendBlocks.filter((b) =>
+    ["APPROVED", "SANCTIONED", "ACTIVE", "SELECTED"].includes(b.status)
+  );
+  const vicinityBlocks = operationalBackendBlocks.filter(isBlockInVicinity);
+  const scopedBlocks = scopeFilter === "vicinity" ? vicinityBlocks : operationalBackendBlocks;
 
   const [weeklyBlocks, setWeeklyBlocks] = useState<StationBlock[]>(() => {
     try {
@@ -119,7 +139,7 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
     stationCode: stationUpper,
     cadence: "WEEKLY",
     title: b.task_title || (b.task_id ? `Assigned Track Block for ${b.task_id}` : `Maintenance Block: ${b.corridor_id} ${b.track_name}`),
-    lineOrPlatform: `${b.track_name} (KM ${b.location_km})`,
+    lineOrPlatform: `${b.track_name} (${formatDistanceKm(b.location_km)})`,
     department: (b.is_multi_department ? "JOINT" : (b.department_id as any) || "PWAY"),
     blockType: b.power_isolation_required ? "COMBINED_BLOCK" : "TRAFFIC_BLOCK",
     scheduledDate: b.date || "2026-03-15",
@@ -129,8 +149,8 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
     remarks: b.conflict_summary || `Slot: ${b.requested_start_time}-${b.requested_end_time}`,
   }));
 
-  const allWeeklyBlocks = [...mappedStationBlocks, ...weeklyBlocks];
-  const allMonthlyBlocks = [...mappedStationBlocks, ...monthlyBlocks];
+  const allWeeklyBlocks = [...mappedStationBlocks.filter((b) => isWeeklyBlock(b)), ...weeklyBlocks];
+  const allMonthlyBlocks = [...mappedStationBlocks.filter((b) => isMonthlyBlock(b)), ...monthlyBlocks];
 
   // 3. Issue / Block Requests (Loaded directly from backend SQLite database via api.getFaults())
   const [issueRequests, setIssueRequests] = useState<StationIssueBlockRequest[]>([]);
@@ -383,6 +403,24 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
               activeSection === "requests" ? "bg-white/20 text-white" : "bg-white text-amber-800 border border-amber-200"
             }`}>
               {issueRequests.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSection("completed")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSection === "completed"
+                ? "bg-emerald-700 text-white shadow-xs"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+            }`}
+          >
+            <CheckCircle2 className={`w-4 h-4 ${activeSection === "completed" ? "text-white" : "text-emerald-600"}`} />
+            <span>Completed Tasks</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ml-1 font-bold ${
+              activeSection === "completed" ? "bg-white/20 text-white" : "bg-white text-emerald-800 border border-emerald-200"
+            }`}>
+              {stationCompletedTasks.length}
             </span>
           </button>
         </div>
@@ -699,6 +737,114 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* SECTION 4: COMPLETED TASKS (STATION MASTER)                    */}
+      {/* ============================================================== */}
+      {activeSection === "completed" && (
+        <div className="space-y-4">
+          <div className="bg-white p-4 sm:p-5 rounded-xl border border-emerald-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span>Station Vicinity Completed Tasks — {stationName} ({stationCode})</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tasks completed by departmental squads (P.Way, S&T, TRD) in this station jurisdiction. Notice: Overall operational track possession blocks remain active until all coordinated work finishes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadStationCompletedTasks}
+              disabled={loadingCompletedTasks}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold rounded-lg shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingCompletedTasks ? "animate-spin" : ""}`} />
+              <span>Refresh Completed</span>
+            </button>
+          </div>
+
+          {stationCompletedTasks.length > 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 font-mono text-[11px] text-slate-600 uppercase">
+                    <tr>
+                      <th className="p-3 pl-4">Task ID</th>
+                      <th className="p-3">Block ID</th>
+                      <th className="p-3">Department</th>
+                      <th className="p-3">Description</th>
+                      <th className="p-3">Location</th>
+                      <th className="p-3">Completed By</th>
+                      <th className="p-3">Completion Time</th>
+                      <th className="p-3">Block Status</th>
+                      <th className="p-3 pr-4">Verification Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-sans">
+                    {stationCompletedTasks.map((tsk) => (
+                      <tr key={tsk.id} className="hover:bg-slate-50/80">
+                        <td className="p-3 pl-4 font-mono font-bold text-slate-900">
+                          {tsk.task_id || tsk.id}
+                        </td>
+                        <td className="p-3 font-mono font-bold text-indigo-700">
+                          {tsk.block_id || "Unlinked"}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] border ${
+                              tsk.department_id === "PWAY"
+                                ? "bg-blue-50 text-blue-900 border-blue-200"
+                                : tsk.department_id === "SNT"
+                                ? "bg-purple-50 text-purple-900 border-purple-200"
+                                : "bg-amber-50 text-amber-900 border-amber-200"
+                            }`}
+                          >
+                            {tsk.department_id}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-800 text-[11px] font-medium max-w-[200px] truncate" title={tsk.description || tsk.title}>
+                          {tsk.description || tsk.title || tsk.work_type_id}
+                        </td>
+                        <td className="p-3 font-mono text-slate-700">
+                          <div>Track {tsk.track_name}</div>
+                          <div className="font-bold text-slate-900">{formatDistanceKm(tsk.location_km)}</div>
+                        </td>
+                        <td className="p-3 text-slate-700 font-medium text-[11px]">
+                          {tsk.completed_by || tsk.assigned_crew || "Field Squad"}
+                        </td>
+                        <td className="p-3 font-mono text-slate-700 text-[11px]">
+                          {tsk.completed_at ? new Date(tsk.completed_at).toLocaleString() : "Recently Completed"}
+                        </td>
+                        <td className="p-3 font-mono">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                            {tsk.block_status || "ACTIVE"}
+                          </span>
+                        </td>
+                        <td className="p-3 pr-4">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                              tsk.verification_status === "VERIFIED"
+                                ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                : "bg-amber-100 text-amber-900 border-amber-300"
+                            }`}
+                          >
+                            {tsk.verification_status || "VERIFIED"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 text-center text-slate-400 text-xs font-mono bg-white rounded-xl border border-slate-200">
+              No completed departmental tasks recorded in the vicinity of {stationName} ({stationCode}) yet.
             </div>
           )}
         </div>

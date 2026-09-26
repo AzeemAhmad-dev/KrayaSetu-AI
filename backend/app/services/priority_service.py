@@ -43,7 +43,10 @@ class SRCAOPriorityEngine:
         work_type_id = task.work_type_id or ""
 
         # 1. Severity Score (35%)
-        if raw_prio == "CRITICAL" or raw_sev == "CRITICAL":
+        if getattr(task, 'sev_score', None) is not None:
+            sev_score = task.sev_score
+            sev_reason = f"Task-specific severity assessment: {sev_score:.0f}/100"
+        elif raw_prio == "CRITICAL" or raw_sev == "CRITICAL":
             sev_score = 100.0
             sev_reason = "Critical condition: immediate derailment or line obstruction hazard"
         elif raw_prio == "HIGH" or raw_sev == "HIGH":
@@ -57,7 +60,10 @@ class SRCAOPriorityEngine:
             sev_reason = "Low severity: routine preventative upkeep or minor inspection"
 
         # 2. Escalation Risk Score (25%)
-        if raw_prio == "CRITICAL":
+        if getattr(task, 'risk_score', None) is not None:
+            risk_score = task.risk_score
+            risk_reason = f"Task-specific escalation risk assessment: {risk_score:.0f}/100"
+        elif raw_prio == "CRITICAL":
             risk_score = 95.0
             risk_reason = "Extreme escalation risk: catastrophic failure risk under repeated train axle loading"
         elif raw_prio == "HIGH":
@@ -73,7 +79,10 @@ class SRCAOPriorityEngine:
         # 3. Criticality Score (20%)
         is_trunk = corridor_id in ["CORR-01", "CORR-02"]
         is_main_line = "MAIN" in track_name
-        if raw_prio == "CRITICAL":
+        if getattr(task, 'crit_score', None) is not None:
+            crit_score = task.crit_score
+            crit_reason = f"Task-specific infrastructure criticality: {crit_score:.0f}/100"
+        elif raw_prio == "CRITICAL":
             crit_score = 95.0
             crit_reason = "Primary mainline asset on heavy passenger/freight trunk corridor"
         elif raw_prio == "HIGH":
@@ -87,7 +96,10 @@ class SRCAOPriorityEngine:
             crit_reason = "Low-intensity running track or siding asset"
 
         # 4. Age Score (10%)
-        if raw_prio == "CRITICAL":
+        if getattr(task, 'age_score', None) is not None:
+            age_score = task.age_score
+            age_reason = f"Task-specific defect age/urgency: {age_score:.0f}/100"
+        elif raw_prio == "CRITICAL":
             age_score = 90.0
             age_reason = "Immediate alert: requires urgent intervention without deferral"
         elif raw_prio == "HIGH":
@@ -101,7 +113,10 @@ class SRCAOPriorityEngine:
             age_reason = "Routine schedule baseline"
 
         # 5. Opportunity Score (10%)
-        if raw_prio == "CRITICAL":
+        if getattr(task, 'opp_score', None) is not None:
+            opp_score = task.opp_score
+            opp_reason = f"Task-specific scheduling opportunity: {opp_score:.0f}/100"
+        elif raw_prio == "CRITICAL":
             opp_score = 85.0
             opp_reason = "High readiness for emergency window allocation"
         elif raw_prio == "HIGH":
@@ -201,6 +216,7 @@ class SRCAOPriorityEngine:
             eval_res = self.calculate_task_priority(task, fault)
             results.append({
                 "task_id": task.id,
+                "block_id": task.block_id,
                 "fault_id": task.fault_id,
                 "corridor_id": task.corridor_id,
                 "section_id": task.section_id,

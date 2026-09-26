@@ -8,6 +8,7 @@ import { PlatformSchematic } from "../components/station/PlatformSchematic";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
 import { CorridorWorkspaceNav, CorridorWorkspaceTabKey } from "../components/corridor/CorridorWorkspaceNav";
 import { CorridorBlockManagement } from "../components/corridor/CorridorBlockManagement";
+import { formatDistanceKm, formatKmBadge } from "../utils/formatDistance";
 import {
   ArrowLeft,
   Layers,
@@ -205,7 +206,7 @@ export const CorridorDetailPage: React.FC = () => {
               Configuration: <strong className="text-slate-900 font-bold">{corridor.track_configuration.replace(/_/g, " ")}</strong>
             </div>
             <div>
-              Total Length: <strong className="text-slate-900 font-bold">{corridor.total_distance_km} KM</strong>
+              Total Length: <strong className="text-slate-900 font-bold">{formatDistanceKm(corridor.total_distance_km)}</strong>
             </div>
             <div>
               Speed Ceiling: <strong className="text-slate-900 font-bold">{corridor.max_permissible_speed_kmph} km/h</strong>
@@ -243,7 +244,7 @@ export const CorridorDetailPage: React.FC = () => {
                   : "INDEX SECTION · ROUTE PROGRESSION"}
               </span>
               <span>·</span>
-              <span>{corridor.name} ({corridor.total_distance_km} KM)</span>
+              <span>{corridor.name} ({formatDistanceKm(corridor.total_distance_km)})</span>
             </div>
 
             {/* Location Dropdown Filter */}
@@ -259,7 +260,7 @@ export const CorridorDetailPage: React.FC = () => {
                 <option value="ALL">ALL LOCATIONS ({corridor.locations.length})</option>
                 {corridor.locations.map((loc) => (
                   <option key={`opt-${loc.code}`} value={loc.code}>
-                    {loc.sequence}. {loc.name} ({loc.code}) · KM {loc.km.toFixed(1)} {loc.is_major ? "★" : ""}
+                    {loc.sequence}. {loc.name} ({loc.code}) · {formatKmBadge(loc.km)} {loc.is_major ? "★" : ""}
                   </option>
                 ))}
               </select>
@@ -303,7 +304,7 @@ export const CorridorDetailPage: React.FC = () => {
                         {selectedLocation.code}
                       </span>
                       <span className="text-xs font-mono text-slate-500 font-semibold">
-                        · KM {selectedLocation.km.toFixed(1)}
+                        · {formatKmBadge(selectedLocation.km)}
                       </span>
                     </div>
                   </div>
@@ -482,7 +483,7 @@ export const CorridorDetailPage: React.FC = () => {
                         {selectedLocation.code}
                       </span>
                       <span className="text-xs sm:text-sm font-mono text-slate-500 font-bold">
-                        · KM {selectedLocation.km.toFixed(1)}
+                        · {formatKmBadge(selectedLocation.km)}
                       </span>
                     </div>
                   </div>
@@ -615,7 +616,7 @@ export const CorridorDetailPage: React.FC = () => {
                       {loc.name}
                     </div>
                     <div className={`text-xs font-mono mt-0.5 ${selectedLocation?.code === loc.code ? "text-sky-300" : "text-slate-500 font-medium"}`}>
-                      KM {loc.km.toFixed(1)}
+                      {formatKmBadge(loc.km)}
                     </div>
                   </div>
                   {idx < corridor.locations.length - 1 && (
@@ -660,7 +661,7 @@ export const CorridorDetailPage: React.FC = () => {
                     <td className="py-3 px-3 font-sans font-bold text-slate-900 text-sm">
                       {loc.name} {loc.is_major && <span className="text-amber-500 ml-1">★</span>}
                     </td>
-                    <td className="py-3 px-3 font-medium">KM {loc.km.toFixed(1)}</td>
+                    <td className="py-3 px-3 font-medium">{formatKmBadge(loc.km)}</td>
                     <td className="py-3 px-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                         loc.category === "MAJOR_JUNCTION"

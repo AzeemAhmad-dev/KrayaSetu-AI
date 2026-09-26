@@ -576,13 +576,19 @@ class MaintenanceBlockOptimizer:
                     low_scheduled += 1
 
                 scheduled_task_ids.add(tid)
+                corr_id = data["task"].get("corridor_id") or "BPL-ET"
+                stn_name = data["task"].get("station_name") or data["task"].get("station_code") or data["section"]
                 scheduled_results.append({
                     "task_id": tid,
+                    "block_id": data["task"].get("block_id"),
                     "task_title": data["task"].get("fault_title") or data["task"].get("id"),
                     "department": data["task"].get("department_id", "PWAY"),
+                    "corridor_id": corr_id,
                     "section_id": data["section"],
                     "track_name": data["track"],
+                    "station_name": stn_name,
                     "location_km": data["task"].get("location_km"),
+                    "block_type": "Planned Block",
                     "allocated_start_time": s_str,
                     "allocated_end_time": e_str,
                     "duration_mins": data["duration"],
@@ -630,8 +636,25 @@ class MaintenanceBlockOptimizer:
                     human_reason = f"Section possession capacity fully utilized by higher-priority safety work during the {minutes_to_time(horizon_start)}-{minutes_to_time(horizon_end)} window."
                     mitigation = "Schedule in tomorrow's maintenance corridor window (08:00 - 20:00)."
 
+                def_corr = task.get("corridor_id") or "BPL-ET"
+                def_sec = task.get("section_id") or "SEC-MAIN"
+                def_stn = task.get("station_name") or task.get("station_code") or def_sec
+                def_loc = f"{def_corr} · {def_stn}"
+
                 deferred_results.append({
                     "task_id": tid,
+                    "block_id": task.get("block_id"),
+                    "department": task.get("department_id", "PWAY"),
+                    "description": task.get("fault_title") or task.get("description") or tid,
+                    "location": def_loc,
+                    "corridor_id": def_corr,
+                    "section_id": def_sec,
+                    "station_name": def_stn,
+                    "location_km": task.get("location_km"),
+                    "track_name": task.get("track_name") or "DOWN_MAIN",
+                    "original_time": f"{minutes_to_time(horizon_start)} – {minutes_to_time(horizon_start + dur)}",
+                    "status": "DEFERRED",
+                    "rescheduled_slot": "Deferred — requires rescheduling",
                     "priority_tier": prio,
                     "priority_score": float(task.get("priority_score") or (76.5 if prio == "HIGH" else (55.0 if prio == "MEDIUM" else 28.0))),
                     "reason_code": reason_code,

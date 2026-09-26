@@ -74,11 +74,8 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
     setLoadingProblems(true);
     setBackendError(null);
     try {
-      const allFaults = await api.getFaults();
-      const deptFaults = (allFaults || []).filter(
-        (f) => (f.department_id || "").toUpperCase() === department.toUpperCase()
-      );
-      const mapped: DepartmentProblem[] = deptFaults.map((f) => {
+      const deptFaults = await api.getFaults(undefined, department);
+      const mapped: DepartmentProblem[] = (deptFaults || []).map((f: any) => {
         let workflowStatus: ProblemWorkflowStatus = "Issue Logged";
         if (f.status === "COMPLETED" || f.human_status === "CONFIRMED") {
           workflowStatus = "Reviewed";
@@ -92,18 +89,30 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
           workflowStatus = "Completed";
         }
 
+        const locDesc = f.location_description || (f.station_code ? `Station ${f.station_code} · KM ${Number(f.location_km).toFixed(2)}` : `KM ${Number(f.location_km).toFixed(2)}`);
+
         return {
           id: f.id,
           department: (f.department_id as "PWAY" | "SNT" | "TRD") || department,
           title: f.fault_title || "Defect",
-          locationKmOrSection: f.location_description || `KM ${f.location_km}`,
+          locationKmOrSection: locDesc,
+          stationCode: f.station_code,
+          exactKm: typeof f.location_km === "number" ? f.location_km : undefined,
+          trackName: f.track_name,
           severity: (f.severity as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL") || "MEDIUM",
+          priority: f.priority,
           category: f.ai_recommended_protection || f.source_type || "Field Observation",
           observation: f.description || "",
           status: workflowStatus,
           rescheduleReason: f.human_notes,
           loggedBy: f.reporter || `${department}-STAFF`,
           createdAt: f.timestamp || new Date().toISOString(),
+          relatedTaskId: f.related_task_id,
+          relatedTaskStatus: f.related_task_status,
+          relatedBlockId: f.related_block_id,
+          relatedBlockStatus: f.related_block_status,
+          completionTime: f.completion_time,
+          resolutionNotes: f.resolution_notes,
         };
       });
       setProblems(mapped);
@@ -372,8 +381,13 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-1 text-[11px] font-mono">
-                    <span className="font-bold text-slate-500">{prob.id}</span>
+                    <span className="font-bold text-slate-800">{prob.id}</span>
                     <div className="flex items-center space-x-1.5">
+                      {prob.priority && (
+                        <span className="px-1.5 py-0.5 rounded font-bold text-[10px] bg-indigo-50 text-indigo-800 border border-indigo-200">
+                          {prob.priority}
+                        </span>
+                      )}
                       <span className={`px-2 py-0.5 rounded font-bold border ${severityClass}`}>
                         {prob.severity}
                       </span>
@@ -387,10 +401,48 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                     {prob.title}
                   </h3>
 
-                  <div className="flex items-center space-x-1.5 text-xs text-slate-600">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    <span className="truncate">{prob.locationKmOrSection}</span>
+                  {prob.observation && (
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed bg-slate-50 p-2 rounded border border-slate-100 font-sans">
+                      {prob.observation}
+                    </p>
+                  )}
+
+                  <div className="space-y-1 text-xs">
+                    <div className="flex items-center space-x-1.5 text-slate-700 font-medium">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="truncate">{prob.locationKmOrSection}</span>
+                    </div>
+
+                    {prob.exactKm !== undefined && (
+                      <div className="text-[11px] font-mono text-slate-500 pl-5">
+                        Chainage: <strong className="text-slate-800 font-bold">{prob.exactKm.toFixed(2)} KM</strong>
+                        {prob.trackName && ` · Line: ${prob.trackName}`}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Related Task & Block Links */}
+                  {(prob.relatedTaskId || prob.relatedBlockId) && (
+                    <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-200 text-[10px] font-mono flex flex-wrap items-center gap-1.5">
+                      {prob.relatedTaskId && (
+                        <span className="text-sky-800 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
+                          Task: {prob.relatedTaskId}
+                        </span>
+                      )}
+                      {prob.relatedBlockId && (
+                        <span className="text-indigo-800 font-bold bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                          Block: {prob.relatedBlockId}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {prob.completionTime && (
+                    <div className="text-[10px] font-mono text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 flex items-center space-x-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>Resolved: {new Date(prob.completionTime).toLocaleDateString()}</span>
+                    </div>
+                  )}
 
                   <div className="inline-flex items-center space-x-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-mono">
                     <Tag className="w-3 h-3 text-slate-400" />
@@ -399,9 +451,9 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
-                  <span>Logged: {new Date(prob.createdAt).toLocaleDateString()}</span>
+                  <span>Reported: {new Date(prob.createdAt).toLocaleDateString()}</span>
                   <div className="flex items-center space-x-1 font-bold text-[#0b2545]">
-                    <span>Workflow</span>
+                    <span>View Details</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </div>
                 </div>
@@ -659,9 +711,27 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                   <span className="font-bold text-slate-900 mt-0.5 block">{selectedProblem.category}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-mono">Severity</span>
-                  <span className="font-bold text-slate-900 mt-0.5 block font-mono">{selectedProblem.severity}</span>
+                  <span className="text-slate-400 block text-[10px] uppercase font-mono">Severity / Priority</span>
+                  <span className="font-bold text-slate-900 mt-0.5 block font-mono">{selectedProblem.severity} {selectedProblem.priority ? `(${selectedProblem.priority})` : ""}</span>
                 </div>
+                {selectedProblem.relatedTaskId && (
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-mono">Related Task</span>
+                    <span className="font-bold text-sky-800 mt-0.5 block font-mono">{selectedProblem.relatedTaskId} ({selectedProblem.relatedTaskStatus || "ACTIVE"})</span>
+                  </div>
+                )}
+                {selectedProblem.relatedBlockId && (
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-mono">Related Block</span>
+                    <span className="font-bold text-indigo-800 mt-0.5 block font-mono">{selectedProblem.relatedBlockId} ({selectedProblem.relatedBlockStatus || "PLANNED"})</span>
+                  </div>
+                )}
+                {selectedProblem.completionTime && (
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-mono">Resolved At</span>
+                    <span className="font-bold text-emerald-800 mt-0.5 block font-mono">{new Date(selectedProblem.completionTime).toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
               {/* Observation text */}

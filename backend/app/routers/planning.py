@@ -18,6 +18,7 @@ from backend.app.models.network import Corridor
 from backend.app.services.priority_service import priority_engine
 from backend.app.services.candidate_generator import candidate_generator
 from backend.app.services.explanation_service import explanation_service
+from backend.app.services.dataset_identity import compute_dataset_fingerprint
 
 router = APIRouter(prefix="/planning", tags=["Planning & Priority Intelligence"])
 
@@ -40,8 +41,11 @@ def get_task_priorities(
     if priority:
         results = [r for r in results if r["priority_tier"].upper() == priority.upper()]
     
+    fingerprint = compute_dataset_fingerprint(db)
     return {
         "status": "SUCCESS",
+        "dataset_fingerprint": fingerprint,
+        "canonical_generation_id": fingerprint,
         "framework": "S-R-C-A-O",
         "weights": {
             "severity": 0.35,
@@ -147,6 +151,7 @@ def get_planning_dashboard_summary(db: Session = Depends(get_db)):
     low_count = db.query(MaintenanceTask).filter(MaintenanceTask.priority == "LOW").count()
 
     blocks = db.query(Block).all()
+    planned_count = sum(1 for b in blocks if b.status == "PLANNED")
     proposed_count = sum(1 for b in blocks if b.status == "PROPOSED")
     pending_count = sum(1 for b in blocks if b.status == "PENDING_APPROVAL")
     approved_count = sum(1 for b in blocks if b.status == "APPROVED")
@@ -159,8 +164,11 @@ def get_planning_dashboard_summary(db: Session = Depends(get_db)):
         score_eval = priority_engine.calculate_task_priority(crit_task)
         crit_score = score_eval.get("total_score", 95.25)
 
+    fingerprint = compute_dataset_fingerprint(db)
     return {
         "status": "SUCCESS",
+        "dataset_fingerprint": fingerprint,
+        "canonical_generation_id": fingerprint,
         "tasks_analyzed": tasks_count,
         "priority_distribution": {
             "CRITICAL": crit_count,
@@ -178,6 +186,7 @@ def get_planning_dashboard_summary(db: Session = Depends(get_db)):
         } if crit_task else None,
         "blocks_summary": {
             "total_blocks": len(blocks),
+            "planned": planned_count,
             "proposed": proposed_count,
             "pending_approval": pending_count,
             "approved": approved_count,

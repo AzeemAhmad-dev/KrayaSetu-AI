@@ -21,7 +21,8 @@ import {
   Train,
   Hammer,
   Sliders,
-  ClipboardEdit
+  ClipboardEdit,
+  TrendingUp
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -46,6 +47,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Sliders: Sliders,
   ShieldAlert: ShieldAlert,
   ClipboardEdit: ClipboardEdit,
+  TrendingUp: TrendingUp,
 };
 
 export const Sidebar: React.FC = () => {

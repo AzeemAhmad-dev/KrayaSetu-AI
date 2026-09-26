@@ -21,6 +21,7 @@ import { PilotActivityLog, BlockData, TrainMovementData } from "../types";
 import { api } from "../services/api";
 import { BlockReasoningModal } from "../components/blocks/BlockReasoningModal";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatKmBadge, formatDistanceKm } from "../utils/formatDistance";
 
 export const TrainPilotWorkspacePage: React.FC = () => {
   const { user } = useAuth();
@@ -91,7 +92,7 @@ export const TrainPilotWorkspacePage: React.FC = () => {
           station_name: f.station_code,
           nearby_location: f.location_description || f.section_id || "En-route Section",
           section_point: f.section_id || "Section Line",
-          km_chainage: f.location_km != null ? `KM ${f.location_km}` : "Unspecified KM",
+          km_chainage: f.location_km != null ? formatKmBadge(f.location_km) : "Unspecified KM",
           primary_observation: f.fault_title || f.description || "Track / Asset Anomaly",
           secondary_observation: f.description && f.description !== f.fault_title ? f.description : undefined,
           departments: [dept],
@@ -112,7 +113,7 @@ export const TrainPilotWorkspacePage: React.FC = () => {
 
   useEffect(() => {
     Promise.all([
-      api.getBlocks().catch(() => []),
+      api.getBlocks(undefined, undefined, undefined, undefined, undefined, true).catch(() => []),
       api.getTrainMovements().catch(() => []),
       loadPilotObservations(),
     ]).then(([bRes, tRes]) => {
@@ -320,7 +321,7 @@ export const TrainPilotWorkspacePage: React.FC = () => {
           <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
             workspaceTab === "restrictions" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
           }`}>
-            {blocks.filter((b) => ["PROPOSED", "PENDING_APPROVAL", "APPROVED", "SELECTED"].includes(b.status)).length}
+            {blocks.filter((b) => ["APPROVED", "SANCTIONED", "ACTIVE", "SELECTED"].includes(b.status)).length}
           </span>
         </button>
 
@@ -349,17 +350,17 @@ export const TrainPilotWorkspacePage: React.FC = () => {
                     <AlertTriangle className="w-4 h-4" />
                   </span>
                   <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-wide font-mono uppercase">
-                    OPERATIONAL LOCKS & PLANNED MOVEMENT RESTRICTIONS (DECISION SUPPORT)
+                    OPERATIONAL LOCKS & SANCTIONED MOVEMENT RESTRICTIONS (COBO AUTHORIZED)
                   </h2>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Surveillance of planned maintenance blocks, temporary sectional possessions, and train impacts across Bhopal Division.
+                  Surveillance of COBO-sanctioned operational maintenance blocks, temporary sectional possessions, and train impacts across Bhopal Division. Unapproved planning proposals are strictly gated out.
                 </p>
               </div>
               <ProvenanceBadge type="REAL_PUBLIC" size="sm" />
             </div>
 
-            {blocks.filter((b) => ["PROPOSED", "PENDING_APPROVAL", "APPROVED", "SELECTED"].includes(b.status)).length === 0 ? (
+            {blocks.filter((b) => ["APPROVED", "SANCTIONED", "ACTIVE", "SELECTED"].includes(b.status)).length === 0 ? (
               <div className="p-12 text-center space-y-2">
                 <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-2">
                   <CheckCircle2 className="w-6 h-6" />
@@ -368,7 +369,7 @@ export const TrainPilotWorkspacePage: React.FC = () => {
                   No Active Operational Locks or Movement Restrictions
                 </div>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  All tracks on the 5 Bhopal Division corridors are currently clear for normal movement. Blocks proposed or approved by Central Control will appear here with precautionary advisories.
+                  All tracks on the 5 Bhopal Division corridors are currently clear for normal movement. Only blocks sanctioned by Chief of Block Officer (COBO) appear here with precautionary advisories.
                 </p>
               </div>
             ) : (
@@ -387,7 +388,7 @@ export const TrainPilotWorkspacePage: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-sans">
                     {blocks
-                      .filter((b) => ["PROPOSED", "PENDING_APPROVAL", "APPROVED", "SELECTED"].includes(b.status))
+                      .filter((b) => ["APPROVED", "SANCTIONED", "ACTIVE", "SELECTED"].includes(b.status))
                       .map((b) => {
                         const conflictingTrainInfo =
                           b.conflicting_trains && b.conflicting_trains.length > 0
@@ -429,7 +430,7 @@ export const TrainPilotWorkspacePage: React.FC = () => {
                             {/* Track / KM */}
                             <td className="py-3 px-3">
                               <div className="font-mono font-medium text-slate-800">{b.track_name}</div>
-                              <div className="text-[11px] text-slate-500 font-mono">KM {b.location_km.toFixed(3)}</div>
+                              <div className="text-[11px] text-slate-500 font-mono">{formatKmBadge(b.location_km)}</div>
                             </td>
 
                             {/* Planned Window */}
@@ -545,7 +546,7 @@ export const TrainPilotWorkspacePage: React.FC = () => {
                   <option value="">-- Select Nearby Station --</option>
                   {stations.map((stn) => (
                     <option key={stn.code} value={stn.code}>
-                      {stn.name} ({stn.code}) · KM {stn.km}
+                      {stn.name} ({stn.code}) · {formatKmBadge(stn.km)}
                     </option>
                   ))}
                 </select>

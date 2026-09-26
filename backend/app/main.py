@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.app.config import settings
 from backend.app.database import engine, Base
 import backend.app.models
-from backend.app.routers import network, trains, maintenance, blocks, scenarios, events, planning
+from backend.app.routers import network, trains, maintenance, blocks, scenarios, events, planning, railway, analytics
 
 # Ensure all database tables exist
 Base.metadata.create_all(bind=engine)
@@ -24,6 +24,7 @@ app = FastAPI(
     description="Smart Railway Maintenance Block Planning & Operational Decision Support for Bhopal Division (WCR)"
 )
 
+# Open CORS configuration ensuring seamless connections across all dev ports & environments
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -46,6 +47,8 @@ app.include_router(blocks.router, prefix=settings.API_PREFIX)
 app.include_router(scenarios.router, prefix=settings.API_PREFIX)
 app.include_router(events.router, prefix=settings.API_PREFIX)
 app.include_router(planning.router, prefix=settings.API_PREFIX)
+app.include_router(railway.router, prefix=settings.API_PREFIX)
+app.include_router(analytics.router, prefix=settings.API_PREFIX)
 
 # Root-level router fallbacks for backward-compatible test suites and qa_backend
 app.include_router(blocks.router)
@@ -55,6 +58,8 @@ app.include_router(trains.router)
 app.include_router(maintenance.router)
 app.include_router(events.router)
 app.include_router(planning.router)
+app.include_router(railway.router)
+app.include_router(analytics.router)
 
 class OverrideRequest(BaseModel):
     work_id: str
@@ -101,4 +106,3 @@ def root_status():
 @app.get("/health")
 def root_health():
     return health_check()
-

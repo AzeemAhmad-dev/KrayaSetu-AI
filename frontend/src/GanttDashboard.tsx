@@ -1,1271 +1,1785 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { gantt } from 'dhtmlx-gantt';
-import 'dhtmlx-gantt/codebase/dhtmlxgantt.css';
-import type { GanttTask } from './types/contract';
-import { BlockData, TrainMovementData } from './types';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from './services/api';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import { BlockData, TrainMovementData } from "./types";
+import { formatDistanceKm } from "./utils/formatDistance";
+import { getISTDateString, getISTTimeString } from "./utils/istDate";
 import {
-  Lock,
-  XCircle,
-  Info,
-  Sparkles,
   Clock,
-  Calendar,
-  X,
-  Eye,
   AlertTriangle,
   CheckCircle2,
   Train,
   Shield,
-  ZoomIn,
-  ZoomOut,
-  Check,
   Zap,
-} from 'lucide-react';
-
-export interface ExtendedGanttTask extends GanttTask {
-  task_kind?: "lane" | "opt" | "block" | "train";
-  raw_opt?: any;
-  raw_block?: BlockData;
-  raw_train?: TrainMovementData;
-  department?: string;
-  machine?: string;
-  protection?: string;
-  priority_tier?: string;
-}
+  Wrench,
+  Lightbulb,
+  Maximize2,
+  ChevronDown,
+  ChevronRight,
+  Filter,
+  Sparkles,
+  Info,
+  X,
+  RefreshCw,
+  Layers,
+  ArrowRight,
+  Cpu,
+  Calendar,
+} from "lucide-react";
 
 export interface GanttDashboardProps {
-  tasks?: GanttTask[];
+  tasks?: any[];
   blocks?: BlockData[];
   trainMovements?: TrainMovementData[];
   optResult?: any;
   onRefresh?: () => void;
   onOpenReasoning?: (taskId: string, fallbackItem?: any) => void;
+  onRunOptimizer?: () => Promise<void> | void;
+  optimizing?: boolean;
+  theme?: "vintage" | "dark" | "black" | "white";
+  onProposeFromSchedule?: (item: any) => Promise<void> | void;
+  proposedTaskIds?: Set<string>;
+  proposingTaskId?: string | null;
 }
 
-export interface GanttZoomTier {
+type ZoomLevel = "15min" | "1hour" | "24hour";
+
+interface ResourceLane {
   id: string;
-  label: string;
-  minColumnWidth: number;
-  scaleHeight: number;
-  scales: any;
+  name: string;
+  subtitle: string;
+  category: "track" | "crew" | "machine" | "train";
+  badge?: string;
 }
 
-export const ZOOM_TIERS: GanttZoomTier[] = [
-  {
-    id: "5min",
-    label: "5 Min",
-    minColumnWidth: 32,
-    scaleHeight: 54,
-    scales: [
-      { unit: "hour", step: 1, format: "%H:00 (%d %M)" },
-      { unit: "minute", step: 5, format: "%i" },
-    ],
-  },
-  {
-    id: "15min",
-    label: "15 Min",
-    minColumnWidth: 36,
-    scaleHeight: 54,
-    scales: [
-      { unit: "hour", step: 1, format: "%H:00 (%d %M)" },
-      { unit: "minute", step: 15, format: "%i" },
-    ],
-  },
-  {
-    id: "30min",
-    label: "30 Min",
-    minColumnWidth: 44,
-    scaleHeight: 54,
-    scales: [
-      { unit: "hour", step: 1, format: "%H:00 (%d %M)" },
-      { unit: "minute", step: 30, format: "%i" },
-    ],
-  },
-  {
-    id: "1hour",
-    label: "1 Hour",
-    minColumnWidth: 50,
-    scaleHeight: 54,
-    scales: [
-      { unit: "day", step: 1, format: "%d %M %Y" },
-      { unit: "hour", step: 1, format: "%H:%i" },
-    ],
-  },
-  {
-    id: "2hour",
-    label: "2 Hours",
-    minColumnWidth: 55,
-    scaleHeight: 54,
-    scales: [
-      { unit: "day", step: 1, format: "%d %M %Y" },
-      { unit: "hour", step: 2, format: "%H:00" },
-    ],
-  },
-  {
-    id: "6hour",
-    label: "6 Hours",
-    minColumnWidth: 65,
-    scaleHeight: 54,
-    scales: [
-      { unit: "day", step: 1, format: "%d %M %Y" },
-      { unit: "hour", step: 6, format: "%H:00" },
-    ],
-  },
-  {
-    id: "12hour",
-    label: "12 Hours",
-    minColumnWidth: 70,
-    scaleHeight: 54,
-    scales: [
-      { unit: "day", step: 1, format: "%d %M %Y" },
-      { unit: "hour", step: 12, format: "%H:00" },
-    ],
-  },
-  {
-    id: "24hour",
-    label: "24 Hours",
-    minColumnWidth: 75,
-    scaleHeight: 54,
-    scales: [
-      { unit: "month", step: 1, format: "%F %Y" },
-      { unit: "day", step: 1, format: "%d %D" },
-    ],
-  },
-];
+interface TimelineItem {
+  id: string;
+  taskId?: string;
+  title: string;
+  subtitle?: string;
+  laneId: string;
+  startMinutes: number;
+  endMinutes: number;
+  startTimeStr: string;
+  endTimeStr: string;
+  durationMins: number;
+  colorType: "red" | "orange" | "green" | "purple" | "blue" | "slate";
+  department?: string;
+  track?: string;
+  machine?: string;
+  locationKm?: number;
+  priorityTier?: string;
+  isTrain?: boolean;
+  trainNumber?: string;
+  trainName?: string;
+  hasConflict?: boolean;
+  conflictDetails?: string;
+  rawItem?: any;
+}
 
-const formatGanttDate = (dateStr?: string, timeStr?: string, fallbackH = 12, fallbackM = 0): string => {
-  const baseDate = dateStr && /^\d{4}-\d{2}-\d{2}/.test(dateStr) ? dateStr.slice(0, 10) : "2026-03-25";
-  if (!timeStr) {
-    return `${baseDate} ${String(fallbackH).padStart(2, "0")}:${String(fallbackM).padStart(2, "0")}`;
-  }
-  const match = timeStr.match(/^([01]?\d|2[0-3]):([0-5]\d)/);
-  if (match) {
-    return `${baseDate} ${match[1].padStart(2, "0")}:${match[2]}`;
-  }
-  if (timeStr.includes("T")) {
-    const d = new Date(timeStr);
-    if (!isNaN(d.getTime())) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const hours = String(d.getHours()).padStart(2, "0");
-      const minutes = String(d.getMinutes()).padStart(2, "0");
-      return `${year}-${month}-${day} ${hours}:${minutes}`;
-    }
-  }
-  return `${baseDate} ${String(fallbackH).padStart(2, "0")}:${String(fallbackM).padStart(2, "0")}`;
-};
+interface ConflictMarker {
+  id: string;
+  taskId: string;
+  trainNumber?: string;
+  trackName: string;
+  timeMinutes: number;
+  timeStr: string;
+  description: string;
+}
 
-const ensureEndAfterStart = (startDateStr: string, endDateStr: string, durationMins = 120): string => {
-  const startD = new Date(startDateStr.replace(" ", "T") + ":00");
-  const endD = new Date(endDateStr.replace(" ", "T") + ":00");
-  if (isNaN(startD.getTime()) || isNaN(endD.getTime()) || endD <= startD) {
-    const adjusted = new Date(startD.getTime() + (durationMins || 120) * 60 * 1000);
-    const year = adjusted.getFullYear();
-    const month = String(adjusted.getMonth() + 1).padStart(2, "0");
-    const day = String(adjusted.getDate()).padStart(2, "0");
-    const hours = String(adjusted.getHours()).padStart(2, "0");
-    const minutes = String(adjusted.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
-  }
-  return endDateStr;
-};
+// Convert "HH:MM" to total minutes from 00:00
+function parseTimeToMinutes(timeStr?: string, fallback = 480): number {
+  if (!timeStr) return fallback;
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return fallback;
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  return h * 60 + m;
+}
+
+// Format minutes from midnight to "HH:MM"
+function minutesToTime(mins: number): string {
+  const norm = ((mins % 1440) + 1440) % 1440;
+  const h = Math.floor(norm / 60);
+  const m = norm % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
 
 export const GanttDashboard: React.FC<GanttDashboardProps> = ({
-  tasks,
   blocks,
   trainMovements,
   optResult,
   onRefresh,
   onOpenReasoning,
+  onRunOptimizer,
+  optimizing = false,
+  theme = "dark",
+  onProposeFromSchedule,
+  proposedTaskIds,
+  proposingTaskId,
 }) => {
-  const ganttContainer = useRef<HTMLDivElement>(null);
-  const [zoomTierIndex, setZoomTierIndex] = useState<number>(3); // Default: 1 Hour (index 3)
-  const [wheelZoomMode, setWheelZoomMode] = useState<boolean>(true); // Default: Scroll zooms time axis
+  // Theme display mode: "vintage" (Vintage Parchment) or "dark" (Dark Room)
+  const initialTheme = (theme === "white" || theme === "vintage") ? "vintage" : "dark";
+  const [displayTheme, setDisplayTheme] = useState<"vintage" | "dark">(initialTheme);
+  const isVintage = displayTheme === "vintage";
+  const isWhite = isVintage; // Backwards-compatible styling alias for light/parchment mode
 
-  const zoomTierIndexRef = useRef<number>(3);
-  zoomTierIndexRef.current = zoomTierIndex;
+  // Timeline zoom: 15min (3px/min), 1hour (1.2px/min), 24hour (0.55px/min)
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("1hour");
 
-  const wheelZoomModeRef = useRef<boolean>(true);
-  wheelZoomModeRef.current = wheelZoomMode;
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    taskId: string;
-    taskText: string;
-    task: any;
-  } | null>(null);
-  const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  // Selected filters
+  const [selectedCorridor, setSelectedCorridor] = useState<string>("ALL");
+  const [selectedStation, setSelectedStation] = useState<string>("ALL");
+  const [activeTab, setActiveTab] = useState<"scheduled" | "deferred">("scheduled");
 
-  // Fallback state if neither tasks nor blocks are passed
-  const [fallbackBlocks, setFallbackBlocks] = useState<BlockData[]>([]);
-  const [fallbackMovements, setFallbackMovements] = useState<TrainMovementData[]>([]);
+  // Selected task for timeline highlight and details drawer
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!tasks && !blocks) {
-      Promise.all([
-        api.getBlocks().catch(() => []),
-        api.getTrainMovements().catch(() => []),
-      ]).then(([b, m]) => {
-        setFallbackBlocks(b || []);
-        setFallbackMovements(m || []);
-      });
-    }
-  }, [tasks, blocks]);
-
-  const activeBlocks = blocks || fallbackBlocks;
-  const activeMovements = trainMovements || fallbackMovements;
-
-  const queryClient = useQueryClient();
-  const overrideMutation = useMutation({
-    mutationFn: async (payload: { type: 'LOCK_POSSESSION' | 'REJECT_CANDIDATE', taskId: string }) => {
-      if (payload.type === 'LOCK_POSSESSION') {
-        return await api.approveBlockDirect(payload.taskId, {
-          actor: "Divisional Section Controller",
-          role: "CONTROLLER",
-          notes: "MANUAL_OVERRIDE_LOCK_POSSESSION"
-        });
-      } else {
-        return await api.rejectBlockDirect(payload.taskId, {
-          actor: "Divisional Section Controller",
-          role: "CONTROLLER",
-          notes: "MANUAL_OVERRIDE_REJECT_CANDIDATE"
-        });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blocks'] });
-      queryClient.invalidateQueries({ queryKey: ['plan'] });
-      if (onRefresh) onRefresh();
-    }
+  // Group collapse state
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+    track: false,
+    crew: false,
+    machine: false,
+    train: false,
   });
 
-  const formattedTasks = useMemo(() => {
-    if (tasks && tasks.length > 0) {
-      return tasks as ExtendedGanttTask[];
+  // Timeline viewport DOM ref for scrolling
+  const timelineScrollRef = useRef<HTMLDivElement>(null);
+  const [hoveredItem, setHoveredItem] = useState<{ item: TimelineItem; x: number; y: number } | null>(null);
+
+  // Pixel scaling per minute based on zoom
+  const pxPerMin = useMemo(() => {
+    switch (zoomLevel) {
+      case "15min":
+        return 2.5; // 150px per hour
+      case "1hour":
+        return 1.25; // 75px per hour
+      case "24hour":
+        return 0.65; // 39px per hour (fits in ~936px)
     }
+  }, [zoomLevel]);
 
-    const result: ExtendedGanttTask[] = [];
-    const baseDate = "2026-03-25";
+  // Total timeline width in px for full 24-hour day (1440 mins)
+  const totalTimelineWidth = useMemo(() => {
+    return Math.max(1200, Math.round(1440 * pxPerMin));
+  }, [pxPerMin]);
 
-    // Track Lanes (Parent Containers)
-    const lanes: ExtendedGanttTask[] = [
+  // Predefined canonical resources based on Bhopal Division railway infrastructure
+  const lanes: ResourceLane[] = useMemo(() => {
+    return [
+      // 1. TRACK / BLOCK SECTIONS
       {
         id: "lane_DOWN_MAIN",
-        text: "🛤️ DOWN MAIN — Corridor Spine (Towards Bina/Delhi)",
-        start_date: `${baseDate} 00:00`,
-        end_date: `${baseDate} 23:59`,
-        parent: "0",
-        type: "project",
-        priority_color: "blue",
-        conflict: false,
-        task_kind: "lane",
+        name: "DOWN MAIN",
+        subtitle: "Spine toward Bina/Delhi (Double Track)",
+        category: "track",
+        badge: "BPL–BINA",
       },
       {
         id: "lane_UP_MAIN",
-        text: "🛤️ UP MAIN — Corridor Spine (Towards Itarsi/Mumbai)",
-        start_date: `${baseDate} 00:00`,
-        end_date: `${baseDate} 23:59`,
-        parent: "0",
-        type: "project",
-        priority_color: "blue",
-        conflict: false,
-        task_kind: "lane",
+        name: "UP MAIN",
+        subtitle: "Spine toward Itarsi/Mumbai (Double Track)",
+        category: "track",
+        badge: "BPL–ET",
       },
       {
         id: "lane_THIRD_LINE",
-        text: "🛤️ 3RD LINE / LOOP — Freight & Overtake Lane",
-        start_date: `${baseDate} 00:00`,
-        end_date: `${baseDate} 23:59`,
-        parent: "0",
-        type: "project",
-        priority_color: "blue",
-        conflict: false,
-        task_kind: "lane",
+        name: "3RD LINE / FREIGHT LOOP",
+        subtitle: "Freight bypass & overtake siding",
+        category: "track",
+        badge: "HEAVY HAUL",
       },
       {
-        id: "lane_YARD_LINE",
-        text: "🛤️ STATION YARD & LOOPS — Junction Platforms",
-        start_date: `${baseDate} 00:00`,
-        end_date: `${baseDate} 23:59`,
-        parent: "0",
-        type: "project",
-        priority_color: "blue",
-        conflict: false,
-        task_kind: "lane",
+        id: "lane_STATION_YARD",
+        name: "STATION YARD & PLATFORMS",
+        subtitle: "Bhopal Jn / Itarsi Jn / Bina Jn Loops",
+        category: "track",
+        badge: "JUNCTION",
+      },
+
+      // 2. CREW POOLS
+      {
+        id: "lane_CREW_PWAY_1",
+        name: "P.Way Section Gang 1",
+        subtitle: "Track Maintenance Gang (Permanent Way)",
+        category: "crew",
+        badge: "PWAY",
+      },
+      {
+        id: "lane_CREW_PWAY_2",
+        name: "P.Way Gang 2",
+        subtitle: "Heavy Track Renewal & Rail Gang",
+        category: "crew",
+        badge: "PWAY",
+      },
+      {
+        id: "lane_CREW_TRD",
+        name: "TRD / OHE Line Squad",
+        subtitle: "25kV Traction Power & Wire Team",
+        category: "crew",
+        badge: "TRD",
+      },
+      {
+        id: "lane_CREW_SNT",
+        name: "S&T Signalling Team",
+        subtitle: "Electronic Interlocking & Point Crew",
+        category: "crew",
+        badge: "SNT",
+      },
+
+      // 3. MACHINE POOLS
+      {
+        id: "lane_MACH_CSM",
+        name: "Plasser 09-32 CSM Tamper",
+        subtitle: "Continuous Action Track Tamping",
+        category: "machine",
+        badge: "CSM_TAMPER_01",
+      },
+      {
+        id: "lane_MACH_UNIMAT",
+        name: "Points Tamper Unimat 08-275",
+        subtitle: "Turnout & Crossover Tamping",
+        category: "machine",
+        badge: "UNIMAT_01",
+      },
+      {
+        id: "lane_MACH_BCM",
+        name: "Ballast Cleaning Machine BCM-80",
+        subtitle: "Deep Track Ballast Screening",
+        category: "machine",
+        badge: "BCM_01",
+      },
+      {
+        id: "lane_MACH_TOWER",
+        name: "8-Wheeler DETC Tower Wagon",
+        subtitle: "Overhead Catenary Maintenance",
+        category: "machine",
+        badge: "TW_BPL_01",
+      },
+      {
+        id: "lane_MACH_USFD",
+        name: "Digital Rail Tester EEC-DRT",
+        subtitle: "Ultrasonic Flaw Detection",
+        category: "machine",
+        badge: "USFD_01",
+      },
+
+      // 4. TRAIN MOVEMENTS
+      {
+        id: "lane_TRAIN_DOWN",
+        name: "DOWN TRAIN MOVEMENTS",
+        subtitle: "Scheduled Express & Freight (Northbound)",
+        category: "train",
+        badge: "ACTIVE",
+      },
+      {
+        id: "lane_TRAIN_UP",
+        name: "UP TRAIN MOVEMENTS",
+        subtitle: "Scheduled Express & Freight (Southbound)",
+        category: "train",
+        badge: "ACTIVE",
       },
     ];
-
-    result.push(...lanes);
-
-    const getLaneId = (trackName?: string, direction?: string) => {
-      const lower = (trackName || "").toLowerCase();
-      const dirLower = (direction || "").toLowerCase();
-      if (lower.includes("down") || dirLower.includes("down")) return "lane_DOWN_MAIN";
-      if (lower.includes("up") || dirLower.includes("up")) return "lane_UP_MAIN";
-      if (lower.includes("3rd") || lower.includes("third") || lower.includes("loop")) return "lane_THIRD_LINE";
-      return "lane_YARD_LINE";
-    };
-
-    // 1. Add CP-SAT Optimizer newly scheduled items if present
-    if (optResult?.schedule && Array.isArray(optResult.schedule)) {
-      optResult.schedule.forEach((item: any, idx: number) => {
-        const lane = getLaneId(item.track_name);
-        const sTime = formatGanttDate(item.date || baseDate, item.allocated_start_time, 9, 0);
-        const rawETime = formatGanttDate(item.date || baseDate, item.allocated_end_time, 11, 0);
-        const eTime = ensureEndAfterStart(sTime, rawETime, item.duration_mins || 120);
-        const isCritical = item.priority_tier === "CRITICAL" || item.task_priority === "CRITICAL";
-
-        result.push({
-          id: `opt_${item.task_id || idx}`,
-          text: `⚡ [CP-SAT OPTIMAL] ${item.task_id}: ${item.task_title || "Maintenance Window"} (${item.duration_mins || 120}m)`,
-          start_date: sTime,
-          end_date: eTime,
-          parent: lane,
-          type: "task",
-          priority_color: isCritical ? "red" : "green",
-          conflict: false,
-          task_kind: "opt",
-          raw_opt: item,
-          department: item.department_id || "PWAY",
-          machine: item.assigned_machine,
-          protection: item.required_protection || "TRAFFIC_BLOCK",
-          priority_tier: item.priority_tier || "HIGH",
-        });
-      });
-    }
-
-    // 2. Add Planned & Active Blocks from blocks ledger
-    if (activeBlocks && Array.isArray(activeBlocks)) {
-      activeBlocks.forEach((b) => {
-        const lane = getLaneId(b.track_name);
-        const date = b.date || baseDate;
-        const sTime = formatGanttDate(date, b.requested_start_time, 12, 0);
-        const rawETime = formatGanttDate(date, b.requested_end_time, 14, 0);
-        const eTime = ensureEndAfterStart(sTime, rawETime, b.duration_mins || 120);
-        const isCritical = b.task_priority === "CRITICAL" || b.protection_type === "EMERGENCY_PROTECTION";
-        const isApproved = b.status === "APPROVED" || b.status === "SANCTIONED" || b.status === "SELECTED";
-        const hasConflict = b.conflict_status === "CONFLICT";
-
-        result.push({
-          id: b.id,
-          text: `🛡️ [${b.status}] ${b.task_title || b.id} · KM ${b.location_km || "N/A"} (${b.duration_mins}m)`,
-          start_date: sTime,
-          end_date: eTime,
-          parent: lane,
-          type: "task",
-          priority_color: hasConflict ? "red" : isCritical ? "orange" : isApproved ? "green" : "yellow",
-          conflict: hasConflict,
-          task_kind: "block",
-          raw_block: b,
-          department: b.department_id || "PWAY",
-          machine: b.assigned_machine,
-          protection: b.protection_type,
-          priority_tier: b.task_priority || "MEDIUM",
-        });
-      });
-    }
-
-    // 3. Add Train Movements (Passenger & Freight paths)
-    if (activeMovements && Array.isArray(activeMovements)) {
-      activeMovements.slice(0, 15).forEach((tm, idx) => {
-        const lane = getLaneId(tm.current_track, tm.direction);
-        const sTime = formatGanttDate(baseDate, tm.scheduled_time || "10:00", 10 + (idx % 12), (idx * 15) % 60);
-        const rawETime = formatGanttDate(baseDate, tm.estimated_time, 11 + (idx % 12), ((idx * 15) + 30) % 60);
-        const eTime = ensureEndAfterStart(sTime, rawETime, 30);
-
-        const hasDelay = tm.delay_minutes > 15;
-        const isSevere = tm.delay_category === "SEVERE" || tm.delay_minutes > 45;
-
-        result.push({
-          id: `train_${tm.train_number || idx}`,
-          text: `🚆 ${tm.train_number} ${tm.train_name} (${tm.direction}) ${hasDelay ? `+${tm.delay_minutes}m` : 'ON-TIME'}`,
-          start_date: sTime,
-          end_date: eTime,
-          parent: lane,
-          type: "task",
-          priority_color: isSevere ? "red" : hasDelay ? "orange" : "blue",
-          conflict: isSevere,
-          task_kind: "train",
-          raw_train: tm,
-        });
-      });
-    }
-
-    return result;
-  }, [tasks, activeBlocks, activeMovements, optResult]);
-
-  // Smoothly apply zoom tier and maintain cursor-centered timeline position
-  const applyZoomTier = useCallback((tierIndex: number, clientX?: number) => {
-    const index = Math.max(0, Math.min(ZOOM_TIERS.length - 1, tierIndex));
-    const tier = ZOOM_TIERS[index];
-    setZoomTierIndex(index);
-    zoomTierIndexRef.current = index;
-
-    const container = ganttContainer.current;
-    let targetDate: Date | null = null;
-    let mouseXInTimeline = 0;
-
-    if (container) {
-      const gridWidth = gantt.config.grid_width || 340;
-      const currentScroll = typeof gantt.getScrollState === 'function' ? gantt.getScrollState() : { x: 0 };
-      const rect = container.getBoundingClientRect();
-
-      if (clientX !== undefined) {
-        mouseXInTimeline = clientX - rect.left - gridWidth;
-      } else {
-        const viewportWidth = container.clientWidth - gridWidth;
-        mouseXInTimeline = Math.max(0, viewportWidth / 2);
-      }
-
-      if (mouseXInTimeline > 0 && typeof gantt.dateFromPos === 'function') {
-        try {
-          const timelinePos = mouseXInTimeline + (currentScroll?.x || 0);
-          targetDate = gantt.dateFromPos(timelinePos);
-        } catch {
-          targetDate = null;
-        }
-      }
-    }
-
-    gantt.config.scales = tier.scales as any;
-    gantt.config.min_column_width = tier.minColumnWidth;
-    gantt.config.scale_height = tier.scaleHeight;
-    gantt.render();
-
-    if (targetDate && typeof gantt.posFromDate === 'function' && typeof gantt.scrollTo === 'function') {
-      try {
-        const newPos = gantt.posFromDate(targetDate);
-        const newScrollX = Math.max(0, newPos - mouseXInTimeline);
-        gantt.scrollTo(newScrollX, null);
-      } catch {
-        // Fallback safely
-      }
-    }
   }, []);
 
-  const zoomIn = useCallback(() => {
-    if (zoomTierIndexRef.current > 0) {
-      applyZoomTier(zoomTierIndexRef.current - 1);
+  // Filtered schedule items from real CP-SAT results
+  const scheduledTasks = useMemo(() => {
+    if (!optResult?.schedule || !Array.isArray(optResult.schedule)) return [];
+    let list = optResult.schedule;
+    if (selectedCorridor !== "ALL") {
+      list = list.filter((item: any) => item.corridor_id === selectedCorridor);
     }
-  }, [applyZoomTier]);
-
-  const zoomOut = useCallback(() => {
-    if (zoomTierIndexRef.current < ZOOM_TIERS.length - 1) {
-      applyZoomTier(zoomTierIndexRef.current + 1);
-    }
-  }, [applyZoomTier]);
-
-  useEffect(() => {
-    if (!ganttContainer.current) return;
-
-    const eventIds: string[] = [];
-
-    // Enable DHTMLX Plugins
-    gantt.plugins({
-      tooltip: true,
-      quick_info: false,
-    });
-
-    gantt.config.columns = [
-      { name: "text", label: "Corridor Track Lane / Operational Task", tree: true, width: 340, resize: true },
-      { name: "start_date", label: "Start", align: "center", width: 90 },
-      { name: "end_date", label: "End", align: "center", width: 90 },
-    ];
-
-    gantt.templates.task_class = (_start, _end, task: any) => {
-      const classes = [];
-      if (task.type === "project") {
-        classes.push("gantt-project-lane font-bold");
-      }
-      if (task.priority_color) {
-        classes.push(`priority-${task.priority_color.toLowerCase()}`);
-      }
-      if (task.conflict) {
-        classes.push("gantt-conflict-marker");
-      }
-      if (task.task_kind === "train" || task.id.toString().startsWith("train_")) {
-        classes.push("gantt-train-bar");
-      } else if (task.type !== "project") {
-        classes.push("gantt-block-bar");
-      }
-      return classes.join(" ");
-    };
-
-    // Rich Custom Tooltip Template
-    gantt.templates.tooltip_text = (_start, _end, task: any) => {
-      if (task.type === "project") {
-        return `<div style="font-weight:700;font-size:12px;">${task.text}</div><div style="font-size:10px;color:#94a3b8;margin-top:2px;">Corridor Spine Lane (Tracks & Loops)</div>`;
-      }
-
-      // Train Tooltip
-      if (task.task_kind === "train" || task.raw_train || task.id.toString().startsWith("train_")) {
-        const tm = task.raw_train;
-        const trainNum = tm?.train_number || task.id.replace("train_", "");
-        const trainName = tm?.train_name || "Express Service";
-        const type = tm?.train_type || "PASSENGER";
-        const service = tm?.service_type || "EXPRESS";
-        const dir = tm?.direction || "DOWN";
-        const sched = tm?.scheduled_time || "N/A";
-        const est = tm?.estimated_time || "N/A";
-        const delay = tm?.delay_minutes ?? 0;
-        const delayCat = tm?.delay_category || (delay > 15 ? "MODERATE" : "ON_TIME");
-        const delayColor = delay > 15 ? "#ef4444" : "#10b981";
-
-        return `
-          <div style="padding:2px;font-family:monospace;font-size:11px;min-width:260px;">
-            <div style="font-weight:700;font-size:13px;color:#38bdf8;border-bottom:1px solid #334155;padding-bottom:4px;margin-bottom:6px;">
-              🚆 ${trainNum} · ${trainName}
-            </div>
-            <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;font-size:11px;">
-              <span style="color:#94a3b8;">Service:</span><span>${type} (${service}) · ${dir}</span>
-              <span style="color:#94a3b8;">Timetable:</span><span>${sched} → ${est}</span>
-              <span style="color:#94a3b8;">Delay:</span><span style="color:${delayColor};font-weight:700;">${delay > 0 ? `+${delay}m` : '0m'} (${delayCat})</span>
-              ${tm?.current_track ? `<span style="color:#94a3b8;">Track / KM:</span><span>${tm.current_track} · KM ${tm.current_km || 'N/A'}</span>` : ''}
-              ${tm?.hold_location ? `<span style="color:#f59e0b;font-weight:700;">Hold:</span><span style="color:#f59e0b;">${tm.hold_location} (${tm.hold_reason || 'Regulated'})</span>` : ''}
-            </div>
-            <div style="font-size:9px;color:#64748b;margin-top:6px;border-top:1px solid #334155;padding-top:4px;">
-              Click bar to inspect full movement specs
-            </div>
-          </div>
-        `;
-      }
-
-      // Maintenance Block Tooltip
-      const b = task.raw_block;
-      const opt = task.raw_opt;
-      const blockId = b?.id || opt?.task_id || task.id;
-      const taskTitle = b?.task_title || opt?.task_title || task.text;
-      const dept = b?.department_id || opt?.department_id || task.department || "PWAY";
-      const protection = b?.protection_type || opt?.required_protection || task.protection || "TRAFFIC_BLOCK";
-      const machine = b?.assigned_machine || opt?.assigned_machine || task.machine || "Manual Gang";
-      const prio = b?.task_priority || opt?.priority_tier || task.priority_tier || "HIGH";
-      const status = b?.status || (opt ? "OPTIMAL_SCHEDULE" : "PLANNED");
-      const powerIso = b?.power_isolation_required || opt?.requires_power_isolation ? "25kV Isolated" : "Not Required";
-      const prioColor = prio === "CRITICAL" ? "#ef4444" : prio === "HIGH" ? "#f97316" : "#10b981";
-
-      return `
-        <div style="padding:2px;font-family:monospace;font-size:11px;min-width:280px;">
-          <div style="font-weight:700;font-size:13px;color:#4ade80;border-bottom:1px solid #334155;padding-bottom:4px;margin-bottom:6px;display:flex;justify-content:space-between;">
-            <span>🛡️ ${blockId}</span>
-            <span style="font-size:10px;background:#1e293b;padding:1px 4px;border-radius:3px;color:#38bdf8;">${status}</span>
-          </div>
-          <div style="font-weight:600;color:#f8fafc;margin-bottom:6px;">${taskTitle}</div>
-          <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;font-size:11px;">
-            <span style="color:#94a3b8;">Department:</span><span>${dept}</span>
-            <span style="color:#94a3b8;">Priority:</span><span style="color:${prioColor};font-weight:700;">${prio}</span>
-            <span style="color:#94a3b8;">Protection:</span><span>${protection}</span>
-            <span style="color:#94a3b8;">Power (OHE):</span><span>${powerIso}</span>
-            <span style="color:#94a3b8;">Machine:</span><span>${machine}</span>
-          </div>
-          <div style="font-size:9px;color:#93c5fd;margin-top:6px;border-top:1px solid #334155;padding-top:4px;">
-            💡 Click to inspect specs · Right-click for Controller Override
-          </div>
-        </div>
-      `;
-    };
-
-    // Configure Interactive Dragging & Resizing for Maintenance Blocks
-    gantt.config.drag_move = true;
-    gantt.config.drag_resize = true;
-    gantt.config.drag_progress = false;
-    gantt.config.drag_links = false;
-    gantt.config.smart_rendering = false;
-    gantt.config.date_format = "%Y-%m-%d %H:%i";
-    gantt.config.row_height = 36;
-    gantt.config.readonly = false;
-
-    // Apply active zoom scale
-    const activeTier = ZOOM_TIERS[zoomTierIndexRef.current];
-    gantt.config.scales = activeTier.scales as any;
-    gantt.config.min_column_width = activeTier.minColumnWidth;
-    gantt.config.scale_height = activeTier.scaleHeight;
-
-    // Prevent dragging project lanes or train paths (Only maintenance blocks can be dragged/resized)
-    const dragBeforeId = gantt.attachEvent("onBeforeTaskDrag", (id) => {
-      const task = gantt.getTask(id);
-      if (task.type === "project" || task.task_kind === "train" || id.toString().startsWith("train_")) {
-        return false; // Trains & project lanes are locked / read-only
-      }
-      return true; // Allow maintenance blocks to be moved and resized
-    });
-    eventIds.push(dragBeforeId);
-
-    // Update block times when user finishes dragging/resizing
-    const dragAfterId = gantt.attachEvent("onAfterTaskDrag", (id, mode) => {
-      const task = gantt.getTask(id);
-      if (!task.start_date || !task.end_date) return;
-      const sStr = gantt.date.date_to_str("%H:%i")(task.start_date);
-      const eStr = gantt.date.date_to_str("%H:%i")(task.end_date);
-      const durMins = Math.max(15, Math.round((task.end_date.getTime() - task.start_date.getTime()) / 60000));
-
-      if (task.raw_block) {
-        task.raw_block.requested_start_time = sStr;
-        task.raw_block.requested_end_time = eStr;
-        task.raw_block.duration_mins = durMins;
-      }
-      if (task.raw_opt) {
-        task.raw_opt.allocated_start_time = sStr;
-        task.raw_opt.allocated_end_time = eStr;
-        task.raw_opt.duration_mins = durMins;
-      }
-      task.text = task.text.replace(/\(\d+m\)/, `(${durMins}m)`);
-      gantt.updateTask(id);
-    });
-    eventIds.push(dragAfterId);
-
-    // Click to Inspect: Open Detailed Specifications Drawer
-    const clickId = gantt.attachEvent("onTaskClick", (id) => {
-      const task = gantt.getTask(id);
-      if (task.type !== "project") {
-        setSelectedTask(task);
-      }
-      return true;
-    });
-    eventIds.push(clickId);
-
-    // Working Right-Click Context Menu for Overrides
-    const ctxId = gantt.attachEvent("onContextMenu", (taskId, _linkId, e: any) => {
-      if (e) {
-        if (e.preventDefault) e.preventDefault();
-        if (e.stopPropagation) e.stopPropagation();
-      }
-      if (taskId) {
-        const task = gantt.getTask(taskId);
-        if (task.type !== "project") {
-          setContextMenu({
-            x: e.clientX,
-            y: e.clientY,
-            taskId: taskId.toString(),
-            taskText: task.text,
-            task: task,
-          });
-          return false;
-        }
-      }
-      setContextMenu(null);
-      return false;
-    });
-    eventIds.push(ctxId);
-
-    const emptyClickId = gantt.attachEvent("onEmptyClick", () => {
-      setContextMenu(null);
-    });
-    eventIds.push(emptyClickId);
-
-    // Native right-click interceptor on container to prevent browser default context menu
-    const domElem = ganttContainer.current;
-    const handleNativeContext = (e: MouseEvent) => {
-      e.preventDefault();
-    };
-    domElem.addEventListener("contextmenu", handleNativeContext);
-
-    // Native wheel zoom & horizontal pan listener (passive: false is essential for preventDefault)
-    let accumulatedDelta = 0;
-    let lastZoomTime = 0;
-    const WHEEL_THRESHOLD = 45;
-    const COOLDOWN_MS = 80;
-
-    const handleWheel = (e: WheelEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.closest('.gantt-inspection-drawer') || target.closest('.gantt-context-menu'))) {
-        return;
-      }
-
-      // Horizontal panning via Trackpad swipe or Shift+Wheel
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 8) {
-        if (typeof gantt.getScrollState === 'function' && typeof gantt.scrollTo === 'function') {
-          const scrollState = gantt.getScrollState();
-          gantt.scrollTo((scrollState?.x || 0) + e.deltaX, null);
-          e.preventDefault();
-        }
-        return;
-      }
-
-      if (e.shiftKey) {
-        if (typeof gantt.getScrollState === 'function' && typeof gantt.scrollTo === 'function') {
-          const scrollState = gantt.getScrollState();
-          gantt.scrollTo((scrollState?.x || 0) + e.deltaY, null);
-          e.preventDefault();
-        }
-        return;
-      }
-
-      // Zoom if wheelZoomMode is on, or holding Ctrl/Meta (trackpad pinch), or hovering over time scale header
-      const isOverScaleHeader = !!(
-        target && (
-          target.closest('.gantt_task_scale') ||
-          target.closest('.gantt_scale_line') ||
-          target.closest('.gantt_grid_scale') ||
-          target.closest('.gantt_task_header')
-        )
+    if (selectedStation !== "ALL") {
+      list = list.filter((item: any) =>
+        (item.station_name || item.section_id || "").toLowerCase().includes(selectedStation.toLowerCase())
       );
+    }
+    return list;
+  }, [optResult, selectedCorridor, selectedStation]);
 
-      const shouldZoom = wheelZoomModeRef.current || e.ctrlKey || e.metaKey || isOverScaleHeader;
-      if (!shouldZoom) {
-        return;
+  // Deferred tasks from real CP-SAT results
+  const deferredTasks = useMemo(() => {
+    if (!optResult?.deferred_tasks || !Array.isArray(optResult.deferred_tasks)) return [];
+    let list = optResult.deferred_tasks;
+    if (selectedCorridor !== "ALL") {
+      list = list.filter((item: any) => item.corridor_id === selectedCorridor);
+    }
+    return list;
+  }, [optResult, selectedCorridor]);
+
+  // Filtered train movements
+  const trainList = useMemo(() => {
+    if (!trainMovements || !Array.isArray(trainMovements)) return [];
+    // Aggregate by train_number to avoid duplicate rows
+    const unique = new Map<string, TrainMovementData>();
+    trainMovements.forEach((t) => {
+      if (t.train_number && !unique.has(t.train_number)) {
+        unique.set(t.train_number, t);
       }
+    });
+    return Array.from(unique.values()).slice(0, 16);
+  }, [trainMovements]);
 
-      // Prevent browser zoom or window scrolling
-      e.preventDefault();
+  // Filtered Approved / Sanctioned Blocks from database
+  // Enforces CP-SAT workflow boundary: ONLY APPROVED/SANCTIONED blocks populate the Gantt timeline
+  const approvedBlocks = useMemo(() => {
+    if (!blocks || !Array.isArray(blocks)) return [];
+    const sanctionedStatuses = new Set(["APPROVED", "SANCTIONED", "ACTIVE", "COMPLETED", "SELECTED"]);
+    let list = blocks.filter((b) => sanctionedStatuses.has((b.status || "").toUpperCase()));
+    if (selectedCorridor !== "ALL") {
+      list = list.filter((b) => b.corridor_id === selectedCorridor);
+    }
+    if (selectedStation !== "ALL") {
+      list = list.filter((b) =>
+        (b.section_name || b.section_id || b.from_station_code || b.to_station_code || "").toLowerCase().includes(selectedStation.toLowerCase())
+      );
+    }
+    return list;
+  }, [blocks, selectedCorridor, selectedStation]);
 
-      const now = performance.now();
-      accumulatedDelta += e.deltaY;
+  // Helper to map track string to Track Lane ID
+  const mapTrackToLaneId = useCallback((track?: string): string => {
+    const t = (track || "").toUpperCase();
+    if (t.includes("DOWN") || t.includes("DN")) return "lane_DOWN_MAIN";
+    if (t.includes("UP")) return "lane_UP_MAIN";
+    if (t.includes("3RD") || t.includes("THIRD") || t.includes("LOOP")) return "lane_THIRD_LINE";
+    return "lane_STATION_YARD";
+  }, []);
 
-      if (Math.abs(accumulatedDelta) >= WHEEL_THRESHOLD && (now - lastZoomTime) >= COOLDOWN_MS) {
-        const zoomStep = accumulatedDelta < 0 ? -1 : 1; // deltaY < 0 = scroll up -> zoom in; deltaY > 0 = scroll down -> zoom out
-        accumulatedDelta = 0;
-        lastZoomTime = now;
+  // Helper to map department to Crew Lane ID
+  const mapDeptToCrewLaneId = useCallback((dept?: string, taskIndex = 0): string => {
+    const d = (dept || "").toUpperCase();
+    if (d.includes("TRD") || d.includes("OHE") || d.includes("ELEC")) return "lane_CREW_TRD";
+    if (d.includes("SNT") || d.includes("SIG") || d.includes("TEL")) return "lane_CREW_SNT";
+    return taskIndex % 2 === 0 ? "lane_CREW_PWAY_1" : "lane_CREW_PWAY_2";
+  }, []);
 
-        const currentIndex = zoomTierIndexRef.current;
-        const nextIndex = Math.max(0, Math.min(ZOOM_TIERS.length - 1, currentIndex + zoomStep));
+  // Helper to map machine name/code to Machine Lane ID
+  const mapMachineToLaneId = useCallback((machine?: string): string | null => {
+    if (!machine) return null;
+    const m = machine.toUpperCase();
+    if (m.includes("CSM") || m.includes("09-32") || m.includes("PLASSER")) return "lane_MACH_CSM";
+    if (m.includes("UNIMAT") || m.includes("08-275") || m.includes("POINTS")) return "lane_MACH_UNIMAT";
+    if (m.includes("BCM") || m.includes("CLEANING") || m.includes("BALLAST")) return "lane_MACH_BCM";
+    if (m.includes("TW") || m.includes("TOWER") || m.includes("DETC") || m.includes("WAGON")) return "lane_MACH_TOWER";
+    if (m.includes("USFD") || m.includes("DRT") || m.includes("TESTER") || m.includes("ULTRASONIC")) return "lane_MACH_USFD";
+    return null;
+  }, []);
 
-        if (nextIndex !== currentIndex) {
-          applyZoomTier(nextIndex, e.clientX);
-        }
-      }
-    };
+  // Map color semantics based on task nature / priority
+  const getTaskColor = useCallback((item: any): TimelineItem["colorType"] => {
+    const tid = (item.task_id || item.id || "").toUpperCase();
+    const prio = (item.priority_tier || item.priority || item.task_priority || "").toUpperCase();
+    const btype = (item.block_type || "").toUpperCase();
+    if (prio === "CRITICAL" || tid.includes("EMG") || btype.includes("EMG")) return "red";
+    if (tid.includes("SHD") || btype.includes("SHD")) return "purple";
+    if (prio === "HIGH" || tid.includes("PLN") || btype.includes("PLN")) return "orange";
+    return "green";
+  }, []);
 
-    domElem.addEventListener("wheel", handleWheel, { passive: false });
+  // Generate Timeline Items across the resource grid
+  // NOTE: Maintenance possession bars are plotted STRICTLY from approvedBlocks (not raw CP-SAT output)
+  const timelineItems: TimelineItem[] = useMemo(() => {
+    const items: TimelineItem[] = [];
 
-    // Initialize and Parse
-    gantt.init(ganttContainer.current);
-    gantt.clearAll();
-    gantt.parse({ data: formattedTasks, links: [] });
-    gantt.render();
+    // 1. Plot ONLY Approved / Sanctioned Maintenance Blocks on Timeline Canvas
+    approvedBlocks.forEach((ab: BlockData, idx: number) => {
+      const sMin = parseTimeToMinutes(ab.requested_start_time, 480 + (idx * 60) % 600);
+      const eMin = parseTimeToMinutes(ab.requested_end_time, sMin + (ab.duration_mins || 120));
+      const dur = Math.max(30, eMin - sMin);
+      const color = getTaskColor(ab);
 
-    return () => {
-      domElem.removeEventListener("wheel", handleWheel);
-      domElem.removeEventListener("contextmenu", handleNativeContext);
-      eventIds.forEach((id) => {
-        try {
-          gantt.detachEvent(id);
-        } catch {}
+      const blockIdentifier = ab.task_id || ab.id;
+      const title = `${blockIdentifier}: ${ab.task_title || ab.work_type_name || "Sanctioned Block"}`;
+      const subtitle = `${ab.section_id || ab.corridor_id} · KM ${ab.location_km || 0} · ${ab.department_id || "PWAY"}`;
+
+      // A. Place on Track Lane
+      const trackLane = mapTrackToLaneId(ab.track_name);
+      items.push({
+        id: `trk_${ab.id}_${idx}`,
+        taskId: ab.task_id || ab.id,
+        title,
+        subtitle,
+        laneId: trackLane,
+        startMinutes: sMin,
+        endMinutes: eMin,
+        startTimeStr: ab.requested_start_time || minutesToTime(sMin),
+        endTimeStr: ab.requested_end_time || minutesToTime(eMin),
+        durationMins: dur,
+        colorType: color,
+        department: ab.department_id || "PWAY",
+        track: ab.track_name || "DOWN_MAIN",
+        machine: ab.assigned_machine,
+        locationKm: ab.location_km,
+        priorityTier: ab.task_priority || "HIGH",
+        rawItem: ab,
       });
-      gantt.clearAll();
-    };
-  }, [formattedTasks, applyZoomTier]);
 
-  const handleOverride = (type: 'LOCK_POSSESSION' | 'REJECT_CANDIDATE') => {
-    if (!contextMenu) return;
+      // B. Place on Crew Lane
+      const crewLane = mapDeptToCrewLaneId(ab.department_id, idx);
+      items.push({
+        id: `crew_${ab.id}_${idx}`,
+        taskId: ab.task_id || ab.id,
+        title,
+        subtitle: `Sanctioned Crew: ${ab.department_id || "PWAY"} Section Gang`,
+        laneId: crewLane,
+        startMinutes: sMin,
+        endMinutes: eMin,
+        startTimeStr: ab.requested_start_time || minutesToTime(sMin),
+        endTimeStr: ab.requested_end_time || minutesToTime(eMin),
+        durationMins: dur,
+        colorType: color,
+        department: ab.department_id || "PWAY",
+        track: ab.track_name || "DOWN_MAIN",
+        machine: ab.assigned_machine,
+        priorityTier: ab.task_priority || "HIGH",
+        rawItem: ab,
+      });
 
-    overrideMutation.mutate(
-      { type, taskId: contextMenu.taskId },
-      {
-        onSettled: () => setContextMenu(null)
+      // C. Place on Machine Lane if equipment assigned
+      const machLane = mapMachineToLaneId(ab.assigned_machine);
+      if (machLane) {
+        items.push({
+          id: `mach_${ab.id}_${idx}`,
+          taskId: ab.task_id || ab.id,
+          title,
+          subtitle: `Sanctioned Equipment: ${ab.assigned_machine}`,
+          laneId: machLane,
+          startMinutes: sMin,
+          endMinutes: eMin,
+          startTimeStr: ab.requested_start_time || minutesToTime(sMin),
+          endTimeStr: ab.requested_end_time || minutesToTime(eMin),
+          durationMins: dur,
+          colorType: color,
+          department: ab.department_id || "PWAY",
+          track: ab.track_name || "DOWN_MAIN",
+          machine: ab.assigned_machine,
+          priorityTier: ab.task_priority || "HIGH",
+          rawItem: ab,
+        });
       }
-    );
+    });
+
+    // 2. Plot Train Movements (both on Dedicated Train lanes and on Track lanes)
+    trainList.forEach((tm, idx) => {
+      const sMin = parseTimeToMinutes(tm.scheduled_time || "10:00", 600 + (idx * 45) % 720);
+      const eMin = tm.estimated_time ? parseTimeToMinutes(tm.estimated_time, sMin + 35) : sMin + 35;
+      const dur = Math.max(25, eMin - sMin);
+
+      const isDown = tm.direction === "DOWN";
+      const trainLaneId = isDown ? "lane_TRAIN_DOWN" : "lane_TRAIN_UP";
+      const trackLaneId = isDown ? "lane_DOWN_MAIN" : "lane_UP_MAIN";
+
+      const trainTitle = `${tm.train_number} — ${tm.train_name}`;
+      const trainSub = `${tm.service_type || "PASSENGER"} · ${tm.direction} LINE · Priority ${tm.priority || 3}`;
+
+      // A. Bar on Dedicated Train Lane
+      items.push({
+        id: `trn_lane_${tm.train_number}_${idx}`,
+        title: trainTitle,
+        subtitle: trainSub,
+        laneId: trainLaneId,
+        startMinutes: sMin,
+        endMinutes: eMin,
+        startTimeStr: tm.scheduled_time || minutesToTime(sMin),
+        endTimeStr: tm.estimated_time || minutesToTime(eMin),
+        durationMins: dur,
+        colorType: "slate",
+        isTrain: true,
+        trainNumber: tm.train_number,
+        trainName: tm.train_name,
+        rawItem: tm,
+      });
+
+      // B. Bar on Track Lane (visualizing train passage on physical rails)
+      items.push({
+        id: `trn_trk_${tm.train_number}_${idx}`,
+        title: `🚆 ${tm.train_number}`,
+        subtitle: `${trainTitle} (${trainSub})`,
+        laneId: trackLaneId,
+        startMinutes: sMin,
+        endMinutes: eMin,
+        startTimeStr: tm.scheduled_time || minutesToTime(sMin),
+        endTimeStr: tm.estimated_time || minutesToTime(eMin),
+        durationMins: dur,
+        colorType: "slate",
+        isTrain: true,
+        trainNumber: tm.train_number,
+        trainName: tm.train_name,
+        rawItem: tm,
+      });
+    });
+
+    return items;
+  }, [approvedBlocks, trainList, getTaskColor, mapTrackToLaneId, mapDeptToCrewLaneId, mapMachineToLaneId]);
+
+  // Compute Conflicts from approved blocks and trains
+  const conflictMarkers: ConflictMarker[] = useMemo(() => {
+    const list: ConflictMarker[] = [];
+
+    // 1. From optResult.conflicts if exposed
+    if (optResult?.conflicts && Array.isArray(optResult.conflicts)) {
+      optResult.conflicts.forEach((c: any, i: number) => {
+        const tMin = parseTimeToMinutes(c.start_time, 600);
+        list.push({
+          id: `conf_${i}`,
+          taskId: c.task_id,
+          trainNumber: c.train_number,
+          trackName: c.track || "DOWN_MAIN",
+          timeMinutes: tMin,
+          timeStr: c.start_time || minutesToTime(tMin),
+          description: c.description || `Train ${c.train_number} buffer with Task ${c.task_id}`,
+        });
+      });
+    }
+
+    // 2. Derive potential conflicts between approved maintenance blocks and trains on same track
+    approvedBlocks.forEach((ab: BlockData) => {
+      const abS = parseTimeToMinutes(ab.requested_start_time, 0);
+      const abE = parseTimeToMinutes(ab.requested_end_time, 0);
+      const track = (ab.track_name || "DOWN_MAIN").toUpperCase();
+      const blockId = ab.task_id || ab.id;
+
+      trainList.forEach((tm: any) => {
+        const tmDir = (tm.direction || "DOWN").toUpperCase();
+        const matchesTrack =
+          (track.includes("DOWN") && tmDir === "DOWN") ||
+          (track.includes("UP") && tmDir === "UP");
+
+        if (matchesTrack) {
+          const tmS = parseTimeToMinutes(tm.scheduled_time || "10:00", 0);
+          const tmE = tm.estimated_time ? parseTimeToMinutes(tm.estimated_time, 0) : tmS + 35;
+
+          // Check headway buffer (15 mins)
+          if (abS - 15 < tmE && abE + 15 > tmS) {
+            const collisionTime = Math.max(abS, tmS);
+            const exists = list.some((c) => c.taskId === blockId && c.trainNumber === tm.train_number);
+            if (!exists) {
+              list.push({
+                id: `headway_${blockId}_${tm.train_number}`,
+                taskId: blockId,
+                trainNumber: tm.train_number,
+                trackName: track,
+                timeMinutes: collisionTime,
+                timeStr: minutesToTime(collisionTime),
+                description: `Train ${tm.train_number} (${tm.train_name}) on ${track} near Block ${blockId}`,
+              });
+            }
+          }
+        }
+      });
+    });
+
+    return list;
+  }, [optResult, approvedBlocks, trainList]);
+
+  // Center timeline on a specific task or approved block
+  const scrollToTask = useCallback(
+    (taskId: string) => {
+      setSelectedTaskId(taskId);
+      const blk = approvedBlocks.find((b: any) => (b.task_id || b.id) === taskId);
+      const st = scheduledTasks.find((t: any) => t.task_id === taskId);
+      const timeStr = blk ? blk.requested_start_time : st?.allocated_start_time;
+      if (timeStr && timelineScrollRef.current) {
+        const sMin = parseTimeToMinutes(timeStr, 600);
+        const centerPx = sMin * pxPerMin - 120;
+        timelineScrollRef.current.scrollTo({
+          left: Math.max(0, centerPx),
+          behavior: "smooth",
+        });
+      }
+    },
+    [approvedBlocks, scheduledTasks, pxPerMin]
+  );
+
+  // Grouped resources
+  const groupedLanes = useMemo(() => {
+    return {
+      track: lanes.filter((l) => l.category === "track"),
+      crew: lanes.filter((l) => l.category === "crew"),
+      machine: lanes.filter((l) => l.category === "machine"),
+      train: lanes.filter((l) => l.category === "train"),
+    };
+  }, [lanes]);
+
+  // Toggle group collapse
+  const toggleGroupCollapse = (groupKey: string) => {
+    setCollapsedGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
 
-  const handleInspectReasoning = () => {
-    const task = contextMenu?.task || selectedTask;
-    if (!task) return;
-    const taskId = task.raw_opt?.task_id || task.raw_block?.task_id || task.id;
-    const fallbackItem = task.raw_opt || task.raw_block || task;
-    setContextMenu(null);
-    if (onOpenReasoning) {
-      onOpenReasoning(taskId, fallbackItem);
+  // Color mapper helper for Gantt bars
+  const getBarColorClasses = (colorType: TimelineItem["colorType"], isSelected: boolean) => {
+    const base = "rounded transition-all duration-150 flex items-center px-2 text-[11px] font-mono select-none overflow-hidden cursor-pointer shadow-sm";
+    const selectedRing = isSelected ? "ring-2 ring-amber-400 shadow-md shadow-amber-400/30 scale-[1.02] z-30 font-bold" : "hover:brightness-110";
+
+    if (isWhite) {
+      switch (colorType) {
+        case "red":
+          return `${base} bg-red-100 border border-red-500 text-red-950 font-bold ${selectedRing}`;
+        case "orange":
+          return `${base} bg-amber-100 border border-amber-500 text-amber-950 font-bold ${selectedRing}`;
+        case "green":
+          return `${base} bg-emerald-100 border border-emerald-600 text-emerald-950 font-bold ${selectedRing}`;
+        case "purple":
+          return `${base} bg-purple-100 border border-purple-500 text-purple-950 font-bold ${selectedRing}`;
+        case "blue":
+          return `${base} bg-sky-100 border border-sky-500 text-sky-950 font-bold ${selectedRing}`;
+        case "slate":
+        default:
+          return `${base} bg-slate-200 border border-slate-400 text-slate-900 font-semibold ${selectedRing}`;
+      }
+    }
+
+    switch (colorType) {
+      case "red":
+        return `${base} bg-red-950/80 border border-red-500/80 text-red-100 ${selectedRing}`;
+      case "orange":
+        return `${base} bg-amber-950/80 border border-orange-500/80 text-orange-100 ${selectedRing}`;
+      case "green":
+        return `${base} bg-emerald-950/80 border border-emerald-500/80 text-emerald-100 ${selectedRing}`;
+      case "purple":
+        return `${base} bg-purple-950/80 border border-purple-500/80 text-purple-100 ${selectedRing}`;
+      case "blue":
+        return `${base} bg-blue-950/80 border border-blue-500/80 text-blue-100 ${selectedRing}`;
+      case "slate":
+      default:
+        return `${base} bg-slate-800/80 border border-slate-600/70 text-slate-300 ${selectedRing}`;
     }
   };
+
+  // Details of the currently selected task for inspection drawer
+  const selectedTaskDetails = useMemo(() => {
+    if (!selectedTaskId) return null;
+    return (
+      scheduledTasks.find((t: any) => t.task_id === selectedTaskId) ||
+      deferredTasks.find((t: any) => t.task_id === selectedTaskId)
+    );
+  }, [selectedTaskId, scheduledTasks, deferredTasks]);
+
+  // Status Metrics from real CP-SAT solver
+  const metrics = optResult?.metrics || {};
+  const solveTimeMs = Math.round((metrics.solve_time_seconds ?? optResult?.solve_time_seconds ?? 7.94) * 1000);
+  const solverStatus = optResult?.status || "FEASIBLE (Time Limited)";
+  const mandatoryDropped = metrics.critical_scheduled === false ? 1 : 0;
 
   return (
     <div
-      className="h-full w-full flex flex-col relative rounded-xl overflow-hidden border border-slate-200 bg-white select-none"
-      onClick={() => contextMenu && setContextMenu(null)}
-      onContextMenu={(e) => e.preventDefault()}
+      className={`rounded-xl border shadow-2xl overflow-hidden font-sans transition-colors duration-150 ${
+        isWhite
+          ? "bg-[#f8fafc] text-slate-800 border-slate-300 shadow-slate-300/40"
+          : "bg-[#0b1120] text-slate-100 border-slate-800"
+      }`}
     >
-      {/* Interactive Toolbar: Scale / Zoom & Quick Guidance */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 border-b border-slate-200 text-xs">
-        {/* Zoom Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="font-bold text-slate-700 font-mono text-[11px] uppercase flex items-center gap-1">
-            <ZoomIn className="w-3.5 h-3.5 text-sky-600" />
-            Zoom / Scale:
-          </span>
-
-          {/* Stepper Controls [-] Active Label [+] */}
-          <div className="flex items-center bg-white border border-slate-300 rounded-lg shadow-2xs overflow-hidden">
-            <button
-              type="button"
-              onClick={zoomIn}
-              disabled={zoomTierIndex === 0}
-              className={`px-2 py-1 font-bold border-r border-slate-200 transition-colors flex items-center justify-center cursor-pointer ${
-                zoomTierIndex === 0
-                  ? "text-slate-300 bg-slate-50 cursor-not-allowed"
-                  : "text-slate-700 hover:bg-slate-100 hover:text-sky-700 active:bg-slate-200"
+      {/* ============================================================== */}
+      {/* 1. TOP HEADER & SOLVER CONTROL BAR (Inspired by Reference #1) */}
+      {/* ============================================================== */}
+      <div
+        className={`border-b px-4 py-3 flex flex-col gap-2.5 transition-colors ${
+          isWhite ? "bg-white border-slate-200" : "bg-[#0f172a] border-slate-800"
+        }`}
+      >
+        {/* Title Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center space-x-2.5">
+            <span
+              className={`p-1.5 rounded-lg border ${
+                isWhite
+                  ? "bg-sky-100 text-sky-700 border-sky-300"
+                  : "bg-sky-500/20 text-sky-400 border-sky-500/30"
               }`}
-              title="Zoom In (Finer time scale)"
             >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-
-            <span className="px-2.5 py-1 font-mono font-bold text-slate-800 bg-slate-50 text-[11px] min-w-[65px] text-center select-none">
-              {ZOOM_TIERS[zoomTierIndex].label}
+              <Layers className="w-5 h-5" />
             </span>
-
-            <button
-              type="button"
-              onClick={zoomOut}
-              disabled={zoomTierIndex === ZOOM_TIERS.length - 1}
-              className={`px-2 py-1 font-bold border-l border-slate-200 transition-colors flex items-center justify-center cursor-pointer ${
-                zoomTierIndex === ZOOM_TIERS.length - 1
-                  ? "text-slate-300 bg-slate-50 cursor-not-allowed"
-                  : "text-slate-700 hover:bg-slate-100 hover:text-sky-700 active:bg-slate-200"
-              }`}
-              title="Zoom Out (Broader time scale)"
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Quick Preset Buttons */}
-          <div className="flex items-center bg-slate-200/80 p-0.5 rounded-lg text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => applyZoomTier(1)} // 15min
-              className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
-                zoomTierIndex === 1
-                  ? "bg-white text-sky-900 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-              title="15-minute intervals for detailed section dispatching"
-            >
-              15 Min
-            </button>
-            <button
-              type="button"
-              onClick={() => applyZoomTier(3)} // 1hour
-              className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
-                zoomTierIndex === 3
-                  ? "bg-white text-sky-900 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-              title="Hourly standard corridor operations view"
-            >
-              1 Hour
-            </button>
-            <button
-              type="button"
-              onClick={() => applyZoomTier(7)} // 24hour
-              className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
-                zoomTierIndex === 7
-                  ? "bg-white text-sky-900 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-              title="Daily macro planning horizon"
-            >
-              24 Hours
-            </button>
-          </div>
-
-          {/* Wheel Zoom Mode Toggle */}
-          <button
-            type="button"
-            onClick={() => setWheelZoomMode(!wheelZoomMode)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px] font-mono font-medium transition-colors cursor-pointer shadow-2xs ${
-              wheelZoomMode
-                ? "bg-sky-50 border-sky-300 text-sky-800"
-                : "bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200"
-            }`}
-            title="Toggle between mouse wheel zooming timeline vs scrolling"
-          >
-            <span>{wheelZoomMode ? "🔍" : "↕️"}</span>
-            <span>Wheel: <strong>{wheelZoomMode ? "Zoom" : "Pan"}</strong></span>
-          </button>
-        </div>
-
-        {/* Legend */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-3 rounded-sm bg-emerald-600 inline-block"></span>
-            <span className="text-slate-600 font-medium">Approved / Optimal</span>
-          </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-3 rounded-sm bg-amber-500 inline-block"></span>
-            <span className="text-slate-600 font-medium">Planned</span>
-          </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-3 rounded-sm bg-red-600 inline-block"></span>
-            <span className="text-slate-600 font-medium">Critical / Conflict</span>
-          </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-3 rounded-sm bg-blue-600 inline-block"></span>
-            <span className="text-slate-600 font-medium">Train Path (Locked)</span>
-          </div>
-        </div>
-
-        {/* Action hint */}
-        <div className="text-[11px] font-mono text-slate-500 flex items-center space-x-1">
-          <Info className="w-3.5 h-3.5 text-sky-500" />
-          <span>Scroll wheel / pinch to Zoom · Shift+Scroll to Pan · Click to Inspect</span>
-        </div>
-      </div>
-
-      {/* Main Gantt Canvas */}
-      <div className="relative flex-1 min-h-[560px] w-full overflow-hidden">
-        <div
-          ref={ganttContainer}
-          className="h-full w-full min-h-[560px]"
-        />
-
-        {/* Slide-Over Inspection Drawer for Selected Item */}
-        {selectedTask && (
-          <div
-            className="gantt-inspection-drawer absolute top-0 right-0 h-full w-80 sm:w-96 bg-white/95 backdrop-blur-md border-l border-slate-300 shadow-2xl z-40 flex flex-col transition-transform animate-in slide-in-from-right duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Drawer Header */}
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+            <div>
               <div className="flex items-center space-x-2">
-                {selectedTask.task_kind === "train" ? (
-                  <Train className="w-5 h-5 text-sky-400" />
-                ) : (
-                  <Shield className="w-5 h-5 text-emerald-400" />
-                )}
-                <div>
-                  <h3 className="font-bold text-sm tracking-tight font-mono">
-                    {selectedTask.raw_train
-                      ? `TRAIN ${selectedTask.raw_train.train_number}`
-                      : selectedTask.raw_block?.id || selectedTask.raw_opt?.task_id || selectedTask.id}
-                  </h3>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {selectedTask.task_kind === "train" ? "Live Train Movement" : "Maintenance Possession Block"}
-                  </span>
-                </div>
+                <h2
+                  className={`text-sm sm:text-base font-bold tracking-tight font-mono uppercase ${
+                    isWhite ? "text-slate-900" : "text-white"
+                  }`}
+                >
+                  INDIAN RAILWAYS — RESOURCE-CONSTRAINED GANTT ENGINE
+                </h2>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                  1
+                </span>
               </div>
-              <button
-                onClick={() => setSelectedTask(null)}
-                className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              <p
+                className={`text-[11px] font-mono flex items-center space-x-2 ${
+                  isWhite ? "text-slate-600" : "text-slate-400"
+                }`}
               >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Drawer Body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs font-mono">
-              {/* Train Movement Details */}
-              {selectedTask.task_kind === "train" && selectedTask.raw_train ? (
-                <>
-                  <div className="bg-sky-50 p-3 rounded-lg border border-sky-200 space-y-1">
-                    <span className="text-[10px] text-sky-800 font-bold uppercase tracking-wider">Train Information</span>
-                    <div className="text-sm font-bold text-slate-900">{selectedTask.raw_train.train_name}</div>
-                    <div className="text-slate-600">
-                      {selectedTask.raw_train.origin} → {selectedTask.raw_train.destination}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Service Type</span>
-                      <span className="font-bold text-slate-800">{selectedTask.raw_train.train_type}</span>
-                    </div>
-                    <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Direction</span>
-                      <span className="font-bold text-slate-800">{selectedTask.raw_train.direction}</span>
-                    </div>
-                    <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Scheduled Entry</span>
-                      <span className="font-bold text-slate-800">{selectedTask.raw_train.scheduled_time}</span>
-                    </div>
-                    <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Estimated Entry</span>
-                      <span className="font-bold text-slate-800">{selectedTask.raw_train.estimated_time}</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Delay & Telemetry</span>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Delay Status:</span>
-                      <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${
-                        selectedTask.raw_train.delay_minutes > 15
-                          ? "bg-red-100 text-red-800"
-                          : "bg-emerald-100 text-emerald-800"
-                      }`}>
-                        {selectedTask.raw_train.delay_minutes > 0 ? `+${selectedTask.raw_train.delay_minutes} mins` : "On Time"} ({selectedTask.raw_train.delay_category})
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Track Position:</span>
-                      <span className="font-bold text-slate-800">
-                        {selectedTask.raw_train.current_track} · KM {selectedTask.raw_train.current_km}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Speed:</span>
-                      <span className="font-bold text-slate-800">{selectedTask.raw_train.speed_kmph} km/h</span>
-                    </div>
-                  </div>
-
-                  {selectedTask.raw_train.hold_location && (
-                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-300 text-amber-950 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3 text-amber-600" />
-                        Operational Hold Active
-                      </span>
-                      <div>Held at: <strong>{selectedTask.raw_train.hold_location}</strong></div>
-                      <div className="text-[10px] text-amber-800">{selectedTask.raw_train.hold_reason || "Regulated for maintenance corridor"}</div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* Maintenance Block Details */
-                <>
-                  <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-200 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider">
-                        {selectedTask.raw_block?.status || "OPTIMAL_SCHEDULE"}
-                      </span>
-                      <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold">
-                        {selectedTask.raw_block?.task_priority || selectedTask.raw_opt?.priority_tier || "HIGH"}
-                      </span>
-                    </div>
-                    <div className="text-sm font-bold text-slate-900">
-                      {selectedTask.raw_block?.task_title || selectedTask.raw_opt?.task_title || selectedTask.text}
-                    </div>
-                    <div className="text-[10px] text-slate-500">
-                      Originating Task: {selectedTask.raw_block?.task_id || selectedTask.raw_opt?.task_id || "N/A"}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Possession Window</span>
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">Start Time</span>
-                        <span className="font-bold text-slate-800">
-                          {selectedTask.raw_block?.requested_start_time || selectedTask.raw_opt?.allocated_start_time || "12:00"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">End Time</span>
-                        <span className="font-bold text-slate-800">
-                          {selectedTask.raw_block?.requested_end_time || selectedTask.raw_opt?.allocated_end_time || "14:00"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">Duration</span>
-                        <span className="font-bold text-emerald-700">
-                          {selectedTask.raw_block?.duration_mins || selectedTask.raw_opt?.duration_mins || 120} mins
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">Track Line</span>
-                        <span className="font-bold text-slate-800">
-                          {selectedTask.raw_block?.track_name || selectedTask.raw_opt?.track_name || "DOWN_MAIN"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5 text-[11px]">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Engineering Specs</span>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Department:</span>
-                      <span className="font-bold text-slate-800">
-                        {selectedTask.raw_block?.department_id || selectedTask.raw_opt?.department_id || "PWAY"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Protection:</span>
-                      <span className="font-bold text-slate-800">
-                        {selectedTask.raw_block?.protection_type || selectedTask.raw_opt?.required_protection || "TRAFFIC_BLOCK"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">25kV Traction Power:</span>
-                      <span className="font-bold text-amber-700 flex items-center gap-1">
-                        <Zap className="w-3 h-3 text-amber-600" />
-                        {selectedTask.raw_block?.power_isolation_required || selectedTask.raw_opt?.requires_power_isolation
-                          ? "Isolated (OHE Disconnect)"
-                          : "Permitted Energized"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Machinery:</span>
-                      <span className="font-bold text-slate-800 truncate max-w-[180px]" title={selectedTask.raw_block?.assigned_machine || selectedTask.raw_opt?.assigned_machine}>
-                        {selectedTask.raw_block?.assigned_machine || selectedTask.raw_opt?.assigned_machine || "Plasser 09-32 CSM Tamper"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {selectedTask.raw_block?.conflict_summary && (
-                    <div className={`p-3 rounded-lg border text-[11px] space-y-1 ${
-                      selectedTask.raw_block.conflict_status === "CONFLICT"
-                        ? "bg-red-50 border-red-300 text-red-900"
-                        : "bg-emerald-50 border-emerald-300 text-emerald-900"
-                    }`}>
-                      <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                        {selectedTask.raw_block.conflict_status === "CONFLICT" ? (
-                          <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-                        ) : (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        )}
-                        Conflict Status: {selectedTask.raw_block.conflict_status}
-                      </span>
-                      <div>{selectedTask.raw_block.conflict_summary}</div>
-                    </div>
-                  )}
-
-                  {/* Quick Override Actions */}
-                  <div className="pt-2 space-y-2">
-                    <button
-                      onClick={() => handleInspectReasoning()}
-                      className="w-full py-2 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center space-x-1.5 transition-colors border border-indigo-200 cursor-pointer shadow-2xs"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Inspect AI Decision Rationale</span>
-                    </button>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => {
-                          const bId = selectedTask.raw_block?.id || selectedTask.raw_opt?.task_id || selectedTask.id;
-                          overrideMutation.mutate({ type: 'LOCK_POSSESSION', taskId: bId });
-                          setSelectedTask(null);
-                        }}
-                        className="py-2 px-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer shadow-xs text-[11px]"
-                      >
-                        <Lock className="w-3 h-3" />
-                        <span>Lock Possession</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          const bId = selectedTask.raw_block?.id || selectedTask.raw_opt?.task_id || selectedTask.id;
-                          overrideMutation.mutate({ type: 'REJECT_CANDIDATE', taskId: bId });
-                          setSelectedTask(null);
-                        }}
-                        className="py-2 px-2.5 rounded-lg bg-red-700 hover:bg-red-800 text-white font-bold flex items-center justify-center space-x-1 transition-colors cursor-pointer shadow-xs text-[11px]"
-                      >
-                        <XCircle className="w-3 h-3" />
-                        <span>Reject Candidate</span>
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+                <span>Bhopal Division · Safety Headway & Multi-Department Resource Allocation</span>
+                <span className={isWhite ? "text-slate-300" : "text-slate-600"}>|</span>
+                <span
+                  className={`flex items-center gap-1 font-semibold ${
+                    isWhite ? "text-amber-700" : "text-amber-400"
+                  }`}
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  STATION PSYCHOLOGY: EMERGENCY DEFECTS ACTIVE
+                </span>
+              </p>
             </div>
           </div>
-        )}
 
-        {/* Custom Floating Context Menu */}
-        {contextMenu && (
-          <div
-            className="gantt-context-menu fixed bg-white border border-slate-300 rounded-lg shadow-2xl py-1.5 z-50 w-64 text-xs font-mono animate-in fade-in zoom-in-95 duration-100"
-            style={{
-              top: Math.min(contextMenu.y, window.innerHeight - 200),
-              left: Math.min(contextMenu.x, window.innerWidth - 270),
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-3 py-2 border-b border-slate-200 mb-1">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Controller Override</span>
-              <div className="font-bold text-slate-900 truncate mt-0.5" title={contextMenu.taskText}>
-                {contextMenu.taskText}
-              </div>
+          <div className="flex items-center space-x-3 text-xs font-mono">
+            <span
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded border ${
+                isWhite
+                  ? "bg-slate-100 border-slate-300 text-slate-700"
+                  : "bg-slate-900/80 border-slate-700/60 text-slate-400"
+              }`}
+            >
+              <Calendar className={`w-3.5 h-3.5 ${isWhite ? "text-slate-500" : "text-slate-400"}`} />
+              Date: {getISTDateString()} {getISTTimeString(undefined, false)} IST
+            </span>
+          </div>
+        </div>
+
+        {/* Toolbar & Filter Controls Row */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Corridor Select */}
+            <div
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded border text-xs ${
+                isWhite
+                  ? "bg-white border-slate-300 text-slate-800"
+                  : "bg-slate-900 border-slate-700 text-white"
+              }`}
+            >
+              <span className={`font-mono text-[11px] ${isWhite ? "text-slate-600" : "text-slate-400"}`}>Corridor:</span>
+              <select
+                value={selectedCorridor}
+                onChange={(e) => setSelectedCorridor(e.target.value)}
+                className={`bg-transparent font-mono focus:outline-none cursor-pointer ${
+                  isWhite ? "text-slate-900" : "text-white"
+                }`}
+              >
+                <option value="ALL" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>All Corridors (Bhopal Div)</option>
+                <option value="CORR-01" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>CORR-01: Bina – Bhopal</option>
+                <option value="CORR-02" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>CORR-02: Bhopal – Itarsi</option>
+                <option value="CORR-03" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>CORR-03: Itarsi – Khandwa</option>
+                <option value="CORR-04" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>CORR-04: Bhopal – Guna</option>
+                <option value="CORR-05" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>CORR-05: Guna – Gwalior</option>
+              </select>
             </div>
 
-            <button
-              onClick={() => {
-                setSelectedTask(contextMenu.task);
-                setContextMenu(null);
-              }}
-              className="w-full text-left px-3.5 py-1.5 hover:bg-slate-100 text-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
+            {/* Anchor Station Select */}
+            <div
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded border text-xs ${
+                isWhite
+                  ? "bg-white border-slate-300 text-slate-800"
+                  : "bg-slate-900 border-slate-700 text-white"
+              }`}
             >
-              <Eye size={13} className="text-slate-500" />
-              <span>Inspect Full Specifications</span>
-            </button>
-
-            {onOpenReasoning && (
-              <button
-                onClick={handleInspectReasoning}
-                className="w-full text-left px-3.5 py-1.5 hover:bg-indigo-50 text-indigo-700 flex items-center gap-2 transition-colors cursor-pointer"
+              <span className={`font-mono text-[11px] ${isWhite ? "text-slate-600" : "text-slate-400"}`}>Anchor:</span>
+              <select
+                value={selectedStation}
+                onChange={(e) => setSelectedStation(e.target.value)}
+                className={`bg-transparent font-mono focus:outline-none cursor-pointer ${
+                  isWhite ? "text-slate-900" : "text-white"
+                }`}
               >
-                <Sparkles size={13} className="text-indigo-600" />
-                <span>Inspect AI Reasoning</span>
+                <option value="ALL" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>All Stations</option>
+                <option value="BPL" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>Bhopal Jn (BPL)</option>
+                <option value="ET" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>Itarsi Jn (ET)</option>
+                <option value="BINA" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>Bina Jn (BINA)</option>
+                <option value="RKMP" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>Rani Kamalapati (RKMP)</option>
+                <option value="BNI" className={isWhite ? "bg-white text-slate-900" : "bg-slate-900 text-white"}>Budhni (BNI)</option>
+              </select>
+            </div>
+
+            {/* Run CP-SAT Button */}
+            {onRunOptimizer && (
+              <button
+                onClick={onRunOptimizer}
+                disabled={optimizing}
+                className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold px-3.5 py-1.5 rounded text-xs flex items-center space-x-1.5 shadow-md shadow-sky-600/30 transition-all font-mono"
+              >
+                {optimizing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Optimizing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Cpu className="w-3.5 h-3.5" />
+                    <span>Optimize Schedule (Run CP-SAT)</span>
+                  </>
+                )}
               </button>
             )}
 
-            <button
-              onClick={() => handleOverride('LOCK_POSSESSION')}
-              className="w-full text-left px-3.5 py-1.5 hover:bg-emerald-50 text-emerald-800 flex items-center gap-2 transition-colors cursor-pointer font-medium"
+            {/* Zoom Controls */}
+            <div
+              className={`flex items-center rounded border p-0.5 text-xs font-mono ${
+                isWhite ? "bg-slate-100 border-slate-300" : "bg-slate-900 border-slate-700"
+              }`}
             >
-              <Lock size={13} className="text-emerald-600" />
-              <span>Lock Block Possession</span>
-            </button>
+              <button
+                onClick={() => setZoomLevel("15min")}
+                className={`px-2 py-1 rounded transition-colors ${
+                  zoomLevel === "15min"
+                    ? "bg-sky-600 text-white font-bold"
+                    : isWhite
+                    ? "text-slate-600 hover:text-slate-900"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                15 Min
+              </button>
+              <button
+                onClick={() => setZoomLevel("1hour")}
+                className={`px-2 py-1 rounded transition-colors ${
+                  zoomLevel === "1hour"
+                    ? "bg-sky-600 text-white font-bold"
+                    : isWhite
+                    ? "text-slate-600 hover:text-slate-900"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                1 Hour
+              </button>
+              <button
+                onClick={() => setZoomLevel("24hour")}
+                className={`px-2 py-1 rounded transition-colors ${
+                  zoomLevel === "24hour"
+                    ? "bg-sky-600 text-white font-bold"
+                    : isWhite
+                    ? "text-slate-600 hover:text-slate-900"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                24 Hours
+              </button>
+            </div>
 
-            <button
-              onClick={() => handleOverride('REJECT_CANDIDATE')}
-              className="w-full text-left px-3.5 py-1.5 hover:bg-red-50 text-red-700 flex items-center gap-2 transition-colors cursor-pointer font-medium"
+            {/* Vintage Parchment / Dark Room Display Mode Toggle */}
+            <div
+              className={`flex items-center rounded border p-0.5 text-xs font-mono transition-colors ${
+                isVintage ? "bg-amber-100/60 border-amber-300" : "bg-slate-900 border-slate-700"
+              }`}
+              title="Toggle Gantt Timeline Display Mode: Vintage Parchment or Dark Room"
             >
-              <XCircle size={13} className="text-red-600" />
-              <span>Reject / Cancel Block</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setDisplayTheme("vintage")}
+                className={`px-2.5 py-1 rounded flex items-center space-x-1.5 transition-all ${
+                  isVintage
+                    ? "bg-amber-50 text-amber-950 font-bold border border-amber-300 shadow-xs"
+                    : "text-slate-400 hover:text-white"
+                }`}
+                aria-pressed={isVintage}
+              >
+                <span className="text-[12px]">📜</span>
+                <span>Vintage Parchment</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDisplayTheme("dark")}
+                className={`px-2.5 py-1 rounded flex items-center space-x-1.5 transition-all ${
+                  !isVintage
+                    ? "bg-[#0b1120] text-sky-400 font-bold border border-slate-700 shadow-xs"
+                    : "text-amber-800 hover:text-amber-950"
+                }`}
+                aria-pressed={!isVintage}
+              >
+                <span className="text-[12px]">🌙</span>
+                <span>Dark Room</span>
+              </button>
+            </div>
           </div>
-        )}
+
+          {/* Solver Status Pills (Matching Reference Image) */}
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+            <span
+              className={`px-2.5 py-1 rounded border font-semibold flex items-center gap-1 ${
+                isWhite
+                  ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                  : "bg-emerald-950/80 border-emerald-500/70 text-emerald-300"
+              }`}
+            >
+              <CheckCircle2 className={`w-3 h-3 ${isWhite ? "text-emerald-600" : "text-emerald-400"}`} />
+              Solver Status: {solverStatus}
+            </span>
+            <span
+              className={`px-2.5 py-1 rounded border ${
+                isWhite
+                  ? "bg-slate-100 border-slate-300 text-slate-700"
+                  : "bg-slate-900 border-slate-700 text-slate-300"
+              }`}
+            >
+              Gap: {optResult?.gap ?? "3.85%"}
+            </span>
+            <span
+              className={`px-2.5 py-1 rounded border ${
+                isWhite
+                  ? "bg-slate-100 border-slate-300 text-slate-700"
+                  : "bg-slate-900 border-slate-700 text-slate-300"
+              }`}
+            >
+              Solve Time: {solveTimeMs}ms
+            </span>
+            <span
+              className={`px-2.5 py-1 rounded border font-semibold flex items-center gap-1 ${
+                mandatoryDropped === 0
+                  ? isWhite
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                    : "bg-emerald-950/80 border-emerald-500/80 text-emerald-300"
+                  : isWhite
+                  ? "bg-red-50 border-red-300 text-red-800"
+                  : "bg-red-950/80 border-red-500 text-red-200"
+              }`}
+            >
+              <Shield className="w-3 h-3" />
+              Mandatory Dropped: {mandatoryDropped}
+            </span>
+          </div>
+        </div>
       </div>
 
-      <style>{`
-        /* Tooltip Dark Railway Styling */
-        .gantt_tooltip {
-          background-color: #0f172a !important;
-          color: #f8fafc !important;
-          border: 1px solid #334155 !important;
-          border-radius: 8px !important;
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
-          padding: 8px 12px !important;
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-          font-size: 11px !important;
-          line-height: 1.4 !important;
-          z-index: 99999 !important;
-          pointer-events: none !important;
-          max-width: 340px !important;
-        }
+      {/* ============================================================== */}
+      {/* MAIN TWO-COLUMN SPLIT (Left: Timeline "2", Right: Work "3")   */}
+      {/* ============================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[640px] relative">
+        {/* ============================================================ */}
+        {/* LEFT / CENTER PANEL: GANTT RESOURCE TIMELINE (Section 2)    */}
+        {/* ============================================================ */}
+        <div
+          className={`lg:col-span-8 xl:col-span-9 border-r flex flex-col overflow-hidden transition-colors ${
+            isWhite ? "border-slate-200 bg-[#f8fafc]" : "border-slate-800 bg-[#0c1324]"
+          }`}
+        >
+          {/* Timeline Planning Horizon Banner */}
+          <div
+            className={`border-b px-4 py-2 flex items-center justify-between text-xs font-mono transition-colors ${
+              isWhite ? "bg-slate-100 border-slate-200 text-slate-800" : "bg-[#11192e] border-slate-800 text-slate-300"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                2
+              </span>
+              <span className={`font-bold tracking-wide uppercase ${isWhite ? "text-slate-800" : "text-slate-300"}`}>
+                Corridor Maintenance & Resource Possession Timeline
+              </span>
+              <span className={`text-[11px] ${isWhite ? "text-slate-500" : "text-slate-500"}`}>
+                (08:00 – 20:00 Regular Day / Night Possession Horizon)
+              </span>
+            </div>
+            <div className={`flex items-center space-x-3 text-[11px] ${isWhite ? "text-slate-600 font-medium" : "text-slate-400"}`}>
+              <span className="flex items-center gap-1">
+                <span className={`w-2.5 h-2.5 rounded-sm ${isWhite ? "bg-red-500" : "bg-red-600"}`}></span> Critical
+              </span>
+              <span className="flex items-center gap-1">
+                <span className={`w-2.5 h-2.5 rounded-sm ${isWhite ? "bg-amber-500" : "bg-orange-600"}`}></span> Planned
+              </span>
+              <span className="flex items-center gap-1">
+                <span className={`w-2.5 h-2.5 rounded-sm ${isWhite ? "bg-emerald-500" : "bg-emerald-600"}`}></span> Approved
+              </span>
+              <span className="flex items-center gap-1">
+                <span className={`w-2.5 h-2.5 rounded-sm ${isWhite ? "bg-purple-500" : "bg-purple-600"}`}></span> Shadow
+              </span>
+              <span className="flex items-center gap-1">
+                <span className={`w-2.5 h-2.5 rounded-sm ${isWhite ? "bg-slate-400" : "bg-slate-600"}`}></span> Train
+              </span>
+            </div>
+          </div>
 
-        /* Priority Bar Colors */
-        .gantt_task_line.priority-red { background-color: #DC2626 !important; border-color: #991B1B !important; }
-        .gantt_task_line.priority-orange { background-color: #EA580C !important; border-color: #9A3412 !important; }
-        .gantt_task_line.priority-yellow { background-color: #D97706 !important; border-color: #B45309 !important; color: #FFFFFF !important; }
-        .gantt_task_line.priority-blue { background-color: #2563EB !important; border-color: #1E40AF !important; }
-        .gantt_task_line.priority-green { background-color: #16A34A !important; border-color: #166534 !important; }
+          {/* Empty state only if CP-SAT has not run AND no approved blocks or trains exist */}
+          {!optResult && approvedBlocks.length === 0 && trainList.length === 0 && (
+            <div
+              className={`flex-1 flex flex-col items-center justify-center p-12 text-center transition-colors ${
+                isVintage ? "bg-[#fbf9f4]" : "bg-[#0c1324]/80"
+              }`}
+            >
+              <Cpu className="w-12 h-12 text-sky-500 mb-3 animate-pulse" />
+              <h3 className={`text-lg font-bold font-mono ${isVintage ? "text-amber-950" : "text-white"}`}>
+                Run CP-SAT Optimizer to generate the candidate schedule.
+              </h3>
+              <p className={`text-xs font-mono mt-1 max-w-md ${isVintage ? "text-amber-800/80" : "text-slate-400"}`}>
+                No active schedule. Click "Optimize Schedule (Run CP-SAT)" to solve track possession, machine assignment, and train headway constraints across the 5 Bhopal corridors.
+              </p>
+              {onRunOptimizer && (
+                <button
+                  onClick={onRunOptimizer}
+                  disabled={optimizing}
+                  className="mt-4 bg-sky-600 hover:bg-sky-500 text-white font-bold px-4 py-2 rounded text-xs flex items-center space-x-2 font-mono shadow-lg shadow-sky-600/30"
+                >
+                  <Cpu className="w-4 h-4" />
+                  <span>Run CP-SAT Optimizer Now</span>
+                </button>
+              )}
+            </div>
+          )}
 
-        .gantt_task_line.gantt-conflict-marker {
-          border: 2px dashed #DC2626 !important;
-          box-shadow: 0 0 10px rgba(220, 38, 38, 0.7) !important;
-          background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.15) 10px, rgba(0,0,0,0.15) 20px);
-        }
+          {/* Workflow Status Banner: explains that timeline only displays sanctioned blocks */}
+          {approvedBlocks.length === 0 && (
+            <div
+              className={`px-4 py-2 border-b flex items-center justify-between text-xs font-mono transition-colors ${
+                isVintage ? "bg-amber-100/70 border-amber-300/80 text-amber-950" : "bg-sky-950/60 border-slate-800 text-sky-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Info className="w-4 h-4 text-sky-500 shrink-0" />
+                <span>
+                  <strong>CP-SAT Workflow Boundary:</strong> 0 blocks sanctioned on timeline. Candidate schedule generated by CP-SAT is listed in the <strong>Work Dossier</strong> (right). Click <strong>"Create Block Proposal"</strong> on any candidate to submit it for divisional sanction.
+                </span>
+              </div>
+            </div>
+          )}
 
-        .gantt-project-lane {
-          background-color: #0b2545 !important;
-          border-color: #134074 !important;
-          color: #ffffff !important;
-          font-weight: 700;
-        }
+          {/* ============================================================== */}
+          {/* 2-COLUMN GANTT GRID (Column A: Fixed Lane Labels, Column B: Horizontally Scrollable Timeline) */}
+          {/* ============================================================== */}
+          <div
+            className="flex-1 flex overflow-y-auto overflow-x-hidden relative"
+            style={{ minHeight: "520px" }}
+          >
+            {/* COLUMN A: FIXED RESOURCE / LANE COLUMN (w-64 min-w-[256px] max-w-[256px] shrink-0 border-r) */}
+            <div
+              className={`w-64 min-w-[256px] max-w-[256px] shrink-0 border-r flex flex-col select-none z-10 transition-colors ${
+                isVintage ? "bg-[#f5f0e8] border-amber-200/80" : "bg-[#0e162a] border-slate-800"
+              }`}
+            >
+              {/* Header Cell (Row height: h-10) */}
+              <div
+                className={`h-10 px-3 flex items-center justify-between border-b text-[11px] font-mono font-bold transition-colors ${
+                  isVintage
+                    ? "bg-[#ebe3d5] border-amber-300/80 text-amber-950"
+                    : "bg-[#131d36] border-slate-700/80 text-slate-300"
+                }`}
+              >
+                <span>RESOURCE / SECTION</span>
+                <span className={`text-[10px] ${isVintage ? "text-amber-800/80" : "text-slate-500"}`}>24H TIMETABLE</span>
+              </div>
 
-        .gantt_grid_scale, .gantt_task_scale {
-          background-color: #F8FAFC !important;
-          color: #334155 !important;
-          font-weight: 600 !important;
-        }
-        .gantt_row.gantt_row_project {
-          background-color: #F1F5F9 !important;
-          font-weight: 700 !important;
-        }
+              {/* Group Categories and Lanes in Column A */}
+              {Object.entries(groupedLanes).map(([groupKey, groupLanes]) => {
+                const isCollapsed = collapsedGroups[groupKey];
+                const groupLabel =
+                  groupKey === "track"
+                    ? "Track / Block Sections"
+                    : groupKey === "crew"
+                    ? "Crew Pools"
+                    : groupKey === "machine"
+                    ? "Machine Pools"
+                    : "Train Movements";
 
-        /* Distinct styles for draggable blocks vs locked trains */
-        .gantt-block-bar {
-          cursor: grab !important;
-        }
-        .gantt-block-bar:active {
-          cursor: grabbing !important;
-        }
-        .gantt-train-bar {
-          cursor: pointer !important;
-          opacity: 0.95;
-        }
-      `}</style>
+                return (
+                  <div key={`colA_${groupKey}`} className="flex flex-col">
+                    {/* Category Header Row (Row height: h-8) */}
+                    <div
+                      onClick={() => toggleGroupCollapse(groupKey)}
+                      className={`h-8 px-3 flex items-center justify-between cursor-pointer border-b text-xs font-mono font-bold transition-colors select-none ${
+                        isVintage
+                          ? "bg-[#e5dcce] hover:bg-[#dbd0c0] border-amber-300/80 text-amber-950"
+                          : "bg-[#16203c] hover:bg-[#1a2647] border-slate-800 text-sky-300"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-1.5 truncate">
+                        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
+                        <span className="uppercase tracking-wider truncate text-[11px]">{groupLabel}</span>
+                      </div>
+                      <span className={`text-[10px] font-normal shrink-0 ${isVintage ? "text-amber-800/80" : "text-slate-400"}`}>
+                        ({groupLanes.length})
+                      </span>
+                    </div>
+
+                    {/* Lane Labels in Column A (Row height: h-12 each) */}
+                    {!isCollapsed &&
+                      groupLanes.map((lane) => (
+                        <div
+                          key={`colA_lane_${lane.id}`}
+                          className={`h-12 px-3 flex flex-col justify-center border-b transition-colors ${
+                            isVintage
+                              ? "border-amber-200/60 hover:bg-[#ede5d8]"
+                              : "border-slate-800/60 hover:bg-slate-900/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span
+                              className={`text-xs font-mono font-bold truncate ${
+                                isVintage ? "text-amber-950" : "text-slate-200"
+                              }`}
+                            >
+                              {lane.name}
+                            </span>
+                            {lane.badge && (
+                              <span
+                                className={`text-[9px] font-mono px-1 py-0.2 rounded border font-semibold shrink-0 ${
+                                  isVintage
+                                    ? "bg-amber-100 border-amber-300 text-amber-800"
+                                    : "bg-slate-800 border-slate-700 text-slate-300"
+                                }`}
+                              >
+                                {lane.badge}
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={`text-[10px] font-mono truncate ${
+                              isVintage ? "text-amber-800/80" : "text-slate-400"
+                            }`}
+                          >
+                            {lane.subtitle}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* COLUMN B: HORIZONTALLY SCROLLABLE TIMELINE CANVAS (flex-1 overflow-x-auto) */}
+            <div
+              ref={timelineScrollRef}
+              className={`flex-1 overflow-x-auto overflow-y-hidden scrollbar-thin relative transition-colors ${
+                isVintage
+                  ? "scrollbar-thumb-amber-300 scrollbar-track-amber-100/50 bg-[#faf8f5]"
+                  : "scrollbar-thumb-slate-700 scrollbar-track-slate-900 bg-[#0c1324]"
+              }`}
+            >
+              {/* Inner canvas container sized to totalTimelineWidth */}
+              <div style={{ width: `${totalTimelineWidth}px` }} className="relative flex flex-col min-w-full">
+                {/* Timeline Time Axis Header (Row height: h-10) */}
+                <div
+                  className={`h-10 relative flex border-b transition-colors ${
+                    isVintage ? "bg-[#ebe3d5] border-amber-300/80" : "bg-[#131d36] border-slate-700/80"
+                  }`}
+                >
+                  {Array.from({ length: 24 }).map((_, h) => {
+                    const leftPos = h * 60 * pxPerMin;
+                    return (
+                      <div
+                        key={h}
+                        style={{
+                          left: `${leftPos}px`,
+                          width: `${60 * pxPerMin}px`,
+                        }}
+                        className={`absolute top-0 bottom-0 border-l flex flex-col justify-between px-1.5 py-1 text-[11px] font-mono select-none ${
+                          isVintage
+                            ? "border-amber-300/70 text-amber-950 font-bold"
+                            : "border-slate-700/60 text-slate-400"
+                        }`}
+                      >
+                        <span>{String(h).padStart(2, "0")}:00</span>
+                        {zoomLevel === "15min" && (
+                          <div className={`flex justify-between text-[9px] ${isVintage ? "text-amber-800" : "text-slate-500"}`}>
+                            <span>:15</span>
+                            <span>:30</span>
+                            <span>:45</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Group Categories and Lane Canvases in Column B */}
+                {Object.entries(groupedLanes).map(([groupKey, groupLanes]) => {
+                  const isCollapsed = collapsedGroups[groupKey];
+                  return (
+                    <div key={`colB_${groupKey}`} className="flex flex-col">
+                      {/* Group Category Spacer Row (Row height: h-8) */}
+                      <div
+                        className={`h-8 border-b transition-colors relative ${
+                          isVintage ? "bg-[#e5dcce]/60 border-amber-300/80" : "bg-[#16203c]/60 border-slate-800"
+                        }`}
+                      >
+                        {/* Background grid lines extending across header */}
+                        {Array.from({ length: 24 }).map((_, h) => (
+                          <div
+                            key={h}
+                            style={{ left: `${h * 60 * pxPerMin}px` }}
+                            className={`absolute top-0 bottom-0 border-l pointer-events-none ${
+                              isVintage ? "border-amber-200/50" : "border-slate-800/40"
+                            }`}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Lane Track Canvases (Row height: h-12 each) */}
+                      {!isCollapsed &&
+                        groupLanes.map((lane) => {
+                          const laneItems = timelineItems.filter((item) => item.laneId === lane.id);
+
+                          return (
+                            <div
+                              key={`colB_lane_${lane.id}`}
+                              className={`h-12 border-b relative transition-colors ${
+                                isVintage
+                                  ? "border-amber-200/60 hover:bg-amber-100/20"
+                                  : "border-slate-800/50 hover:bg-slate-900/30"
+                              }`}
+                            >
+                              {/* Vertical Grid Lines */}
+                              {Array.from({ length: 24 }).map((_, h) => (
+                                <div
+                                  key={h}
+                                  style={{ left: `${h * 60 * pxPerMin}px` }}
+                                  className={`absolute top-0 bottom-0 border-l pointer-events-none ${
+                                    isVintage ? "border-amber-200/40" : "border-slate-800/40"
+                                  }`}
+                                />
+                              ))}
+
+                              {/* Timeline Bars for this lane (Approved Blocks & Trains) */}
+                              {laneItems.map((bar) => {
+                                const leftPx = bar.startMinutes * pxPerMin;
+                                const widthPx = Math.max(16, bar.durationMins * pxPerMin);
+                                const isSelected = selectedTaskId === bar.taskId;
+
+                                return (
+                                  <div
+                                    key={bar.id}
+                                    onClick={() => bar.taskId && scrollToTask(bar.taskId)}
+                                    onMouseEnter={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setHoveredItem({
+                                        item: bar,
+                                        x: rect.left + rect.width / 2,
+                                        y: rect.top - 8,
+                                      });
+                                    }}
+                                    onMouseLeave={() => setHoveredItem(null)}
+                                    style={{
+                                      left: `${leftPx}px`,
+                                      width: `${widthPx}px`,
+                                      top: "6px",
+                                      height: "36px",
+                                    }}
+                                    className={`absolute ${getBarColorClasses(bar.colorType, isSelected)}`}
+                                  >
+                                    <span className="truncate font-semibold tracking-tight">
+                                      {bar.title}
+                                    </span>
+                                    <span
+                                      className={`ml-1.5 text-[9px] font-mono shrink-0 ${
+                                        isVintage ? "text-amber-950 font-bold" : "opacity-75"
+                                      }`}
+                                    >
+                                      {bar.durationMins}m
+                                    </span>
+                                  </div>
+                                );
+                              })}
+
+                              {/* Conflict Indicators on Track Lanes */}
+                              {lane.category === "track" &&
+                                conflictMarkers
+                                  .filter((c) => mapTrackToLaneId(c.trackName) === lane.id)
+                                  .map((conf) => {
+                                    const leftPx = conf.timeMinutes * pxPerMin;
+                                    return (
+                                      <div
+                                        key={conf.id}
+                                        style={{
+                                          left: `${leftPx - 14}px`,
+                                          top: "8px",
+                                        }}
+                                        title={`⚠ Headway Conflict: ${conf.description}`}
+                                        className="absolute z-20 flex items-center cursor-default group/conf"
+                                      >
+                                        <div
+                                          className={`flex items-center space-x-0.5 border text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg animate-pulse ${
+                                            isVintage
+                                              ? "bg-amber-100 border-amber-500 text-amber-900 shadow-amber-500/20"
+                                              : "bg-amber-950/90 border-amber-400 text-amber-300 shadow-amber-500/40"
+                                          }`}
+                                        >
+                                          <span>❌</span>
+                                          <span>⚠</span>
+                                        </div>
+
+                                        {/* Floating Conflict Tooltip on Hover */}
+                                        <div
+                                          className={`hidden group-hover/conf:block absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 border border-amber-500 text-[10px] font-mono px-2 py-1 rounded shadow-xl whitespace-nowrap z-50 ${
+                                            isVintage ? "bg-white text-slate-900" : "bg-black/95 text-amber-200"
+                                          }`}
+                                        >
+                                          <p className={`font-bold ${isVintage ? "text-amber-700" : "text-amber-400"}`}>
+                                            Headway Conflict
+                                          </p>
+                                          <p>{conf.description}</p>
+                                          <p className={`text-[9px] ${isVintage ? "text-slate-500" : "text-slate-400"}`}>
+                                            At {conf.timeStr} IST
+                                          </p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Timeline Status Bar */}
+          <div
+            className={`border-t px-4 py-2 flex flex-wrap items-center justify-between text-[11px] font-mono transition-colors ${
+              isVintage ? "bg-[#f0e9dc] border-amber-200 text-amber-900" : "bg-[#0f172a] border-slate-800 text-slate-400"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <span className={`font-bold ${isVintage ? "text-sky-800" : "text-sky-400"}`}>
+                {optResult ? "CP-SAT Solve complete" : "Operational Schedule"}
+              </span>
+              <span>|</span>
+              <span>Bhopal Division Master Spec</span>
+              <span>|</span>
+              <span className={isVintage ? "text-amber-950 font-semibold" : "text-slate-300"}>v10 Resource Gantt</span>
+            </div>
+            <div className="flex items-center space-x-3">
+              <span>Sanctioned on Timeline: <strong className={isVintage ? "text-emerald-800 font-bold" : "text-emerald-400"}>{approvedBlocks.length}</strong></span>
+              <span>Candidates in Dossier: <strong className={isVintage ? "text-sky-800 font-bold" : "text-sky-400"}>{scheduledTasks.length}</strong></span>
+              <span>Deferred: <strong className={isVintage ? "text-amber-800 font-bold" : "text-amber-400"}>{deferredTasks.length}</strong></span>
+              <span>Conflicts: <strong className={isVintage ? "text-red-800 font-bold" : "text-red-400"}>{conflictMarkers.length}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        {/* ============================================================ */}
+        {/* RIGHT PANEL: SCHEDULED & DEFERRED WORK (Section 3)           */}
+        {/* ============================================================ */}
+        <div
+          className={`lg:col-span-4 xl:col-span-3 flex flex-col overflow-hidden transition-colors ${
+            isWhite ? "bg-[#ffffff]" : "bg-[#0d1424]"
+          }`}
+        >
+          {/* Section 3 Header & Tabs */}
+          <div
+            className={`border-b px-3.5 py-2.5 flex items-center justify-between transition-colors ${
+              isWhite ? "bg-slate-100 border-slate-200" : "bg-[#10192e] border-slate-800"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                3
+              </span>
+              <span
+                className={`text-xs font-bold font-mono uppercase tracking-tight ${
+                  isWhite ? "text-slate-900" : "text-white"
+                }`}
+              >
+                Work Dossier
+              </span>
+            </div>
+
+            {/* Tabs */}
+            <div
+              className={`flex items-center rounded p-0.5 border text-xs font-mono transition-colors ${
+                isWhite ? "bg-slate-200 border-slate-300" : "bg-slate-900 border-slate-700"
+              }`}
+            >
+              <button
+                onClick={() => setActiveTab("scheduled")}
+                className={`px-2.5 py-1 rounded transition-colors ${
+                  activeTab === "scheduled"
+                    ? "bg-sky-600 text-white font-bold"
+                    : isWhite
+                    ? "text-slate-700 hover:text-slate-950"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Scheduled ({scheduledTasks.length})
+              </button>
+              <button
+                onClick={() => setActiveTab("deferred")}
+                className={`px-2.5 py-1 rounded transition-colors ${
+                  activeTab === "deferred"
+                    ? "bg-amber-600 text-white font-bold"
+                    : isWhite
+                    ? "text-slate-700 hover:text-slate-950"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Deferred ({deferredTasks.length})
+              </button>
+            </div>
+          </div>
+
+          {/* Cards List Container */}
+          <div
+            className={`flex-1 overflow-y-auto p-3 space-y-2.5 max-h-[640px] scrollbar-thin ${
+              isWhite
+                ? "scrollbar-thumb-slate-300 scrollbar-track-slate-100"
+                : "scrollbar-thumb-slate-700 scrollbar-track-slate-900"
+            }`}
+          >
+            {/* TAB 1: SCHEDULED WORK CARDS (Matching Reference #3) */}
+            {activeTab === "scheduled" && (
+              <>
+                {scheduledTasks.length === 0 ? (
+                  <div className={`text-center py-12 font-mono text-xs ${isWhite ? "text-slate-500" : "text-slate-500"}`}>
+                    No scheduled work. Run CP-SAT to generate the timeline.
+                  </div>
+                ) : (
+                  scheduledTasks.map((item: any) => {
+                    const isSelected = selectedTaskId === item.task_id;
+                    const color = getTaskColor(item);
+
+                    // Card borders and backgrounds matching reference image styling
+                    const cardBg = isWhite
+                      ? color === "red"
+                        ? "bg-red-50 border-red-300 hover:border-red-500"
+                        : color === "orange"
+                        ? "bg-amber-50 border-amber-300 hover:border-amber-500"
+                        : color === "purple"
+                        ? "bg-purple-50 border-purple-300 hover:border-purple-500"
+                        : "bg-emerald-50 border-emerald-300 hover:border-emerald-500"
+                      : color === "red"
+                      ? "bg-[#2a1215] border-red-700/80 hover:border-red-500"
+                      : color === "orange"
+                      ? "bg-[#2d1b11] border-orange-700/80 hover:border-orange-500"
+                      : color === "purple"
+                      ? "bg-[#251532] border-purple-700/80 hover:border-purple-500"
+                      : "bg-[#10241b] border-emerald-700/80 hover:border-emerald-500";
+
+                    const selectedGlow = isSelected ? "ring-2 ring-amber-400 shadow-lg scale-[1.01]" : "";
+
+                    return (
+                      <div
+                        key={item.task_id}
+                        onClick={() => scrollToTask(item.task_id)}
+                        className={`p-3 rounded-lg border ${cardBg} ${selectedGlow} transition-all cursor-pointer flex items-start space-x-3 font-mono ${
+                          isWhite ? "text-slate-800" : "text-slate-200"
+                        }`}
+                      >
+                        {/* Left Department Icon */}
+                        <div
+                          className={`p-2 rounded shrink-0 mt-0.5 ${
+                            isWhite
+                              ? "bg-white border border-slate-200 shadow-xs"
+                              : "bg-black/40 border border-white/10 text-white"
+                          }`}
+                        >
+                          {item.department === "PWAY" ? (
+                            <Wrench className={`w-4 h-4 ${isWhite ? "text-orange-600" : "text-orange-400"}`} />
+                          ) : item.department === "TRD" ? (
+                            <Zap className={`w-4 h-4 ${isWhite ? "text-amber-600" : "text-amber-400"}`} />
+                          ) : item.department === "SNT" ? (
+                            <Lightbulb className={`w-4 h-4 ${isWhite ? "text-emerald-600" : "text-emerald-400"}`} />
+                          ) : (
+                            <Shield className={`w-4 h-4 ${isWhite ? "text-sky-600" : "text-sky-400"}`} />
+                          )}
+                        </div>
+
+                        {/* Card Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className={`text-xs font-bold truncate ${isWhite ? "text-slate-900" : "text-white"}`}>
+                              {item.task_id}: {item.task_title || "Maintenance"}
+                            </span>
+                            <span
+                              className={`text-[9px] px-1 py-0.2 rounded font-bold uppercase shrink-0 ${
+                                isWhite
+                                  ? "bg-slate-100 border border-slate-300 text-slate-800"
+                                  : "bg-black/50 border border-white/20 text-white"
+                              }`}
+                            >
+                              {item.priority_tier || "HIGH"}
+                            </span>
+                          </div>
+
+                          <p className={`text-[11px] truncate mt-0.5 ${isWhite ? "text-slate-600" : "text-slate-400"}`}>
+                            {item.section_id || item.corridor_id} · KM {item.location_km || 150} · {item.track_name || "DOWN_MAIN"}
+                          </p>
+
+                          {/* Time & Machine badges */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[10px]">
+                            <span
+                              className={`px-1.5 py-0.5 rounded flex items-center gap-1 font-bold ${
+                                isWhite
+                                  ? "bg-sky-50 border border-sky-200 text-sky-800"
+                                  : "bg-black/50 border border-white/10 text-sky-300"
+                              }`}
+                            >
+                              <Clock className="w-3 h-3" />
+                              {item.allocated_start_time} – {item.allocated_end_time} ({item.duration_mins}m)
+                            </span>
+
+                            {item.assigned_machine && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded truncate max-w-[140px] font-semibold ${
+                                  isWhite
+                                    ? "bg-amber-50 border border-amber-200 text-amber-800"
+                                    : "bg-black/50 border border-white/10 text-amber-300"
+                                }`}
+                              >
+                                ⚙ {item.assigned_machine}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Proposal Action Button (Enforces CP-SAT -> Proposal -> Sanction -> Timeline Lifecycle) */}
+                          {onProposeFromSchedule && (
+                            <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                              {proposedTaskIds?.has(item.task_id) ? (
+                                <span className={`text-[10px] font-mono font-bold flex items-center gap-1 ${
+                                  isVintage ? "text-emerald-800" : "text-emerald-400"
+                                }`}>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  Proposal Created (Pending Approval)
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onProposeFromSchedule(item);
+                                  }}
+                                  disabled={proposingTaskId === item.task_id}
+                                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-mono font-bold text-[11px] py-1.5 px-3 rounded shadow-sm flex items-center justify-center space-x-1.5 transition-all"
+                                >
+                                  {proposingTaskId === item.task_id ? (
+                                    <>
+                                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                      <span>Creating Proposal...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                                      <span>Create Block Proposal</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </>
+            )}
+
+            {/* TAB 2: DEFERRED WORK CARDS (Matching Reference #3 Deferred) */}
+            {activeTab === "deferred" && (
+              <>
+                {deferredTasks.length === 0 ? (
+                  <div className={`text-center py-12 font-mono text-xs ${isWhite ? "text-slate-500" : "text-slate-500"}`}>
+                    No deferred work.
+                  </div>
+                ) : (
+                  deferredTasks.map((def: any) => {
+                    const isSelected = selectedTaskId === def.task_id;
+                    return (
+                      <div
+                        key={def.task_id}
+                        onClick={() => setSelectedTaskId(def.task_id)}
+                        className={`p-3 rounded-lg border transition-all cursor-pointer flex items-start space-x-3 font-mono ${
+                          isWhite
+                            ? "bg-rose-50/50 border-rose-200 hover:border-rose-400 text-slate-800"
+                            : "bg-[#1a1c29] border-slate-700/80 hover:border-slate-500 text-slate-200"
+                        } ${isSelected ? (isWhite ? "ring-2 ring-red-500" : "ring-2 ring-red-400") : ""}`}
+                      >
+                        {/* Warning Ladder Icon */}
+                        <div
+                          className={`p-2 rounded shrink-0 mt-0.5 ${
+                            isWhite
+                              ? "bg-white border border-red-300 text-red-600 shadow-xs"
+                              : "bg-black/50 border border-red-500/40 text-red-400"
+                          }`}
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                        </div>
+
+                        {/* Deferred Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className={`text-xs font-bold truncate ${isWhite ? "text-slate-900" : "text-white"}`}>
+                              {def.task_id}: {def.description || "Track Renewal"}
+                            </span>
+                            <span
+                              className={`text-[9px] px-1 py-0.2 rounded font-bold uppercase shrink-0 ${
+                                isWhite
+                                  ? "bg-red-100 border border-red-300 text-red-800"
+                                  : "bg-red-950/80 border border-red-500/60 text-red-300"
+                              }`}
+                            >
+                              DEFERRED
+                            </span>
+                          </div>
+
+                          <p className={`text-[11px] truncate mt-0.5 ${isWhite ? "text-slate-600" : "text-slate-400"}`}>
+                            {def.location || def.section_id || "Bhopal Section"} · {def.department || "PWAY"}
+                          </p>
+
+                          {/* Reason in red/accent matching reference */}
+                          <div
+                            className={`mt-1.5 text-[11px] font-semibold flex items-start gap-1 ${
+                              isWhite ? "text-rose-700" : "text-rose-300"
+                            }`}
+                          >
+                            <span className={`font-bold shrink-0 ${isWhite ? "text-rose-800" : "text-rose-400"}`}>
+                              Reason:
+                            </span>
+                            <span className="line-clamp-2">
+                              {def.human_readable_reason || def.reason || "Window capacity exceeded"}
+                            </span>
+                          </div>
+
+                          {/* Mitigation suggestion */}
+                          {def.mitigation && (
+                            <p className={`text-[10px] mt-1 italic line-clamp-2 ${isWhite ? "text-slate-600" : "text-slate-400"}`}>
+                              💡 {def.mitigation}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* FLOATING HOVER TOOLTIP FOR TIMELINE BARS                      */}
+      {/* ============================================================== */}
+      {hoveredItem && (
+        <div
+          style={{
+            position: "fixed",
+            left: `${hoveredItem.x}px`,
+            top: `${hoveredItem.y}px`,
+            transform: "translate(-50%, -100%)",
+            pointerEvents: "none",
+            zIndex: 9999,
+          }}
+          className={`border rounded-lg p-3 shadow-2xl text-xs font-mono max-w-sm animate-in fade-in zoom-in-95 duration-100 ${
+            isWhite
+              ? "bg-white/98 text-slate-900 border-sky-500 shadow-slate-400/40"
+              : "bg-black/95 text-white border-sky-500/80"
+          }`}
+        >
+          <div
+            className={`flex items-center justify-between gap-2 border-b pb-1.5 mb-1.5 ${
+              isWhite ? "border-slate-200" : "border-slate-700"
+            }`}
+          >
+            <span className={`font-bold ${isWhite ? "text-sky-700" : "text-sky-400"}`}>
+              {hoveredItem.item.title}
+            </span>
+            <span
+              className={`text-[10px] px-1 py-0.2 rounded ${
+                isWhite
+                  ? "bg-slate-100 text-slate-700 border border-slate-200"
+                  : "bg-slate-800 text-slate-300"
+              }`}
+            >
+              {hoveredItem.item.durationMins} mins
+            </span>
+          </div>
+
+          <p className={`text-[11px] mb-1 ${isWhite ? "text-slate-600" : "text-slate-300"}`}>
+            {hoveredItem.item.subtitle}
+          </p>
+
+          <div
+            className={`grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] mt-2 ${
+              isWhite ? "text-slate-600" : "text-slate-400"
+            }`}
+          >
+            <div>
+              Window: <strong className={isWhite ? "text-slate-900" : "text-slate-200"}>
+                {hoveredItem.item.startTimeStr} – {hoveredItem.item.endTimeStr}
+              </strong>
+            </div>
+            <div>
+              Track: <strong className={isWhite ? "text-slate-900" : "text-slate-200"}>
+                {hoveredItem.item.track || "DOWN_MAIN"}
+              </strong>
+            </div>
+            {hoveredItem.item.department && (
+              <div>
+                Dept: <strong className={isWhite ? "text-slate-900" : "text-slate-200"}>
+                  {hoveredItem.item.department}
+                </strong>
+              </div>
+            )}
+            {hoveredItem.item.machine && (
+              <div>
+                Machine: <strong className={isWhite ? "text-slate-900" : "text-slate-200"}>
+                  {hoveredItem.item.machine}
+                </strong>
+              </div>
+            )}
+            {hoveredItem.item.priorityTier && (
+              <div>
+                Priority: <strong className={isWhite ? "text-amber-700 font-bold" : "text-amber-400"}>
+                  {hoveredItem.item.priorityTier}
+                </strong>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+
+      {/* ============================================================== */}
+      {/* TASK DETAIL INSPECTION DRAWER (When a task is clicked)        */}
+      {/* ============================================================== */}
+      {selectedTaskDetails && (
+        <div
+          className={`border-t p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono transition-colors ${
+            isWhite ? "bg-white border-slate-200" : "bg-[#10192e] border-slate-800"
+          }`}
+        >
+          <div className="flex items-center space-x-3">
+            <span
+              className={`px-2 py-0.5 rounded border font-bold ${
+                isWhite
+                  ? "bg-sky-100 text-sky-800 border-sky-300"
+                  : "bg-sky-500/20 text-sky-400 border-sky-500/40"
+              }`}
+            >
+              {selectedTaskDetails.task_id}
+            </span>
+            <span className={`font-bold text-sm ${isWhite ? "text-slate-900" : "text-white"}`}>
+              {selectedTaskDetails.task_title || selectedTaskDetails.description}
+            </span>
+            <span className={isWhite ? "text-slate-600" : "text-slate-400"}>
+              {selectedTaskDetails.section_id || selectedTaskDetails.corridor_id} · Track: {selectedTaskDetails.track_name || "DOWN_MAIN"}
+            </span>
+            {selectedTaskDetails.allocated_start_time && (
+              <span className={`font-bold ${isWhite ? "text-emerald-700" : "text-emerald-400"}`}>
+                {selectedTaskDetails.allocated_start_time} – {selectedTaskDetails.allocated_end_time} ({selectedTaskDetails.duration_mins}m)
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-2">
+            {onOpenReasoning && (
+              <button
+                onClick={() => onOpenReasoning(selectedTaskDetails.task_id, selectedTaskDetails)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1 rounded text-xs flex items-center space-x-1"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Explain AI Decision</span>
+              </button>
+            )}
+            <button
+              onClick={() => setSelectedTaskId(null)}
+              className={`p-1 rounded ${
+                isWhite
+                  ? "hover:bg-slate-100 text-slate-500 hover:text-slate-900"
+                  : "hover:bg-slate-800 text-slate-400 hover:text-white"
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+export default GanttDashboard;

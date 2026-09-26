@@ -29,17 +29,30 @@ import { api } from "../../services/api";
 import { RoleBlockTable } from "../blocks/RoleBlockTable";
 import { RefreshCw } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { formatDistanceKm, formatKmBadge, formatKmValue } from "../../utils/formatDistance";
+import {
+  isDailyBlock,
+  isWeeklyBlock,
+  isMonthlyBlock,
+  cleanApprovalRemarks,
+  CURRENT_SYSTEM_DATE,
+} from "../../utils/plannedBlocksHelper";
 
 interface CorridorBlockManagementProps {
   corridor: DetailedCorridor;
 }
 
 const STATUS_CONFIG: Record<
-  CorridorBlockStatus,
+  string,
   { label: string; badgeClass: string }
 > = {
   PLANNED: { label: "Planned", badgeClass: "bg-slate-100 text-slate-800 border-slate-300" },
+  PROPOSED: { label: "Proposed", badgeClass: "bg-amber-50 text-amber-900 border-amber-300" },
+  PENDING_APPROVAL: { label: "Pending Approval", badgeClass: "bg-amber-100 text-amber-900 border-amber-300" },
   APPROVED: { label: "Approved", badgeClass: "bg-sky-100 text-sky-900 border-sky-300" },
+  SANCTIONED: { label: "Sanctioned", badgeClass: "bg-sky-100 text-sky-900 border-sky-300" },
+  SELECTED: { label: "Selected", badgeClass: "bg-indigo-100 text-indigo-900 border-indigo-300" },
+  ACTIVE: { label: "Active", badgeClass: "bg-emerald-100 text-emerald-900 border-emerald-300" },
   IN_PROGRESS: { label: "In Progress", badgeClass: "bg-amber-100 text-amber-900 border-amber-300" },
   COMPLETED: { label: "Completed", badgeClass: "bg-emerald-100 text-emerald-900 border-emerald-300" },
   RESCHEDULED: { label: "Rescheduled", badgeClass: "bg-purple-100 text-purple-900 border-purple-300" },
@@ -50,22 +63,38 @@ const STATUS_CONFIG: Record<
 export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = ({ corridor }) => {
   const { user } = useAuth();
 
-  // Sub-section tab inside Block Management
-  const [activeSection, setActiveSection] = useState<"monthly" | "weekly" | "critical" | "issues">("monthly");
+  // Sub-section tab inside Block Management: daily, weekly, monthly, critical, issues, completed
+  const [activeSection, setActiveSection] = useState<"daily" | "weekly" | "monthly" | "critical" | "issues" | "completed">("daily");
 
   // Real backend blocks for this corridor from SQLite database
   const [backendBlocks, setBackendBlocks] = useState<BlockData[]>([]);
   const [loadingBackendBlocks, setLoadingBackendBlocks] = useState(false);
+  const [corridorCompletedTasks, setCorridorCompletedTasks] = useState<any[]>([]);
+  const [loadingCompletedTasks, setLoadingCompletedTasks] = useState(false);
   const [submittingBlock, setSubmittingBlock] = useState(false);
   const [blockServerError, setBlockServerError] = useState<string | null>(null);
   const [blockServerSuccess, setBlockServerSuccess] = useState<string | null>(null);
+
+  const loadCompletedTasks = async () => {
+    setLoadingCompletedTasks(true);
+    try {
+      const data = await api.getCompletedTasks({ corridor_id: corridor.id });
+      setCorridorCompletedTasks(data || []);
+    } catch (err) {
+      console.warn("Could not load completed tasks for corridor", err);
+    } finally {
+      setLoadingCompletedTasks(false);
+    }
+  };
 
   const loadBackendBlocks = async () => {
     setLoadingBackendBlocks(true);
     setBlockServerError(null);
     try {
+      // Query canonical backend blocks for this corridor without operational_only to give full planning visibility
       const data = await api.getBlocks(undefined, corridor.id);
       setBackendBlocks(data || []);
+      await loadCompletedTasks();
     } catch (e: any) {
       console.warn("Could not load backend blocks for corridor", corridor.id, e);
       setBlockServerError(e?.message || "Failed to load corridor blocks from database.");
@@ -76,6 +105,7 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
 
   useEffect(() => {
     loadBackendBlocks();
+    loadCompletedTasks();
   }, [corridor.id]);
 
   // Issues state
@@ -179,34 +209,41 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
     return "DOWN_MAIN";
   };
 
-  const mappedBackendBlocks: CorridorBlock[] = backendBlocks.map((b) => ({
-    id: b.id,
-    corridorId: b.corridor_id,
-    type: (b.task_priority === "CRITICAL" || b.protection_type === "EMERGENCY_PROTECTION"
-      ? "CRITICAL"
-      : b.duration_mins <= 120
-      ? "WEEKLY"
-      : "MONTHLY") as CorridorBlockType,
-    title: b.task_title || (b.task_id ? `Assigned Block for ${b.task_id}` : `Maintenance Block: ${b.corridor_id} ${b.track_name}`),
-    sectionOrStation: b.section_name || b.section_id || corridor.name,
-    lineOrTrack: `${b.track_name} (KM ${b.location_km})`,
-    department: (b.is_multi_department ? "JOINT" : (b.department_id as any) || "PWAY"),
-    scheduledDate: b.date || b.scheduled_date || "2026-03-25",
-    timeWindow: `${b.requested_start_time} – ${b.requested_end_time}`,
-    durationMinutes: b.duration_mins,
-    status: (b.status === "APPROVED" || b.status === "SANCTIONED" || b.status === "SELECTED") ? "APPROVED" : b.status === "REJECTED" ? "REJECTED" : "PLANNED",
-    description: b.conflict_summary || (b.is_multi_department ? `Coordinated with ${b.participating_departments}` : "Scheduled maintenance block"),
-    isCritical: b.task_priority === "CRITICAL" || b.protection_type === "EMERGENCY_PROTECTION",
-    createdBy: b.proposed_by || "Divisional Operations Control",
-    createdAt: b.created_at || new Date().toISOString(),
-  }));
+  const mappedBackendBlocks: CorridorBlock[] = backendBlocks.map((b) => {
+    const rawDate = b.scheduled_date || b.execution_date || b.date || b.planning_date || CURRENT_SYSTEM_DATE;
+    const isCrit = b.task_priority === "CRITICAL" || b.protection_type === "EMERGENCY_PROTECTION" || b.block_type === "EMERGENT";
+    return {
+      id: b.id,
+      corridorId: b.corridor_id || corridor.id,
+      type: (isCrit ? "CRITICAL" : (b.block_type as any) || "PLANNED") as CorridorBlockType,
+      rawBlockType: b.block_type || "PLANNED",
+      title: b.task_title || (b.task_id ? `Assigned Block for ${b.task_id}` : `Maintenance Block: ${b.corridor_id} ${b.track_name}`),
+      sectionOrStation: b.section_name || b.section_id || corridor.name,
+      lineOrTrack: `${b.track_name || "Mainline"} (${formatDistanceKm(b.location_km)})`,
+      locationKm: b.location_km,
+      department: (b.is_multi_department ? "JOINT" : (b.department_id as any) || "PWAY"),
+      participatingDepts: b.participating_departments || b.department_id || "PWAY",
+      scheduledDate: rawDate,
+      startTime: b.requested_start_time || "00:00",
+      endTime: b.requested_end_time || "04:00",
+      timeWindow: `${b.requested_start_time || "00:00"} – ${b.requested_end_time || "04:00"}`,
+      durationMinutes: b.duration_mins || 120,
+      status: b.status as any,
+      description: b.conflict_summary || (b.is_multi_department ? `Coordinated with ${b.participating_departments}` : "Scheduled maintenance block"),
+      isCritical: isCrit,
+      createdBy: b.proposed_by || "Divisional Operations Control",
+      createdAt: b.created_at || new Date().toISOString(),
+      approvalNotes: cleanApprovalRemarks(b.approval_notes) || undefined,
+    };
+  });
 
   const allBlocks = mappedBackendBlocks;
 
-  // Filtered blocks by type
-  const monthlyBlocks = allBlocks.filter((b) => (b.type === "MONTHLY" || !b.type) && !b.isCritical);
-  const weeklyBlocks = allBlocks.filter((b) => b.type === "WEEKLY" && !b.isCritical);
-  const criticalBlocks = allBlocks.filter((b) => b.isCritical || b.type === "CRITICAL");
+  // Filtered blocks by cadence and criticality
+  const dailyBlocks = allBlocks.filter((b) => isDailyBlock(b));
+  const weeklyBlocks = allBlocks.filter((b) => isWeeklyBlock(b));
+  const monthlyBlocks = allBlocks.filter((b) => isMonthlyBlock(b));
+  const criticalBlocks = allBlocks.filter((b) => b.isCritical);
 
   // Open New Block Modal helper
   const handleOpenNewBlock = (type: CorridorBlockType, critical: boolean = false) => {
@@ -470,6 +507,16 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       badgeClass: "bg-slate-100 text-slate-800 border-slate-200",
     };
 
+    const typeLabel = (blk.rawBlockType || (blk.isCritical ? "EMERGENT" : blk.type)).toUpperCase();
+    const typeBadge =
+      typeLabel === "EMERGENT" || blk.isCritical
+        ? "bg-rose-100 text-rose-900 border-rose-300"
+        : typeLabel === "SHADOW"
+        ? "bg-amber-100 text-amber-900 border-amber-300"
+        : typeLabel === "RULING"
+        ? "bg-purple-100 text-purple-900 border-purple-300"
+        : "bg-sky-50 text-sky-800 border-sky-200";
+
     return (
       <div
         key={blk.id}
@@ -479,12 +526,10 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-1 text-[11px] font-mono">
             <div className="flex items-center space-x-1.5">
-              <span className="font-bold text-slate-500">{blk.id}</span>
-              {blk.isCritical && (
-                <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300 font-bold text-[9px] uppercase">
-                  Critical
-                </span>
-              )}
+              <span className="font-bold text-slate-700">{blk.id}</span>
+              <span className={`px-1.5 py-0.5 rounded font-bold border text-[9px] uppercase ${typeBadge}`}>
+                {typeLabel}
+              </span>
             </div>
 
             {/* Status Badge */}
@@ -495,26 +540,43 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
 
           <h4 className="font-bold text-slate-900 text-sm leading-snug">{blk.title}</h4>
 
+          <div className="text-[11px] font-semibold text-slate-600 font-mono bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+            {corridor.id}: {corridor.name}
+          </div>
+
           <div className="flex items-center space-x-1.5 text-xs text-slate-600">
             <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
             <span className="truncate">{blk.sectionOrStation} · {blk.lineOrTrack}</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono pt-1">
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-bold">
-              {blk.department}
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-bold border border-slate-200">
+              {blk.participatingDepts || blk.department}
             </span>
             <span className="px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded">
-              {blk.durationMinutes} Minutes
+              {blk.durationMinutes} mins
             </span>
           </div>
+
+          {/* Clean human remarks if present */}
+          {blk.approvalNotes && !blk.approvalNotes.startsWith("{") && (
+            <div className="text-[11px] text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-200 italic">
+              Remarks: "{blk.approvalNotes}"
+            </div>
+          )}
         </div>
 
         {/* Bottom bar with action buttons */}
         <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
-          <div className="flex items-center space-x-1">
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>{blk.scheduledDate}</span>
+          <div className="space-y-0.5">
+            <div className="flex items-center space-x-1 text-slate-700 font-medium">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <span>{blk.scheduledDate}</span>
+            </div>
+            <div className="flex items-center space-x-1 text-[11px] text-slate-500">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span>{blk.timeWindow || `${blk.startTime || "00:00"} – ${blk.endTime || "04:00"}`}</span>
+            </div>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -576,7 +638,7 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
                 {corridor.name.toUpperCase()}
               </h1>
               <span className="text-sm sm:text-base font-semibold text-slate-500 font-sans">
-                ({corridor.origin} ⇄ {corridor.destination} · {corridor.total_distance_km} KM)
+                ({corridor.origin} ⇄ {corridor.destination} · {formatDistanceKm(corridor.total_distance_km)})
               </span>
             </div>
           </div>
@@ -633,10 +695,13 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
               Scope: <strong>{corridor.id} Isolated</strong>
             </div>
             <div>
-              Monthly Blocks: <strong className="text-slate-900 font-bold">{monthlyBlocks.length}</strong>
+              Daily Blocks: <strong className="text-slate-900 font-bold">{dailyBlocks.length}</strong>
             </div>
             <div>
               Weekly Blocks: <strong className="text-slate-900 font-bold">{weeklyBlocks.length}</strong>
+            </div>
+            <div>
+              Monthly Blocks: <strong className="text-slate-900 font-bold">{monthlyBlocks.length}</strong>
             </div>
             <div>
               Critical Blocks: <strong className="text-rose-700 font-bold">{criticalBlocks.length}</strong>
@@ -692,22 +757,22 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       {/* ============================================================== */}
       <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-2 overflow-x-auto">
-          {/* Monthly Blocks */}
+          {/* Daily Blocks */}
           <button
             type="button"
-            onClick={() => setActiveSection("monthly")}
+            onClick={() => setActiveSection("daily")}
             className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "monthly"
+              activeSection === "daily"
                 ? "bg-[#0b2545] text-white shadow-xs"
                 : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
             }`}
           >
-            <CalendarRange className="w-4 h-4" />
-            <span>Monthly Blocks</span>
+            <Calendar className="w-4 h-4" />
+            <span>Daily Blocks</span>
             <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-              activeSection === "monthly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
+              activeSection === "daily" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
             }`}>
-              {monthlyBlocks.length}
+              {dailyBlocks.length}
             </span>
           </button>
 
@@ -721,12 +786,31 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
                 : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
             }`}
           >
-            <Calendar className="w-4 h-4" />
+            <CalendarRange className="w-4 h-4" />
             <span>Weekly Blocks</span>
             <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
               activeSection === "weekly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
             }`}>
               {weeklyBlocks.length}
+            </span>
+          </button>
+
+          {/* Monthly Blocks */}
+          <button
+            type="button"
+            onClick={() => setActiveSection("monthly")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSection === "monthly"
+                ? "bg-[#0b2545] text-white shadow-xs"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Monthly Blocks</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+              activeSection === "monthly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
+            }`}>
+              {monthlyBlocks.length}
             </span>
           </button>
 
@@ -767,6 +851,25 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
               {issues.length}
             </span>
           </button>
+
+          {/* Completed Tasks Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveSection("completed")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSection === "completed"
+                ? "bg-emerald-700 text-white shadow-xs"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+            }`}
+          >
+            <CheckCircle2 className={`w-4 h-4 ${activeSection === "completed" ? "text-white" : "text-emerald-600"}`} />
+            <span>Completed Tasks</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+              activeSection === "completed" ? "bg-white/20 text-white" : "bg-white text-emerald-800 border border-emerald-200"
+            }`}>
+              {corridorCompletedTasks.length}
+            </span>
+          </button>
         </div>
 
         <div className="text-xs font-mono text-slate-500 hidden sm:block pr-2">
@@ -775,7 +878,55 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       </div>
 
       {/* ============================================================== */}
-      {/* 3. SECTION 1: MONTHLY BLOCKS                                   */}
+      {/* 3. SECTION 0: DAILY BLOCKS                                      */}
+      {/* ============================================================== */}
+      {activeSection === "daily" && (
+        <div className="space-y-4">
+          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-base font-bold text-slate-900">
+                  Daily Planned Blocks — {corridor.name} ({corridor.id})
+                </h3>
+                <span className="px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-sky-100 text-sky-900 border border-sky-300">
+                  Today: {CURRENT_SYSTEM_DATE}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Real-time visibility into planned maintenance blocks and possessory work scheduled for execution today across this corridor
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleOpenNewBlock("DAILY")}
+              className="px-3.5 py-2 bg-[#0b2545] hover:bg-sky-900 text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Daily Block</span>
+            </button>
+          </div>
+
+          {dailyBlocks.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
+              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
+                <Calendar className="w-7 h-7" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-800">No Daily Blocks Scheduled for Today</h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                There are no planned possession windows scheduled for <strong>{corridor.name} ({corridor.id})</strong> today ({CURRENT_SYSTEM_DATE}). Use the <strong>"Add Daily Block"</strong> button above to plan a maintenance window.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {dailyBlocks.map((blk) => renderBlockCard(blk))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 4. SECTION 1: MONTHLY BLOCKS                                   */}
       {/* ============================================================== */}
       {activeSection === "monthly" && (
         <div className="space-y-4">
@@ -1034,6 +1185,114 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* SECTION 5: COMPLETED TASKS (CORRIDOR COORDINATOR)              */}
+      {/* ============================================================== */}
+      {activeSection === "completed" && (
+        <div className="space-y-4">
+          <div className="bg-white p-4 sm:p-5 rounded-xl border border-emerald-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span>Department Completed Tasks — {corridor.name} ({corridor.id})</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tasks finished and confirmed by departmental squads (P.Way, S&T, TRD). Parent operational block possession remains active until all coordinated work finishes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadCompletedTasks}
+              disabled={loadingCompletedTasks}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold rounded-lg shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingCompletedTasks ? "animate-spin" : ""}`} />
+              <span>Refresh Completed</span>
+            </button>
+          </div>
+
+          {corridorCompletedTasks.length > 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 font-mono text-[11px] text-slate-600 uppercase">
+                    <tr>
+                      <th className="p-3 pl-4">Task ID</th>
+                      <th className="p-3">Block ID</th>
+                      <th className="p-3">Department</th>
+                      <th className="p-3">Description</th>
+                      <th className="p-3">Location</th>
+                      <th className="p-3">Completed By</th>
+                      <th className="p-3">Completion Time</th>
+                      <th className="p-3">Block Status</th>
+                      <th className="p-3 pr-4">Verification Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-sans">
+                    {corridorCompletedTasks.map((tsk) => (
+                      <tr key={tsk.id} className="hover:bg-slate-50/80">
+                        <td className="p-3 pl-4 font-mono font-bold text-slate-900">
+                          {tsk.task_id || tsk.id}
+                        </td>
+                        <td className="p-3 font-mono font-bold text-indigo-700">
+                          {tsk.block_id || "Unlinked"}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] border ${
+                              tsk.department_id === "PWAY"
+                                ? "bg-blue-50 text-blue-900 border-blue-200"
+                                : tsk.department_id === "SNT"
+                                ? "bg-purple-50 text-purple-900 border-purple-200"
+                                : "bg-amber-50 text-amber-900 border-amber-200"
+                            }`}
+                          >
+                            {tsk.department_id}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-800 text-[11px] font-medium max-w-[200px] truncate" title={tsk.description || tsk.title}>
+                          {tsk.description || tsk.title || tsk.work_type_id}
+                        </td>
+                        <td className="p-3 font-mono text-slate-700">
+                          <div>Track {tsk.track_name}</div>
+                          <div className="font-bold text-slate-900">{formatDistanceKm(tsk.location_km)}</div>
+                        </td>
+                        <td className="p-3 text-slate-700 font-medium text-[11px]">
+                          {tsk.completed_by || tsk.assigned_crew || "Field Squad"}
+                        </td>
+                        <td className="p-3 font-mono text-slate-700 text-[11px]">
+                          {tsk.completed_at ? new Date(tsk.completed_at).toLocaleString() : "Recently Completed"}
+                        </td>
+                        <td className="p-3 font-mono">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                            {tsk.block_status || "ACTIVE"}
+                          </span>
+                        </td>
+                        <td className="p-3 pr-4">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                              tsk.verification_status === "VERIFIED"
+                                ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                : "bg-amber-100 text-amber-900 border-amber-300"
+                            }`}
+                          >
+                            {tsk.verification_status || "VERIFIED"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 text-center text-slate-400 text-xs font-mono bg-white rounded-xl border border-slate-200">
+              No completed tasks recorded for corridor {corridor.id} yet. Tasks marked Completed by field departments will appear here.
             </div>
           )}
         </div>

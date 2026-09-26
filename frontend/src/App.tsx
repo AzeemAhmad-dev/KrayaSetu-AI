@@ -18,6 +18,8 @@ import { EngineeringPWayControl } from "./pages/EngineeringPWayControl";
 import { SignalSNTControl } from "./pages/SignalSNTControl";
 import { DivisionalOperationsControl } from "./pages/DivisionalOperationsControl";
 import { TrainPilotWorkspacePage } from "./pages/TrainPilotWorkspacePage";
+import { MareyDiagramPage } from "./pages/MareyDiagramPage";
+import { BaselineComparisonPage } from "./pages/BaselineComparisonPage";
 
 const ProtectedRoute: React.FC<{ path: string; children: React.ReactNode }> = ({ path, children }) => {
   const { isAuthenticated, canAccessPath, currentRole } = useAuth();
@@ -119,7 +121,7 @@ const AppContent: React.FC = () => {
               }
             />
 
-            {/* Track / P.Way Maintenance Workspace (PWAY-001, PWAY-002) */}
+            {/* Track / P.Way Maintenance Workspace (PWAY-001) */}
             <Route
               path="/pway-control"
               element={
@@ -139,7 +141,7 @@ const AppContent: React.FC = () => {
               }
             />
 
-            {/* Traction / OHE Control Workspace (TRD-001, TRD-002) */}
+            {/* Traction / OHE Control Workspace (TRD-001) */}
             <Route
               path="/trd-control"
               element={
@@ -169,6 +171,16 @@ const AppContent: React.FC = () => {
               }
             />
 
+            {/* Live Marey Train-Time-Distance Diagram */}
+            <Route
+              path="/marey-diagram"
+              element={
+                <ProtectedRoute path="/marey-diagram">
+                  <MareyDiagramPage />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Block Planner (CP-SAT Constraint Engine) */}
             <Route
               path="/block-planner"
@@ -193,6 +205,16 @@ const AppContent: React.FC = () => {
               element={
                 <ProtectedRoute path="/coordination">
                   <CoordinationPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Department-Baseline Comparison & Impact Assessment (SIH26027 Objective Function) */}
+            <Route
+              path="/baseline-comparison"
+              element={
+                <ProtectedRoute path="/baseline-comparison">
+                  <BaselineComparisonPage />
                 </ProtectedRoute>
               }
             />

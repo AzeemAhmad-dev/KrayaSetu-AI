@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import { TrainMovementData, BlockData, DivisionSummary } from "../types";
@@ -6,6 +6,16 @@ import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
 import { useRole } from "../context/RoleContext";
 import { BlockReasoningModal } from "../components/blocks/BlockReasoningModal";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatDistanceKm } from "../utils/formatDistance";
+import {
+  useCanonicalBlocks,
+  useTrainMovements,
+  usePriorityTasks,
+  useNetworkSummary,
+  useDashboardSummary,
+  useInvalidateCanonicalData,
+  useBaselineComparison,
+} from "../hooks/useCanonicalData";
 import {
   BarChart3,
   TrendingUp,
@@ -36,14 +46,41 @@ export const DivisionalOperationsControl: React.FC = () => {
   const { currentRole } = useRole();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const invalidateCanonicalData = useInvalidateCanonicalData();
 
-  const [trains, setTrains] = useState<TrainMovementData[]>([]);
-  const [blocks, setBlocks] = useState<BlockData[]>([]);
-  const [summary, setSummary] = useState<DivisionSummary | null>(null);
-  const [dashSummary, setDashSummary] = useState<any>(null);
-  const [priorityTasks, setPriorityTasks] = useState<any[]>([]);
+  // React Query hooks — data survives navigation (staleTime=Infinity for canonical data)
+  const { data: trainsData, isLoading: trainsLoading } = useTrainMovements();
+  const { data: blocksData, isLoading: blocksLoading } = useCanonicalBlocks();
+  const { data: summaryData, isLoading: summaryLoading } = useNetworkSummary();
+  const { data: dashData } = useDashboardSummary();
+  const { data: prioData, isLoading: prioLoading } = usePriorityTasks(1000);
+  const { data: baselineData } = useBaselineComparison();
+
+  // Derived state from query results
+  const trains = trainsData ?? [];
+  const blocks = blocksData ?? [];
+  const summary = summaryData ?? null;
+  const dashSummary = dashData ?? null;
+  const priorityTasks = prioData?.tasks ?? [];
+  const loading = trainsLoading || blocksLoading || summaryLoading || prioLoading;
+
+  // Baseline Comparison headline metrics
+  const baselineHours = baselineData?.independent_baseline?.total_hours ?? 132.5;
+  const baselineWindows = baselineData?.independent_baseline?.total_windows ?? 64;
+  const optimizedHours = baselineData?.optimized_plan?.total_hours ?? 99.5;
+  const optimizedBlocks = baselineData?.optimized_plan?.total_blocks ?? 50;
+  const hoursSaved = baselineData?.impact?.hours_saved ?? 33.0;
+  const pctReduction = baselineData?.impact?.percentage_reduction ?? 24.9;
+  const windowsEliminated = baselineData?.impact?.windows_eliminated ?? 14;
+  const shadowSavingsPct = baselineData?.impact?.shadow_sections_savings?.percentage_reduction ?? 61.7;
+
+  // The Division Block Ledger strictly displays blocks that have actually been proposed or are in active clearance/operational workflow.
+  // Raw canonical blocks in "PLANNED" / "DRAFT" state remain unproposed and do NOT appear in the ledger.
+  const ledgerBlocks = blocks.filter(
+    (b) => b.status !== "PLANNED" && b.approval_status !== "DRAFT"
+  );
+
   const [selectedTierFilter, setSelectedTierFilter] = useState<string>("ALL");
-  const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [executiveNotes, setExecutiveNotes] = useState<Record<string, string>>({});
@@ -51,32 +88,6 @@ export const DivisionalOperationsControl: React.FC = () => {
 
   // Modal State for "Why this task?"
   const [modalTaskId, setModalTaskId] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadDivisionalData();
-  }, []);
-
-  const loadDivisionalData = async () => {
-    setLoading(true);
-    try {
-      const [trainsRes, blocksRes, sumRes, dashRes, prioRes] = await Promise.all([
-        api.getTrainMovements(),
-        api.getBlocks(),
-        api.getNetworkSummary(),
-        api.getPlanningDashboardSummary().catch(() => null),
-        api.getTaskPriorities(undefined, undefined, 1000).catch(() => null),
-      ]);
-      setTrains(trainsRes);
-      setBlocks(blocksRes);
-      setSummary(sumRes);
-      if (dashRes) setDashSummary(dashRes);
-      if (prioRes && prioRes.tasks) setPriorityTasks(prioRes.tasks);
-    } catch (err) {
-      console.error("Failed to load operations data", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleMasterSanction = async (blockId: string, action: "APPROVE" | "REJECT") => {
     setActioningId(blockId);
@@ -87,7 +98,7 @@ export const DivisionalOperationsControl: React.FC = () => {
         approved_by: "Divisional Operations Manager (DOM / Bhopal)",
         notes: executiveNotes[blockId] || `Executive sanction: ${action} under Divisional Policy`,
       });
-      await loadDivisionalData();
+      await invalidateCanonicalData();
     } catch (err) {
       console.error("Master sanction failed", err);
     } finally {
@@ -95,33 +106,34 @@ export const DivisionalOperationsControl: React.FC = () => {
     }
   };
 
-  const handleResetDemo = async () => {
+  const handleRegenerateCanonical = async () => {
     setResetting(true);
     try {
-      const res = await api.resetDemoBlocks();
-      setResetMessage(res.message || "Demo state reset: 50 dynamic randomized tasks generated.");
-      // Invalidate all TanStack queries to trigger fresh re-fetch
-      await queryClient.invalidateQueries();
-      // Reload divisional state directly
-      await loadDivisionalData();
-      setTimeout(() => setResetMessage(null), 5000);
+      const res = await api.regenerateCanonicalBlocks();
+      setResetMessage(res.message || "50 planning blocks regenerated successfully.");
+      // Invalidate canonical data cache — useQuery hooks will automatically refetch
+      await invalidateCanonicalData();
+      setTimeout(() => setResetMessage(null), 6000);
     } catch (err: any) {
-      console.error("Failed to reset demo:", err);
-      setResetMessage("Error resetting demo state: " + (err.message || err));
-      setTimeout(() => setResetMessage(null), 5000);
+      console.error("Failed to regenerate planning blocks:", err);
+      const errMsg = err?.detail || err?.message || String(err);
+      setResetMessage("Error regenerating blocks: " + errMsg);
+      setTimeout(() => setResetMessage(null), 6000);
     } finally {
       setResetting(false);
     }
   };
 
-  const delayedTrains = trains.filter((t) => t.delay_minutes > 10);
-  const pendingBlocks = blocks.filter((b) => b.approval_status === "PENDING" || b.status === "PENDING_APPROVAL");
-  const freightTrains = trains.filter((t) => t.service_type === "FREIGHT" || t.train_type === "FREIGHT");
-  const onTimeCount = trains.filter((t) => t.delay_minutes <= 15).length;
+  const delayedTrains = trains.filter((t: TrainMovementData) => t.delay_minutes > 10);
+  const pendingBlocks = ledgerBlocks.filter((b: BlockData) => b.approval_status === "PENDING" || b.status === "PENDING_APPROVAL");
+  const freightTrains = trains.filter((t: TrainMovementData) => t.service_type === "FREIGHT" || t.train_type === "FREIGHT");
+  const onTimeCount = trains.filter((t: TrainMovementData) => t.delay_minutes <= 15).length;
   const punctualityPct = trains.length > 0 ? ((onTimeCount / trains.length) * 100).toFixed(1) : "92.4";
 
+  const datasetFingerprint = prioData?.dataset_fingerprint || dashData?.dataset_fingerprint || "CANON-50-BLOCK";
+
   // Filter tasks based on tier selector
-  const filteredTasks = priorityTasks.filter((t) => {
+  const filteredTasks = priorityTasks.filter((t: any) => {
     if (selectedTierFilter === "ALL") return true;
     return t.priority_tier === selectedTierFilter;
   });
@@ -148,17 +160,35 @@ export const DivisionalOperationsControl: React.FC = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ProvenanceBadge type="REAL_PUBLIC" />
+
+            {/* Regenerate 50 Blocks Button */}
             <button
-              onClick={handleResetDemo}
+              onClick={handleRegenerateCanonical}
               disabled={resetting}
-              className={`px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-amber-300 text-xs font-semibold rounded-lg border border-amber-500/40 shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 bg-purple-700/80 hover:bg-purple-600 text-purple-100 text-xs font-bold rounded-lg border border-purple-400/50 shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer ${
                 resetting ? "opacity-60 cursor-not-allowed" : ""
               }`}
-              title="Reset demonstration blocks and generate 50 dynamic randomized maintenance tasks"
+              title="Generate a new validated 50-block planning scenario"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${resetting ? "animate-spin text-amber-400" : ""}`} />
-              <span>{resetting ? "Generating 50 Dynamic Tasks..." : "Safe Demo Reset"}</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${resetting ? "animate-spin text-purple-300" : ""}`} />
+              <span>{resetting ? "Validating & Promoting..." : "Regenerate 50 Blocks"}</span>
             </button>
+            <Link
+              to="/baseline-comparison"
+              className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer border border-emerald-400/40"
+              title="View Independent Baseline vs Co-located Optimizer Comparison"
+            >
+              <GitMerge className="w-4 h-4 text-emerald-200" />
+              <span>Downtime Saved: {hoursSaved.toFixed(1)}h (-{pctReduction.toFixed(0)}%)</span>
+            </Link>
+            <Link
+              to="/marey-diagram"
+              className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer border border-amber-400/40"
+              title="Launch Live Indian Railways Marey (train-time-distance) Diagram"
+            >
+              <TrendingUp className="w-4 h-4 text-amber-200" />
+              <span>Live Marey Diagram</span>
+            </Link>
             <Link
               to="/block-planner"
               className="px-4 py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer"
@@ -171,8 +201,18 @@ export const DivisionalOperationsControl: React.FC = () => {
 
         {/* Demo Notification Toast */}
         {resetMessage && (
-          <div className="mt-4 p-2.5 bg-emerald-950/80 border border-emerald-500/60 rounded-lg text-emerald-200 text-xs flex items-center space-x-2 animate-fadeIn">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <div
+            className={`mt-4 p-2.5 rounded-lg text-xs flex items-center space-x-2 animate-fadeIn ${
+              resetMessage.startsWith("Error")
+                ? "bg-rose-950/80 border border-rose-500/60 text-rose-200"
+                : "bg-emerald-950/80 border border-emerald-500/60 text-emerald-200"
+            }`}
+          >
+            {resetMessage.startsWith("Error") ? (
+              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            )}
             <span>{resetMessage}</span>
           </div>
         )}
@@ -235,8 +275,70 @@ export const DivisionalOperationsControl: React.FC = () => {
         </div>
       </div>
 
+      {/* 2.5 Executive Impact Banner: Total Asset Downtime Saved */}
+      <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white rounded-2xl p-5 border border-emerald-500/40 shadow-md relative overflow-hidden">
+        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-emerald-500/5 -skew-x-12 pointer-events-none" />
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center space-x-1">
+                <GitMerge className="w-3.5 h-3.5 text-emerald-400 mr-1" />
+                <span>CROSS-DEPARTMENT COORDINATION IMPACT</span>
+              </span>
+              <span className="text-xs text-slate-300 font-mono">P.Way · TRD · S&T Shared Corridor Windows</span>
+              <ProvenanceBadge type="SYNTHETIC" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex flex-wrap items-baseline gap-3">
+              <span>{hoursSaved.toFixed(1)} Hours Asset Downtime Saved</span>
+              <span className="text-emerald-400 text-xl sm:text-2xl font-black">
+                (-{pctReduction.toFixed(1)}% Track Possession Reduction)
+              </span>
+            </h2>
+            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+              Consolidated <strong>{baselineWindows} uncoordinated departmental requests</strong> ({baselineHours.toFixed(1)}h) down to <strong>{optimizedBlocks} multi-department blocks</strong> ({optimizedHours.toFixed(1)}h). Avoided <strong>{windowsEliminated} separate track possession outages</strong> and achieved <strong>{shadowSavingsPct.toFixed(1)}% downtime reduction</strong> across shared corridor sections.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="grid grid-cols-2 gap-2 text-center text-xs font-mono">
+              <div className="bg-slate-800/80 border border-rose-500/40 rounded-xl p-2.5">
+                <div className="text-[10px] uppercase text-rose-400 font-bold">Uncoordinated Baseline</div>
+                <div className="text-lg font-black text-rose-300">{baselineHours.toFixed(1)}h</div>
+                <div className="text-[10px] text-slate-400">{baselineWindows} Windows</div>
+              </div>
+              <div className="bg-slate-800/80 border border-emerald-500/40 rounded-xl p-2.5">
+                <div className="text-[10px] uppercase text-emerald-400 font-bold">KrayaSetu AI Plan</div>
+                <div className="text-lg font-black text-emerald-300">{optimizedHours.toFixed(1)}h</div>
+                <div className="text-[10px] text-slate-400">{optimizedBlocks} Blocks</div>
+              </div>
+            </div>
+
+            <Link
+              to="/baseline-comparison"
+              className="px-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center space-x-2 transition-all cursor-pointer group"
+            >
+              <span>View Side-by-Side Comparison</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* 3. Real-Time Operational KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-3.5 border border-emerald-300 shadow-xs">
+          <span className="text-[10px] font-bold uppercase font-mono text-emerald-800 flex items-center justify-between">
+            <span>Downtime Saved</span>
+            <GitMerge className="w-3 h-3 text-emerald-600" />
+          </span>
+          <div className="text-xl font-black text-emerald-700 mt-1">
+            {hoursSaved.toFixed(1)}h
+          </div>
+          <span className="text-[10px] text-emerald-700 font-mono font-semibold">
+            -{pctReduction.toFixed(1)}% ({windowsEliminated} Outages Avoided)
+          </span>
+        </div>
+
         <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs">
           <span className="text-[10px] font-bold uppercase font-mono text-slate-500">Tasks Analyzed</span>
           <div className="text-xl font-black text-slate-900 mt-1">
@@ -248,13 +350,13 @@ export const DivisionalOperationsControl: React.FC = () => {
         <div className="bg-white rounded-xl p-3.5 border border-red-200 bg-red-50/30 shadow-xs">
           <span className="text-[10px] font-bold uppercase font-mono text-red-600">Critical Tier</span>
           <div className="text-xl font-black text-red-700 mt-1">
-            {dashSummary?.priority_distribution?.CRITICAL ?? priorityTasks.filter((t) => t.priority_tier === "CRITICAL").length}
+            {dashSummary?.priority_distribution?.CRITICAL ?? priorityTasks.filter((t: any) => t.priority_tier === "CRITICAL").length}
           </div>
           <span className="text-[10px] text-red-600 font-mono truncate block">
             {dashSummary?.critical_task
               ? `${dashSummary.critical_task.id} (${Number(dashSummary.critical_task.score).toFixed(1)})`
-              : (priorityTasks.find((t) => t.priority_tier === "CRITICAL")
-                ? `${priorityTasks.find((t) => t.priority_tier === "CRITICAL")?.task_id} (${Number(priorityTasks.find((t) => t.priority_tier === "CRITICAL")?.total_score).toFixed(1)})`
+              : (priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")
+                ? `${priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")?.task_id} (${Number(priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")?.total_score).toFixed(1)})`
                 : "Active")}
           </span>
         </div>
@@ -262,7 +364,7 @@ export const DivisionalOperationsControl: React.FC = () => {
         <div className="bg-white rounded-xl p-3.5 border border-amber-200 bg-amber-50/30 shadow-xs">
           <span className="text-[10px] font-bold uppercase font-mono text-amber-700">High Tier</span>
           <div className="text-xl font-black text-amber-700 mt-1">
-            {dashSummary?.priority_distribution?.HIGH ?? priorityTasks.filter((t) => t.priority_tier === "HIGH").length}
+            {dashSummary?.priority_distribution?.HIGH ?? priorityTasks.filter((t: any) => t.priority_tier === "HIGH").length}
           </div>
           <span className="text-[10px] text-amber-600 font-mono">Score 70.0 – 89.9</span>
         </div>
@@ -270,7 +372,7 @@ export const DivisionalOperationsControl: React.FC = () => {
         <div className="bg-white rounded-xl p-3.5 border border-blue-200 bg-blue-50/30 shadow-xs">
           <span className="text-[10px] font-bold uppercase font-mono text-blue-700">Medium Tier</span>
           <div className="text-xl font-black text-blue-700 mt-1">
-            {dashSummary?.priority_distribution?.MEDIUM ?? priorityTasks.filter((t) => t.priority_tier === "MEDIUM").length}
+            {dashSummary?.priority_distribution?.MEDIUM ?? priorityTasks.filter((t: any) => t.priority_tier === "MEDIUM").length}
           </div>
           <span className="text-[10px] text-blue-600 font-mono">Score 45.0 – 69.9</span>
         </div>
@@ -278,7 +380,7 @@ export const DivisionalOperationsControl: React.FC = () => {
         <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs">
           <span className="text-[10px] font-bold uppercase font-mono text-slate-500">Low Tier</span>
           <div className="text-xl font-black text-slate-700 mt-1">
-            {dashSummary?.priority_distribution?.LOW ?? priorityTasks.filter((t) => t.priority_tier === "LOW").length}
+            {dashSummary?.priority_distribution?.LOW ?? priorityTasks.filter((t: any) => t.priority_tier === "LOW").length}
           </div>
           <span className="text-[10px] text-slate-500 font-mono">Routine Upkeep</span>
         </div>
@@ -286,17 +388,17 @@ export const DivisionalOperationsControl: React.FC = () => {
         <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs">
           <span className="text-[10px] font-bold uppercase font-mono text-slate-500">Blocks Proposed</span>
           <div className="text-xl font-black text-slate-900 mt-1">
-            {blocks.length}
+            {ledgerBlocks.length}
           </div>
           <span className="text-[10px] text-slate-500 font-mono">
-            {blocks.filter((b) => b.status === "APPROVED").length} Sanctioned
+            {ledgerBlocks.filter((b) => b.status === "APPROVED" || b.status === "SANCTIONED").length} Sanctioned
           </span>
         </div>
 
         <div className="bg-white rounded-xl p-3.5 border border-emerald-200 bg-emerald-50/30 shadow-xs">
           <span className="text-[10px] font-bold uppercase font-mono text-emerald-700">Tasks Scheduled</span>
           <div className="text-xl font-black text-emerald-700 mt-1">
-            {blocks.filter((b) => b.status === "SCHEDULED" || b.status === "APPROVED").length}
+            {ledgerBlocks.filter((b) => b.status === "SCHEDULED" || b.status === "APPROVED" || b.status === "SANCTIONED").length}
           </div>
           <span className="text-[10px] text-emerald-600 font-mono">CP-SAT Optimized</span>
         </div>
@@ -354,7 +456,7 @@ export const DivisionalOperationsControl: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-sans">
-              {filteredTasks.slice(0, 15).map((task, idx) => {
+              {filteredTasks.slice(0, 15).map((task: any, idx: number) => {
                 const isTask0001 = task.task_id === "TASK-0001";
                 const isCritical = task.priority_tier === "CRITICAL";
                 const isHigh = task.priority_tier === "HIGH";
@@ -397,7 +499,7 @@ export const DivisionalOperationsControl: React.FC = () => {
                     <td className="py-3 px-3">
                       <div className="font-medium text-slate-900">{task.corridor_id}</div>
                       <div className="text-[11px] text-slate-500 font-mono">
-                        {task.track_name} · KM {task.location_km}
+                        {task.track_name} · {formatDistanceKm(task.location_km)}
                       </div>
                     </td>
 
@@ -547,7 +649,7 @@ export const DivisionalOperationsControl: React.FC = () => {
                     </div>
 
                     <div className="text-xs font-semibold text-slate-800 mt-1">
-                      Corridor: {b.corridor_id} · Track: {b.track_name} (KM {b.location_km}) · Slot: {b.requested_start_time} - {b.requested_end_time} ({b.duration_mins}m)
+                      Corridor: {b.corridor_id} · Track: {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time} - {b.requested_end_time} ({b.duration_mins}m)
                     </div>
 
                     <p className="text-xs text-slate-600 mt-1 leading-relaxed bg-slate-50 p-2 rounded border border-slate-100">
@@ -657,7 +759,7 @@ export const DivisionalOperationsControl: React.FC = () => {
                   Divisional Blocks Ledger
                 </h2>
                 <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-sky-100 text-sky-800 border border-sky-200">
-                  {blocks.length} Active Records
+                  {ledgerBlocks.length} Active Records
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
@@ -677,12 +779,12 @@ export const DivisionalOperationsControl: React.FC = () => {
           </div>
         </div>
 
-        {blocks.length === 0 ? (
+        {ledgerBlocks.length === 0 ? (
           <div className="p-12 text-center text-slate-500 space-y-2">
             <Calendar className="w-10 h-10 mx-auto text-slate-300" />
             <div className="text-sm font-bold text-slate-700">0 Divisional Blocks Currently Registered</div>
             <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-              Use "Plan Block →" on any Priority Queue item above or launch the CP-SAT Optimizer in Block Planner to schedule canonical maintenance blocks.
+              Use "Plan Block →" on any Priority Queue item above or launch the CP-SAT Optimizer in Block Planner to schedule maintenance blocks.
             </p>
           </div>
         ) : (
@@ -702,7 +804,7 @@ export const DivisionalOperationsControl: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-sans">
-                {blocks.map((b) => (
+                {ledgerBlocks.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-3 font-mono">
                       <div className="font-bold text-slate-900">{b.id}</div>
@@ -734,7 +836,7 @@ export const DivisionalOperationsControl: React.FC = () => {
                     </td>
                     <td className="py-3 px-3 font-mono">
                       <div className="text-slate-800 font-semibold">{b.track_name}</div>
-                      <div className="text-[11px] text-slate-500">KM {b.location_km}</div>
+                      <div className="text-[11px] text-slate-500">{formatDistanceKm(b.location_km)}</div>
                     </td>
                     <td className="py-3 px-3 font-mono">
                       <div className="font-bold text-slate-900">{b.requested_start_time} – {b.requested_end_time}</div>

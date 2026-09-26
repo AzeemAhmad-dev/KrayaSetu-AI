@@ -4,6 +4,7 @@ import { getAllCorridors } from "../data/corridorsData";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
 import { CorridorWorkspaceNav } from "../components/corridor/CorridorWorkspaceNav";
 import { ArrowRight, Compass, Layers, ShieldCheck } from "lucide-react";
+import { formatDistanceKm } from "../utils/formatDistance";
 
 export const CorridorsPage: React.FC = () => {
   const corridors = getAllCorridors();
@@ -113,7 +114,7 @@ export const CorridorsPage: React.FC = () => {
             {/* Bottom Specs & Action Link */}
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-mono">
               <div className="text-slate-600 text-xs">
-                <strong className="text-slate-900 font-bold">{c.total_distance_km} KM</strong> · Speed: <strong className="text-slate-900 font-bold">{c.max_permissible_speed_kmph} km/h</strong>
+                <strong className="text-slate-900 font-bold">{formatDistanceKm(c.total_distance_km)}</strong> · Speed: <strong className="text-slate-900 font-bold">{c.max_permissible_speed_kmph} km/h</strong>
               </div>
 
               <Link

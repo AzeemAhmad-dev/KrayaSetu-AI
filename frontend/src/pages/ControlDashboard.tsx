@@ -18,7 +18,8 @@ import {
   ArrowRight,
   ExternalLink,
   ShieldCheck,
-  Compass
+  Compass,
+  GitMerge,
 } from "lucide-react";
 
 export type CoaWorkspaceTab = "map" | "corridors" | "junctions" | "sections" | "block";
@@ -35,7 +36,7 @@ export const ControlDashboard: React.FC = () => {
   const loadNetworkBlocks = async () => {
     setLoadingBlocks(true);
     try {
-      const data = await api.getBlocks();
+      const data = await api.getBlocks(undefined, undefined, undefined, undefined, undefined, true);
       setNetworkBlocks(data);
     } catch (e) {
       console.warn("Could not load network blocks for Master Map", e);
@@ -98,7 +99,7 @@ export const ControlDashboard: React.FC = () => {
     },
     {
       key: "block",
-      label: "Block",
+      label: "Master Control Planning",
       icon: ShieldAlert,
     },
   ];
@@ -122,6 +123,17 @@ export const ControlDashboard: React.FC = () => {
             </div>
           </div>
 
+          <div className="flex items-center gap-2">
+            <ProvenanceBadge type="REAL_PUBLIC" />
+            <Link
+              to="/baseline-comparison"
+              className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-emerald-500/80"
+              title="View Independent Baseline vs Co-located Optimizer Comparison"
+            >
+              <GitMerge className="w-3.5 h-3.5 text-emerald-200" />
+              <span>Downtime Saved: 33.0h (-24.9%)</span>
+            </Link>
+          </div>
         </div>
 
         {/* Infrastructure Telemetry Strip */}

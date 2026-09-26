@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from backend.app.models.events import EventLog
 
@@ -12,11 +12,12 @@ def log_event(
     previous_state: str = None,
     new_state: str = "COMPLETED",
     reason: str = None,
-    provenance: str = "SIMULATED"
+    provenance: str = "SIMULATED",
+    auto_commit: bool = True
 ) -> EventLog:
     """Logs an operational event with strict provenance tracking."""
     event = EventLog(
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         actor=actor,
         role=role,
         entity=entity,
@@ -28,6 +29,9 @@ def log_event(
         provenance=provenance
     )
     db.add(event)
-    db.commit()
-    db.refresh(event)
+    if auto_commit:
+        db.commit()
+        db.refresh(event)
+    else:
+        db.flush()
     return event

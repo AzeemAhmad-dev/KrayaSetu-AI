@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  krayasetu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: krayasetu-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=sqlite:////app/krayasetu.db
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8000
+      - RAILRADAR_API_BASE_URL=https://api.railradar.in/v1
+      - RAILRADAR_API_KEY=
+      - RAILRADAR_TIMEOUT_SECONDS=0.5
+    volumes:
+      - ./krayasetu.db:/app/krayasetu.db

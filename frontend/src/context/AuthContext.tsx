@@ -66,6 +66,7 @@ export const DEMO_ACCOUNTS_REGISTRY: Record<string, { user: UserAccount; passwor
       allowedPaths: [
         "/operations-control",
         "/block-planner",
+        "/marey-diagram",
         "/coordination",
         "/control",
         "/corridors",
@@ -85,6 +86,8 @@ export const DEMO_ACCOUNTS_REGISTRY: Record<string, { user: UserAccount; passwor
       },
       sidebarLinks: [
         { path: "/operations-control", label: "Operations & Decisions", iconName: "Monitor", badge: "Demo" },
+        { path: "/baseline-comparison", label: "Baseline vs Optimizer", iconName: "BarChart3", badge: "IMPACT" },
+        { path: "/marey-diagram", label: "Marey Time-Distance", iconName: "TrendingUp", badge: "LIVE" },
         { path: "/block-planner", label: "Block Planner (CP-SAT)", iconName: "Cpu", badge: "8.0s" },
         { path: "/coordination", label: "Joint Coordination Desk", iconName: "GitMerge" },
         { path: "/control", label: "Master Network Map", iconName: "Layers" },
@@ -106,7 +109,7 @@ export const DEMO_ACCOUNTS_REGISTRY: Record<string, { user: UserAccount; passwor
       zone: "West Central Railway (WCR)",
       workspaceName: "Corridor Control",
       defaultPath: "/corridors",
-      allowedPaths: ["/corridors", "/control"],
+      allowedPaths: ["/corridors", "/control", "/marey-diagram"],
       badgeColor: "bg-blue-100 text-blue-900 border-blue-300",
       permissions: {
         canApproveTrafficBlocks: false,
@@ -118,6 +121,7 @@ export const DEMO_ACCOUNTS_REGISTRY: Record<string, { user: UserAccount; passwor
       },
       sidebarLinks: [
         { path: "/corridors", label: "Corridor Networks", iconName: "Activity" },
+        { path: "/marey-diagram", label: "Marey Time-Distance", iconName: "TrendingUp", badge: "LIVE" },
         { path: "/corridors/CORR-01?tab=infrastructure", label: "Section Infrastructure", iconName: "Building2" },
         { path: "/corridors/CORR-01?tab=index", label: "Index Section", iconName: "Sliders" },
         { path: "/corridors/CORR-01?tab=map", label: "Detailed Corridor Map", iconName: "Compass" },
@@ -327,11 +331,9 @@ export const DEMO_CREDENTIALS_LIST: DemoCredential[] = [
   { username: "COA-001", role: "Chief of Block Officer", workspace: "Master Control", password: "coa@demo", description: "Master network infrastructure, 5 corridors, major junctions & division boundaries" },
   { username: "COR-001", role: "Corridor Master", workspace: "Corridor Control", password: "cor@demo", description: "Corridor & section infrastructure, track arrangements, stations line string" },
   { username: "SM-001", role: "Station Master", workspace: "Station Master", password: "sm@demo", description: "Station schematic layout, physical platforms, loops, sidings & turnouts" },
-  { username: "PWAY-001", role: "Track / P.Way (SSE)", workspace: "Track Infrastructure", password: "pway@demo", description: "Track network, 60kg rail profile, PSC sleepers, bridges & permanent way assets" },
-  { username: "PWAY-002", role: "Track / P.Way (JE)", workspace: "Track Infrastructure", password: "pway@demo", description: "Civil Engineering Vidisha Section track maintenance & inspection rakes" },
+  { username: "PWAY-001", role: "Track / P.Way", workspace: "Track Infrastructure", password: "pway@demo", description: "Permanent Way infrastructure, 60kg rail profile, PSC sleepers, track geometry & maintenance" },
   { username: "SNT-001", role: "Signal & S&T", workspace: "Signal & S&T Infrastructure", password: "snt@demo", description: "Electronic Interlocking (EI), signal locations, point machines & axle counters" },
-  { username: "TRD-001", role: "Traction / OHE (DEE)", workspace: "Traction / OHE Infrastructure", password: "trd@demo", description: "25kV AC traction infrastructure, Traction Substations (TSS) & feeding zones" },
-  { username: "TRD-002", role: "Traction / OHE (Supervisor)", workspace: "Traction / OHE Infrastructure", password: "trd@demo", description: "OHE field asset supervision, pantograph clearance & breakdown response" },
+  { username: "TRD-001", role: "Traction / OHE", workspace: "Traction / OHE Infrastructure", password: "trd@demo", description: "25kV AC traction infrastructure, Traction Substations (TSS), feeding zones & power isolation" },
   { username: "TRAIN-001", role: "Train Pilot", workspace: "Train Pilot Workspace", password: "train@demo", description: "En-route driver activity logging, visual track/OHE/signal observations & department routing" },
 ];
 
@@ -438,6 +440,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       "/block-planner",
       "/planner",
       "/coordination",
+      "/baseline-comparison",
       "/maintenance",
       "/scenario-analysis",
       "/scenarios",

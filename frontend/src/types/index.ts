@@ -148,6 +148,12 @@ export interface BlockData {
   approval_status: string;
   approved_by?: string;
   approval_notes?: string;
+  block_type?: "RULING" | "PLANNED" | "EMERGENT" | "SHADOW" | string;
+  planning_origin?: string;
+  planning_date?: string;
+  execution_date?: string;
+  tasks?: any[];
+  bundled_tasks?: any[];
   created_at?: string;
 }
 
@@ -199,6 +205,7 @@ export interface PilotActivityLog {
 
 export type TaskWorkflowStatus =
   | "Planned"
+  | "Awaiting COBO Sanction"
   | "Block Approved"
   | "Team Going"
   | "Work Started"
@@ -208,7 +215,7 @@ export type TaskWorkflowStatus =
 export interface DepartmentTask {
   id: string;
   department: "PWAY" | "SNT" | "TRD";
-  cadence: "WEEKLY" | "MONTHLY";
+  cadence: "CURRENT" | "WEEKLY" | "MONTHLY";
   title: string;
   sectionOrLocation: string;
   targetDate: string;
@@ -220,6 +227,10 @@ export interface DepartmentTask {
   rescheduleReason?: string;
   createdAt: string;
   createdBy: string;
+  backendBlockStatus?: string;
+  isCoboApproved?: boolean;
+  backendTaskId?: string;
+  completed_at?: string;
 }
 
 export type ProblemWorkflowStatus =
@@ -238,13 +249,23 @@ export interface DepartmentProblem {
   department: "PWAY" | "SNT" | "TRD";
   title: string;
   locationKmOrSection: string;
+  stationCode?: string;
+  exactKm?: number;
+  trackName?: string;
   severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  priority?: string;
   category: string;
   observation: string;
   status: ProblemWorkflowStatus;
   rescheduleReason?: string;
   loggedBy: string;
   createdAt: string;
+  relatedTaskId?: string;
+  relatedTaskStatus?: string;
+  relatedBlockId?: string;
+  relatedBlockStatus?: string;
+  completionTime?: string;
+  resolutionNotes?: string;
 }
 
 export interface StationBlock {
@@ -278,18 +299,23 @@ export interface StationIssueBlockRequest {
   createdAt: string;
 }
 
-export type CorridorBlockType = "WEEKLY" | "MONTHLY" | "CRITICAL";
-export type CorridorBlockStatus = "PLANNED" | "APPROVED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "RESCHEDULED" | "REJECTED";
+export type CorridorBlockType = "DAILY" | "WEEKLY" | "MONTHLY" | "CRITICAL" | "RULING" | "EMERGENT" | "SHADOW" | "PLANNED";
+export type CorridorBlockStatus = "PLANNED" | "PROPOSED" | "PENDING_APPROVAL" | "APPROVED" | "SANCTIONED" | "SELECTED" | "IN_PROGRESS" | "ACTIVE" | "COMPLETED" | "CANCELLED" | "RESCHEDULED" | "REJECTED" | "RE_PLAN" | "DEFERRED";
 
 export interface CorridorBlock {
   id: string;
   corridorId: string;
   type: CorridorBlockType;
+  rawBlockType?: string;
   title: string;
   sectionOrStation: string;
   lineOrTrack: string;
+  locationKm?: number;
   department: "PWAY" | "SNT" | "TRD" | "JOINT";
+  participatingDepts?: string;
   scheduledDate: string;
+  startTime?: string;
+  endTime?: string;
   timeWindow?: string;
   durationMinutes: number;
   status: CorridorBlockStatus;
@@ -299,6 +325,7 @@ export interface CorridorBlock {
   createdBy: string;
   createdAt: string;
   updatedAt?: string;
+  approvalNotes?: string;
 }
 
 export interface CorridorIssue {

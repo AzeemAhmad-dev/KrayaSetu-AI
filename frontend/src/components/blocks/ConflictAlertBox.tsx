@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { ProvenanceBadge } from "../common/ProvenanceBadge";
 import { AlertOctagon, AlertTriangle, CheckCircle, Clock, Zap, ArrowRight } from "lucide-react";
 
@@ -63,18 +63,25 @@ export const ConflictAlertBox: React.FC<Props> = ({
           <div className="font-bold uppercase tracking-wider text-[11px] text-red-800">
             Directly Impacted Passenger Services:
           </div>
-          {conflictingPassengerTrains.map((pt, i) => (
-            <div
-              key={i}
-              className="bg-white p-2 rounded border border-red-200 text-[11px] text-slate-800 shadow-2xs"
-            >
-              <div className="flex items-center justify-between font-bold">
-                <span className="font-mono text-red-700">{pt.train_number} · {pt.train_name}</span>
-                <span className="text-red-600 font-mono">Estimated {pt.estimated_time}</span>
+          {conflictingPassengerTrains.map((pt, i) => {
+            const trainTitle = pt.display_title || (pt.train_name && pt.train_name !== pt.train_number
+              ? `${pt.train_number} — ${pt.train_name}`
+              : `Train ${pt.train_number}`);
+            return (
+              <div
+                key={i}
+                className="bg-white p-2.5 rounded border border-red-200 text-[11px] text-slate-800 shadow-2xs space-y-1"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-1 font-bold">
+                  <span className="font-mono text-red-700">{trainTitle}</span>
+                  <span className="text-red-600 font-mono text-[10px]">
+                    Estimated passage: {pt.estimated_time}{pt.delay_minutes ? ` (+${pt.delay_minutes} min)` : ""}
+                  </span>
+                </div>
+                <p className="text-slate-600 leading-relaxed">{pt.reason}</p>
               </div>
-              <p className="text-slate-600 mt-0.5">{pt.reason}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -84,18 +91,32 @@ export const ConflictAlertBox: React.FC<Props> = ({
           <div className="font-bold uppercase tracking-wider text-[11px] text-amber-800">
             Synthetic Freight Regulation / Loop Holding:
           </div>
-          {freightImpacts.map((ft, i) => (
-            <div
-              key={i}
-              className="bg-white p-2 rounded border border-amber-200 text-[11px] text-slate-800 shadow-2xs"
-            >
-              <div className="flex items-center justify-between font-bold">
-                <span className="font-mono text-amber-800">{ft.train_number} ({ft.cargo_type} Rake)</span>
-                <span className="text-amber-700 font-mono">ETA {ft.estimated_time}</span>
+          {freightImpacts.map((ft, i) => {
+            const commodityName = (ft.commodity || ft.cargo_type || "Coal").replace(/_rake$/i, "").replace(/ rake$/i, "");
+            const freightTitle = ft.display_title || `${ft.train_number} — Commodity: ${commodityName}`;
+            return (
+              <div
+                key={i}
+                className="bg-white p-2.5 rounded border border-amber-200 text-[11px] text-slate-800 shadow-2xs space-y-1"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-1 font-bold">
+                  <span className="font-mono text-amber-800">{freightTitle}</span>
+                  <span className="text-amber-700 font-mono text-[10px]">
+                    Estimated passage: {ft.estimated_time}
+                  </span>
+                </div>
+                <p className="text-slate-600 leading-relaxed">{ft.reason}</p>
               </div>
-              <p className="text-slate-600 mt-0.5">{ft.reason}</p>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+      )}
+
+      {/* Clearly labeled demonstration data banner when testing with seeded Bhopal trains */}
+      {(conflictingPassengerTrains.some(t => t.is_demonstration_data) || freightImpacts.some(f => f.is_demonstration_data) || isConflict) && (
+        <div className="mb-3 px-2.5 py-1.5 rounded bg-amber-50 border border-amber-200 text-amber-900 text-[10px] font-mono flex items-center justify-between">
+          <span className="font-semibold">Bhopal Division Conflict Evaluation:</span>
+          <span className="italic font-bold text-amber-800">Demonstration/Seeded Railway Data — Live API not connected</span>
         </div>
       )}
 

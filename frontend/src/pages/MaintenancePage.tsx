@@ -1,7 +1,8 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { api } from "../services/api";
 import { FaultObservationData } from "../types";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
+import { formatKmValue, formatDistanceKm } from "../utils/formatDistance";
 import {
   Wrench,
   Sparkles,
@@ -162,7 +163,7 @@ export const MaintenancePage: React.FC = () => {
                 </div>
                 <h3 className="text-base font-bold text-slate-900 mt-1">{f.fault_title}</h3>
                 <div className="text-xs text-slate-500 font-medium mt-0.5">
-                  Location: {f.location_description} · Track: {f.track_name} (KM {f.location_km})
+                  Location: {f.location_description} · Track: {f.track_name} ({formatDistanceKm(f.location_km)})
                 </div>
               </div>
 
@@ -209,7 +210,9 @@ export const MaintenancePage: React.FC = () => {
                   </div>
                 </div>
 
-                <p className="text-[11px] text-indigo-900 font-medium">{f.ai_explanation}</p>
+                <div className="text-[11px] text-indigo-950 font-medium whitespace-pre-line leading-relaxed bg-white/80 p-2.5 rounded border border-indigo-100 mt-2 shadow-2xs">
+                  {f.ai_explanation}
+                </div>
               </div>
             ) : (
               <div className="mt-3 flex items-center justify-between p-3 rounded bg-slate-50 border border-slate-200">

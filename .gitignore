@@ -58,6 +58,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# --- Database Files ---
+*.db
+*.sqlite
+*.sqlite3
+!krayasetu.db
+
 # --- Database Journals & Locks ---
 *.db-journal
 *.db-wal

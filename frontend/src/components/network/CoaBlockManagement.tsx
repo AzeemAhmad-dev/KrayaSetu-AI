@@ -1,786 +1,660 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../services/api";
-import {
-  CorridorBlock,
-  CorridorBlockType,
-  CorridorBlockStatus,
-  CorridorIssue,
-  BlockData
-} from "../../types";
-import { RoleBlockTable } from "../blocks/RoleBlockTable";
+import { BlockData } from "../../types";
+import { PlannedBlockCard } from "../blocks/PlannedBlockCard";
+import { BlockReasoningModal } from "../blocks/BlockReasoningModal";
 import {
   RefreshCw,
-  ShieldAlert,
   Calendar,
   CalendarRange,
   Flame,
   Plus,
-  AlertTriangle,
-  Clock,
-  MapPin,
-  CheckCircle2,
-  XCircle,
-  Edit2,
-  Trash2,
-  RotateCcw,
-  Play,
-  FileCheck,
-  Building2,
-  ChevronRight,
   Filter,
   Layers,
-  X
+  Sparkles,
+  LayoutGrid,
+  List,
+  CheckCircle2,
+  AlertTriangle,
+  RotateCcw,
+  Zap,
+  Info
 } from "lucide-react";
+import {
+  ACTIVE_CORRIDORS,
+  ACTIVE_CORRIDOR_IDS,
+  isRuthiyaiMaksiExcluded,
+  isDailyBlock,
+  isWeeklyBlock,
+  isMonthlyBlock,
+  CURRENT_SYSTEM_DATE,
+} from "../../utils/plannedBlocksHelper";
 
-const CORRIDORS_LIST = [
-  { id: "CORR-01", name: "Itarsi – Bhopal", code: "ET-BPL" },
-  { id: "CORR-02", name: "Bhopal – Bina", code: "BPL-BINA" },
-  { id: "CORR-03", name: "Khandwa – Itarsi", code: "KNW-ET" },
-  { id: "CORR-04", name: "Bina – Guna", code: "BINA-GUNA" },
-  { id: "CORR-05", name: "Guna – Gwalior", code: "GUNA-GWL" },
-];
-
-const STATUS_CONFIG: Record<
-  CorridorBlockStatus,
-  { label: string; badgeClass: string; icon: React.ComponentType<{ className?: string }> }
-> = {
-  PLANNED: {
-    label: "PLANNED",
-    badgeClass: "bg-slate-100 text-slate-800 border-slate-300",
-    icon: Clock,
-  },
-  APPROVED: {
-    label: "APPROVED",
-    badgeClass: "bg-sky-100 text-sky-900 border-sky-300",
-    icon: FileCheck,
-  },
-  IN_PROGRESS: {
-    label: "IN PROGRESS",
-    badgeClass: "bg-amber-100 text-amber-900 border-amber-300",
-    icon: Play,
-  },
-  COMPLETED: {
-    label: "COMPLETED",
-    badgeClass: "bg-emerald-100 text-emerald-900 border-emerald-300",
-    icon: CheckCircle2,
-  },
-  CANCELLED: {
-    label: "CANCELLED",
-    badgeClass: "bg-rose-100 text-rose-900 border-rose-300",
-    icon: XCircle,
-  },
-  REJECTED: {
-    label: "REJECTED",
-    badgeClass: "bg-red-100 text-red-900 border-red-300",
-    icon: XCircle,
-  },
-  RESCHEDULED: {
-    label: "RESCHEDULED",
-    badgeClass: "bg-purple-100 text-purple-900 border-purple-300",
-    icon: RotateCcw,
-  },
-};
+export type MasterPlanningTab = "daily" | "weekly" | "monthly" | "critical";
 
 export const CoaBlockManagement: React.FC = () => {
-  const [selectedCorridorFilter, setSelectedCorridorFilter] = useState<string>("ALL");
-  const [activeSection, setActiveSection] = useState<"monthly" | "weekly" | "critical" | "issues">("monthly");
+  const [activeTab, setActiveTab] = useState<MasterPlanningTab>("daily");
+  const [viewMode, setViewMode] = useState<"card" | "row">("card");
 
-  const [blocks, setBlocks] = useState<CorridorBlock[]>([]);
-  const [issues, setIssues] = useState<CorridorIssue[]>([]);
-  // Backend real blocks
+  // Real backend blocks across Bhopal Division from SQLite
   const [backendBlocks, setBackendBlocks] = useState<BlockData[]>([]);
-  const [loadingBackendBlocks, setLoadingBackendBlocks] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  const loadBackendBlocks = async () => {
-    setLoadingBackendBlocks(true);
-    try {
-      const data = await api.getBlocks();
-      setBackendBlocks(data);
-    } catch (e) {
-      console.warn("Could not load backend blocks for COA", e);
-    } finally {
-      setLoadingBackendBlocks(false);
-    }
-  };
+  // Filters
+  const [selectedCorridor, setSelectedCorridor] = useState<string>("ALL");
+  const [selectedDept, setSelectedDept] = useState<string>("ALL");
+  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [selectedType, setSelectedType] = useState<string>("ALL");
 
-  useEffect(() => {
-    loadBackendBlocks();
-  }, []);
+  // Reasoning modal
+  const [reasoningBlockId, setReasoningBlockId] = useState<string | null>(null);
 
-
-  // Modal states
+  // New Block modal
   const [isNewBlockModalOpen, setIsNewBlockModalOpen] = useState(false);
-  const [isEditBlockModalOpen, setIsEditBlockModalOpen] = useState(false);
-  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
-  const [selectedBlock, setSelectedBlock] = useState<CorridorBlock | null>(null);
+  const [newCorridorId, setNewCorridorId] = useState<string>("CORR-01");
+  const [newTitle, setNewTitle] = useState("");
+  const [newSection, setNewSection] = useState("");
+  const [newTrack, setNewTrack] = useState("UP_MAIN");
+  const [newKm, setNewKm] = useState<number>(25.0);
+  const [newDept, setNewDept] = useState<string>("PWAY");
+  const [newDate, setNewDate] = useState<string>(CURRENT_SYSTEM_DATE);
+  const [newStartTime, setNewStartTime] = useState<string>("02:00");
+  const [newEndTime, setNewEndTime] = useState<string>("04:30");
+  const [newDuration, setNewDuration] = useState<number>(150);
+  const [newPowerCut, setNewPowerCut] = useState(false);
+  const [newBlockType, setNewBlockType] = useState<string>("PLANNED");
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Form states for block creation
-  const [blockCorridorId, setBlockCorridorId] = useState("CORR-01");
-  const [blockType, setBlockType] = useState<CorridorBlockType>("MONTHLY");
-  const [isCritical, setIsCritical] = useState(false);
-  const [title, setTitle] = useState("");
-  const [department, setDepartment] = useState<"PWAY" | "SNT" | "TRD" | "JOINT">("PWAY");
-  const [sectionOrStation, setSectionOrStation] = useState("");
-  const [lineOrTrack, setLineOrTrack] = useState("UP Main Line");
-  const [scheduledDate, setScheduledDate] = useState("");
-  const [startTime, setStartTime] = useState("10:00");
-  const [endTime, setEndTime] = useState("14:00");
-  const [durationMinutes, setDurationMinutes] = useState(240);
-  const [speedRestrictionKmph, setSpeedRestrictionKmph] = useState<number | undefined>(undefined);
-  const [requiresTractionPowerCut, setRequiresTractionPowerCut] = useState(false);
-  const [notes, setNotes] = useState("");
-
-  // Load blocks and issues from all corridors in localStorage
-  const loadAllData = () => {
-    const loadedBlocks: CorridorBlock[] = [];
-    const loadedIssues: CorridorIssue[] = [];
-
-    CORRIDORS_LIST.forEach((corr) => {
-      const storedBlocks = localStorage.getItem(`krayasetu_corridor_blocks_${corr.id}`);
-      if (storedBlocks) {
-        try {
-          const parsed = JSON.parse(storedBlocks);
-          if (Array.isArray(parsed)) {
-            loadedBlocks.push(...parsed);
-          }
-        } catch (e) {
-          console.error(`Error loading blocks for ${corr.id}`, e);
-        }
-      }
-
-      const storedIssues = localStorage.getItem(`krayasetu_corridor_issues_${corr.id}`);
-      if (storedIssues) {
-        try {
-          const parsed = JSON.parse(storedIssues);
-          if (Array.isArray(parsed)) {
-            loadedIssues.push(...parsed);
-          }
-        } catch (e) {
-          console.error(`Error loading issues for ${corr.id}`, e);
-        }
-      }
-    });
-
-    setBlocks(loadedBlocks);
-    setIssues(loadedIssues);
+  // Load canonical backend blocks
+  const loadBlocks = async () => {
+    setLoading(true);
+    setServerError(null);
+    try {
+      // Query without operational_only to provide full planning visibility into all planned blocks
+      const data = await api.getBlocks();
+      setBackendBlocks(data || []);
+    } catch (err: any) {
+      console.error("Could not load planned blocks for Master Control Planning:", err);
+      setServerError(err?.message || "Failed to load planned blocks from database.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadAllData();
+    loadBlocks();
   }, []);
 
-  // Save block back to its corridor's localStorage
-  const saveBlockToStorage = (block: CorridorBlock) => {
-    const corrId = block.corridorId || "CORR-01";
-    const stored = localStorage.getItem(`krayasetu_corridor_blocks_${corrId}`);
-    let list: CorridorBlock[] = [];
-    if (stored) {
-      try {
-        list = JSON.parse(stored);
-      } catch (e) {
-        list = [];
+  // Filter out non-active corridors (e.g. Ruthiyai-Maksi) and keep only active WCR Bhopal corridors
+  const validDivisionBlocks = useMemo(() => {
+    return backendBlocks.filter((b) => {
+      if (!b.corridor_id) return true;
+      if (isRuthiyaiMaksiExcluded(b.corridor_id, b.section_id || b.section_name)) return false;
+      return ACTIVE_CORRIDOR_IDS.has(b.corridor_id);
+    });
+  }, [backendBlocks]);
+
+  // Apply User Interactive Filters
+  const filteredBlocks = useMemo(() => {
+    return validDivisionBlocks.filter((b) => {
+      // Corridor filter
+      if (selectedCorridor !== "ALL" && b.corridor_id !== selectedCorridor) {
+        return false;
       }
+      // Department filter
+      if (selectedDept !== "ALL") {
+        if (selectedDept === "JOINT") {
+          if (!b.is_multi_department && (!b.departments || b.departments.length <= 1)) return false;
+        } else {
+          const depts = b.departments || [b.department_id || "PWAY"];
+          if (!depts.includes(selectedDept)) return false;
+        }
+      }
+      // Status filter
+      if (selectedStatus !== "ALL" && b.status !== selectedStatus) {
+        return false;
+      }
+      // Block type filter
+      if (selectedType !== "ALL") {
+        const bt = (b.block_type || "PLANNED").toUpperCase();
+        if (bt !== selectedType) return false;
+      }
+      return true;
+    });
+  }, [validDivisionBlocks, selectedCorridor, selectedDept, selectedStatus, selectedType]);
+
+  // Cadence Slices
+  const dailyBlocks = useMemo(() => filteredBlocks.filter((b) => isDailyBlock(b)), [filteredBlocks]);
+  const weeklyBlocks = useMemo(() => filteredBlocks.filter((b) => isWeeklyBlock(b)), [filteredBlocks]);
+  const monthlyBlocks = useMemo(() => filteredBlocks.filter((b) => isMonthlyBlock(b)), [filteredBlocks]);
+  const criticalBlocks = useMemo(
+    () =>
+      filteredBlocks.filter(
+        (b) =>
+          b.task_priority === "CRITICAL" ||
+          b.protection_type === "EMERGENCY_PROTECTION" ||
+          b.block_type === "EMERGENT"
+      ),
+    [filteredBlocks]
+  );
+
+  // Active list based on activeTab
+  const currentTabBlocks = useMemo(() => {
+    switch (activeTab) {
+      case "daily":
+        return dailyBlocks;
+      case "weekly":
+        return weeklyBlocks;
+      case "monthly":
+        return monthlyBlocks;
+      case "critical":
+        return criticalBlocks;
+      default:
+        return dailyBlocks;
     }
-    const idx = list.findIndex((b) => b.id === block.id);
-    if (idx >= 0) {
-      list[idx] = block;
-    } else {
-      list.unshift(block);
-    }
-    localStorage.setItem(`krayasetu_corridor_blocks_${corrId}`, JSON.stringify(list));
-    loadAllData();
+  }, [activeTab, dailyBlocks, weeklyBlocks, monthlyBlocks, criticalBlocks]);
+
+  // Reset filters helper
+  const handleResetFilters = () => {
+    setSelectedCorridor("ALL");
+    setSelectedDept("ALL");
+    setSelectedStatus("ALL");
+    setSelectedType("ALL");
   };
 
-  // Remove block from storage/backend
-  const removeBlockFromStorage = async (blockId: string, corridorId?: string) => {
-    try {
-      await api.rejectBlockDirect(blockId, {
-        approved_by: "Chief of Block Operations",
-        notes: "Removed/Deleted from COA Block Management Panel",
-      });
-      await loadBackendBlocks();
-      if (selectedBlock?.id === blockId) {
-        setSelectedBlock(null);
-      }
-    } catch (err) {
-      console.error("Failed to remove block:", err);
-      alert("Failed to remove block. See console for details.");
-    }
-  };
-
-  // Status updates
-  const handleUpdateStatus = async (blockId: string, newStatus: CorridorBlockStatus) => {
-    try {
-      if (newStatus === "APPROVED") {
-        await api.approveBlockDirect(blockId, {
-          approved_by: "Chief of Block Operations",
-          notes: "Approved from COA Block Management Panel",
-        });
-      } else if (newStatus === "CANCELLED" || newStatus === "REJECTED") {
-        await api.rejectBlockDirect(blockId, {
-          approved_by: "Chief of Block Operations",
-          notes: "Cancelled from COA Block Management Panel",
-        });
-      }
-      await loadBackendBlocks();
-    } catch (err) {
-      console.error("Failed to update block status:", err);
-      alert("Failed to update block status. See console for details.");
-    }
-  };
-
-  // Create new block handler
-  const handleCreateBlock = async (e: React.FormEvent) => {
+  // Submit New Proposed Block
+  const handleCreateBlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !sectionOrStation.trim() || !scheduledDate) {
-      alert("Please fill in the block title, location/section, and scheduled date.");
+    setFormError(null);
+
+    if (!newTitle.trim()) {
+      setFormError("Please enter a maintenance work title.");
       return;
     }
 
+    setSubmitting(true);
     try {
       await api.proposeBlock({
-        corridor_id: blockCorridorId,
-        section_id: sectionOrStation.trim(),
-        track_name: lineOrTrack,
-        location_km: 0.0,
-        requested_start_time: startTime,
-        requested_end_time: endTime,
-        duration_mins: Number(durationMinutes) || 180,
-        protection_type: requiresTractionPowerCut ? "POWER_BLOCK" : "TRAFFIC_BLOCK",
-        power_isolation_required: requiresTractionPowerCut,
-        proposed_by: "COA-001 (Chief of Block Operations)",
-        departments: [department],
+        corridor_id: newCorridorId,
+        section_id: newSection.trim() || `${newCorridorId}-MAIN`,
+        track_name: newTrack,
+        location_km: Number(newKm) || 25.0,
+        requested_start_time: newStartTime,
+        requested_end_time: newEndTime,
+        duration_mins: Number(newDuration) || 120,
+        protection_type: newPowerCut ? "POWER_BLOCK" : "TRAFFIC_BLOCK",
+        power_isolation_required: newPowerCut || newDept === "TRD",
+        proposed_by: "Chief of Block Operations (COA / Bhopal Master)",
+        departments: newDept === "JOINT" ? ["PWAY", "TRD", "SNT"] : [newDept],
+        block_type: newBlockType,
       });
 
-      await loadBackendBlocks();
+      await loadBlocks();
       setIsNewBlockModalOpen(false);
-      resetForm();
-    } catch (err) {
-      console.error("Failed to create new block:", err);
-      alert("Failed to create block. See console for details.");
+      setNewTitle("");
+      setNewSection("");
+    } catch (err: any) {
+      setFormError(err?.message || "Failed to create block proposal.");
+    } finally {
+      setSubmitting(false);
     }
-  };
-
-  const resetForm = () => {
-    setTitle("");
-    setSectionOrStation("");
-    setLineOrTrack("UP Main Line");
-    setScheduledDate("");
-    setStartTime("10:00");
-    setEndTime("14:00");
-    setDurationMinutes(240);
-    setSpeedRestrictionKmph(undefined);
-    setRequiresTractionPowerCut(false);
-    setNotes("");
-  };
-
-    const filteredBackendBlocks = selectedCorridorFilter === "ALL"
-    ? backendBlocks
-    : backendBlocks.filter((b) => b.corridor_id === selectedCorridorFilter);
-
-  const mappedBackendBlocks: CorridorBlock[] = filteredBackendBlocks.map((b) => ({
-    id: b.id,
-    corridorId: b.corridor_id,
-    type: "MONTHLY",
-    title: b.task_title || (b.task_id ? `Assigned Block for ${b.task_id}` : `Maintenance Block: ${b.corridor_id} ${b.track_name}`),
-    sectionOrStation: b.section_name || b.section_id || b.corridor_id,
-    lineOrTrack: `${b.track_name} (KM ${b.location_km})`,
-    department: (b.is_multi_department ? "JOINT" : (b.department_id as any) || "PWAY"),
-    scheduledDate: b.date || "2026-03-15",
-    timeWindow: `${b.requested_start_time} – ${b.requested_end_time}`,
-    durationMinutes: b.duration_mins,
-    status: (b.status === "APPROVED" || b.status === "SELECTED") ? "APPROVED" : "PLANNED",
-    description: b.conflict_summary || (b.is_multi_department ? `Coordinated with ${b.participating_departments}` : "Scheduled maintenance block"),
-    isCritical: b.task_priority === "CRITICAL",
-    createdBy: b.proposed_by || "Divisional Operations Control",
-    createdAt: b.created_at || new Date().toISOString(),
-  }));
-
-  const visibleBlocks = [
-    ...mappedBackendBlocks,
-    ...(selectedCorridorFilter === "ALL"
-      ? blocks
-      : blocks.filter((b) => b.corridorId === selectedCorridorFilter)),
-  ];
-
-  const monthlyBlocks = visibleBlocks.filter((b) => (b.type === "MONTHLY" || !b.type) && !b.isCritical);
-  const weeklyBlocks = [
-    ...visibleBlocks.filter((b) => b.type === "WEEKLY" && !b.isCritical),
-    ...mappedBackendBlocks.filter((b) => !b.isCritical),
-  ];
-  const criticalBlocks = visibleBlocks.filter((b) => b.isCritical || b.type === "CRITICAL");
-
-  const visibleIssues = selectedCorridorFilter === "ALL"
-    ? issues
-    : issues.filter((i) => i.corridorId === selectedCorridorFilter);
-
-  // Render a single block card
-  const renderBlockCard = (blk: CorridorBlock) => {
-    const statusCfg = STATUS_CONFIG[blk.status] || {
-      label: blk.status,
-      badgeClass: "bg-slate-100 text-slate-800 border-slate-200",
-    };
-
-    return (
-      <div
-        key={blk.id}
-        onClick={() => setSelectedBlock(blk)}
-        className="bg-white rounded-xl border border-slate-200 hover:border-slate-400 p-4 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-3 flex flex-col justify-between"
-      >
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-1 text-[11px] font-mono">
-            <div className="flex items-center space-x-1.5">
-              <span className="font-bold text-slate-500">{blk.id}</span>
-              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold border border-slate-200">
-                {blk.corridorId}
-              </span>
-              {blk.isCritical && (
-                <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300 font-bold text-[9px] uppercase">
-                  Critical
-                </span>
-              )}
-            </div>
-
-            {/* Status Badge */}
-            <span className={`px-2 py-0.5 rounded font-bold border ${statusCfg.badgeClass}`}>
-              {statusCfg.label}
-            </span>
-          </div>
-
-          <h4 className="font-bold text-slate-900 text-sm leading-snug">{blk.title}</h4>
-
-          <div className="flex items-center space-x-1.5 text-xs text-slate-600">
-            <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-            <span className="truncate">{blk.sectionOrStation} · {blk.lineOrTrack}</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono pt-1">
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-bold">
-              {blk.department}
-            </span>
-            <span className="px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded">
-              {blk.durationMinutes} Min
-            </span>
-            {blk.description?.includes("Power Cut") && (
-              <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded font-bold">
-                OHE Power Cut
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom bar with action buttons */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
-          <div className="flex items-center space-x-1">
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>{blk.scheduledDate}</span>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {blk.status === "PLANNED" && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleUpdateStatus(blk.id, "APPROVED");
-                }}
-                className="px-2 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded text-[10px] font-bold"
-                title="Approve Block"
-              >
-                Approve
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeBlockFromStorage(blk.id, blk.corridorId);
-              }}
-              className="p-1 hover:bg-rose-50 rounded text-slate-400 hover:text-rose-600"
-              title="Remove Block"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (
     <div className="space-y-5 font-sans">
-      {/* 1. TOP HEADER & TELEMETRY */}
+      {/* 1. MASTER CONTROL PLANNING COMMAND HEADER */}
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <span className="text-xs sm:text-sm font-bold tracking-wider text-sky-800 uppercase font-mono">
-                CHIEF OF BLOCK OPERATIONS · DIVISIONAL BLOCK CONTROL
+                CHIEF OF BLOCK OPERATIONS · MASTER CONTROL PLANNING
               </span>
               <span className="text-slate-300">|</span>
               <span className="text-xs font-semibold text-slate-500 font-mono">
-                Bhopal Division (WCR)
+                Bhopal Division · West Central Railway
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 mt-1">
-              Divisional Block Supervision & Possession Sanction
-            </h2>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-slate-900">
+              DIVISIONAL PLANNED BLOCK REGISTER
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-3xl">
+              Division-wide planned block visibility across all 5 active Bhopal corridors.
+              Review and monitor scheduled Daily, Weekly, and Monthly possessions.
+            </p>
           </div>
 
-          {/* Header Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={loadBlocks}
+              disabled={loading}
+              title="Refresh blocks from database"
+              className="p-2 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-300 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-sky-600" : ""}`} />
+            </button>
+
             <button
               type="button"
               onClick={() => {
-                setBlockType("MONTHLY");
-                setIsCritical(false);
+                setNewBlockType("PLANNED");
                 setIsNewBlockModalOpen(true);
               }}
               className="px-3.5 py-2 bg-[#0b2545] hover:bg-sky-900 text-white text-xs font-bold rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>New Block</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setBlockType("CRITICAL");
-                setIsCritical(true);
-                setIsNewBlockModalOpen(true);
-              }}
-              className="px-3.5 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer"
-            >
-              <Flame className="w-4 h-4" />
-              <span>Critical Block</span>
+              <span>Propose Block</span>
             </button>
           </div>
         </div>
 
         {/* Telemetry Strip */}
-        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-slate-700">
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-slate-700">
             <div>
-              Scope: <strong>{selectedCorridorFilter === "ALL" ? "All 5 Corridors" : selectedCorridorFilter}</strong>
+              Active Corridors: <strong className="text-slate-900 font-bold">5 Corridors</strong>
             </div>
             <div>
-              Monthly Blocks: <strong className="text-slate-900 font-bold">{monthlyBlocks.length}</strong>
+              Daily (Today): <strong className="text-sky-800 font-bold">{dailyBlocks.length}</strong>
             </div>
             <div>
-              Weekly Blocks: <strong className="text-slate-900 font-bold">{weeklyBlocks.length}</strong>
+              Weekly (Week 39): <strong className="text-slate-900 font-bold">{weeklyBlocks.length}</strong>
             </div>
             <div>
-              Critical Blocks: <strong className="text-rose-700 font-bold">{criticalBlocks.length}</strong>
+              Monthly (Sep 2026): <strong className="text-slate-900 font-bold">{monthlyBlocks.length}</strong>
             </div>
             <div>
-              Issues Logged: <strong className="text-amber-700 font-bold">{visibleIssues.length}</strong>
+              Critical: <strong className="text-rose-700 font-bold">{criticalBlocks.length}</strong>
+            </div>
+            <div>
+              Total In Register: <strong className="text-slate-900 font-bold">{validDivisionBlocks.length}</strong>
             </div>
           </div>
 
           <div className="flex items-center space-x-2 text-xs">
             <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200 font-bold">
-              BLOCK SANCTION: COA GOVERNANCE
+              RUTHIYAI–MAKSI: EXCLUDED
             </span>
           </div>
         </div>
       </div>
 
-      {/* 2. CORRIDOR FILTER BAR */}
-      <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-2 text-xs font-mono">
-        <span className="text-[11px] font-bold text-slate-500 uppercase px-2">Corridor Scope:</span>
-
-        <button
-          type="button"
-          onClick={() => setSelectedCorridorFilter("ALL")}
-          className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-            selectedCorridorFilter === "ALL"
-              ? "bg-[#0b2545] text-white shadow-xs"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-          }`}
-        >
-          All Corridors ({blocks.length} Blocks)
-        </button>
-
-        {CORRIDORS_LIST.map((c) => (
+      {serverError && (
+        <div className="p-3.5 bg-red-50 border border-red-300 text-red-900 rounded-xl text-xs font-mono flex items-center justify-between shadow-xs">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+            <span>{serverError}</span>
+          </div>
           <button
-            key={c.id}
             type="button"
-            onClick={() => setSelectedCorridorFilter(c.id)}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-              selectedCorridorFilter === c.id
+            onClick={() => setServerError(null)}
+            className="text-red-700 hover:text-red-900 text-xs px-2 py-0.5 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* 2. SUB-NAVIGATION TABS (DAILY / WEEKLY / MONTHLY / CRITICAL) */}
+      <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center space-x-2 overflow-x-auto">
+          {/* Daily Blocks Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("daily")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "daily"
                 ? "bg-[#0b2545] text-white shadow-xs"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
             }`}
           >
-            {c.id} ({c.code})
+            <Calendar className="w-4 h-4" />
+            <span>Daily Blocks</span>
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                activeTab === "daily"
+                  ? "bg-white/20 text-white"
+                  : "bg-white text-slate-700 border border-slate-200"
+              }`}
+            >
+              {dailyBlocks.length}
+            </span>
           </button>
-        ))}
+
+          {/* Weekly Blocks Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("weekly")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "weekly"
+                ? "bg-[#0b2545] text-white shadow-xs"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+            }`}
+          >
+            <CalendarRange className="w-4 h-4" />
+            <span>Weekly Blocks</span>
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                activeTab === "weekly"
+                  ? "bg-white/20 text-white"
+                  : "bg-white text-slate-700 border border-slate-200"
+              }`}
+            >
+              {weeklyBlocks.length}
+            </span>
+          </button>
+
+          {/* Monthly Blocks Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("monthly")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "monthly"
+                ? "bg-[#0b2545] text-white shadow-xs"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Monthly Blocks</span>
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                activeTab === "monthly"
+                  ? "bg-white/20 text-white"
+                  : "bg-white text-slate-700 border border-slate-200"
+              }`}
+            >
+              {monthlyBlocks.length}
+            </span>
+          </button>
+
+          {/* Critical Blocks Tab */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("critical")}
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === "critical"
+                ? "bg-rose-700 text-white shadow-xs"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+            }`}
+          >
+            <Flame className={`w-4 h-4 ${activeTab === "critical" ? "text-white" : "text-rose-600"}`} />
+            <span>Critical Blocks</span>
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                activeTab === "critical"
+                  ? "bg-white/20 text-white"
+                  : "bg-white text-rose-700 border border-rose-200"
+              }`}
+            >
+              {criticalBlocks.length}
+            </span>
+          </button>
+        </div>
+
+        {/* View Mode Toggle: Cards vs Rows */}
+        <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <button
+            type="button"
+            onClick={() => setViewMode("card")}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer ${
+              viewMode === "card"
+                ? "bg-white text-[#0b2545] shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+            title="Grid View"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Cards</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("row")}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer ${
+              viewMode === "row"
+                ? "bg-white text-[#0b2545] shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+            title="Table View"
+          >
+            <List className="w-3.5 h-3.5" />
+            <span>Table</span>
+          </button>
+        </div>
       </div>
 
-      {/* 3. SUB-NAVIGATION TABS */}
-      <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-2">
-        {/* Monthly Blocks */}
-        <button
-          type="button"
-          onClick={() => setActiveSection("monthly")}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer ${
-            activeSection === "monthly"
-              ? "bg-[#0b2545] text-white shadow-xs"
-              : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-          }`}
-        >
-          <CalendarRange className="w-4 h-4" />
-          <span>Monthly Blocks</span>
-          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-            activeSection === "monthly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
-          }`}>
-            {monthlyBlocks.length}
-          </span>
-        </button>
+      {/* 3. MULTI-DIMENSION FILTER CONTROLS */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 uppercase font-mono">
+            <Filter className="w-3.5 h-3.5 text-slate-500" />
+            <span>Multi-Corridor Planning Filters</span>
+          </div>
 
-        {/* Weekly Blocks */}
-        <button
-          type="button"
-          onClick={() => setActiveSection("weekly")}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer ${
-            activeSection === "weekly"
-              ? "bg-[#0b2545] text-white shadow-xs"
-              : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>Weekly Blocks</span>
-          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-            activeSection === "weekly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
-          }`}>
-            {weeklyBlocks.length}
-          </span>
-        </button>
+          {(selectedCorridor !== "ALL" ||
+            selectedDept !== "ALL" ||
+            selectedStatus !== "ALL" ||
+            selectedType !== "ALL") && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="text-xs font-mono font-bold text-sky-700 hover:text-sky-900 flex items-center space-x-1 cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset Filters</span>
+            </button>
+          )}
+        </div>
 
-        {/* Critical Blocks */}
-        <button
-          type="button"
-          onClick={() => setActiveSection("critical")}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer ${
-            activeSection === "critical"
-              ? "bg-rose-700 text-white shadow-xs"
-              : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-          }`}
-        >
-          <Flame className={`w-4 h-4 ${activeSection === "critical" ? "text-white" : "text-rose-600"}`} />
-          <span>Critical Blocks</span>
-          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-            activeSection === "critical" ? "bg-white/20 text-white" : "bg-white text-rose-700 border border-rose-200"
-          }`}>
-            {criticalBlocks.length}
-          </span>
-        </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          {/* Corridor Filter */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase font-mono mb-1">
+              Corridor
+            </label>
+            <select
+              value={selectedCorridor}
+              onChange={(e) => setSelectedCorridor(e.target.value)}
+              className="w-full p-2 rounded-lg border border-slate-300 font-mono text-xs bg-slate-50 focus:bg-white"
+            >
+              <option value="ALL">All Active Corridors (5)</option>
+              {ACTIVE_CORRIDORS.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.id}: {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+          </div>
 
-        {/* Issue / Block Requests */}
-        <button
-          type="button"
-          onClick={() => setActiveSection("issues")}
-          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer ${
-            activeSection === "issues"
-              ? "bg-amber-600 text-white shadow-xs"
-              : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-          }`}
-        >
-          <AlertTriangle className={`w-4 h-4 ${activeSection === "issues" ? "text-white" : "text-amber-600"}`} />
-          <span>Issue / Block Requests</span>
-          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-            activeSection === "issues" ? "bg-white/20 text-white" : "bg-white text-amber-700 border border-amber-200"
-          }`}>
-            {visibleIssues.length}
-          </span>
-        </button>
+          {/* Department Filter */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase font-mono mb-1">
+              Department
+            </label>
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="w-full p-2 rounded-lg border border-slate-300 font-mono text-xs bg-slate-50 focus:bg-white"
+            >
+              <option value="ALL">All Departments</option>
+              <option value="PWAY">P.Way (Civil Engineering)</option>
+              <option value="TRD">TRD (25kV OHE Electrical)</option>
+              <option value="SNT">S&T (Signaling & Telecom)</option>
+              <option value="JOINT">Joint Multi-Department</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase font-mono mb-1">
+              Lifecycle Status
+            </label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full p-2 rounded-lg border border-slate-300 font-mono text-xs bg-slate-50 focus:bg-white"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="PROPOSED">PROPOSED (Unsubmitted Draft)</option>
+              <option value="PENDING_APPROVAL">PENDING APPROVAL (Divisional Ledger)</option>
+              <option value="APPROVED">APPROVED (CMC / SOBO Sanctioned)</option>
+              <option value="SELECTED">SELECTED (Operational Master Plan)</option>
+              <option value="ACTIVE">ACTIVE (In Execution)</option>
+              <option value="COMPLETED">COMPLETED</option>
+              <option value="REJECTED">REJECTED</option>
+            </select>
+          </div>
+
+          {/* Block Type Filter */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase font-mono mb-1">
+              Block Type
+            </label>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="w-full p-2 rounded-lg border border-slate-300 font-mono text-xs bg-slate-50 focus:bg-white"
+            >
+              <option value="ALL">All Block Types</option>
+              <option value="RULING">RULING (Long-range periodic possession)</option>
+              <option value="EMERGENT">EMERGENT (Safety-critical defect rectification)</option>
+              <option value="SHADOW">SHADOW (Coordinated multi-department synergy)</option>
+              <option value="PLANNED">PLANNED (Routine Scheduled)</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      {/* 4. SECTION PANELS */}
-      {/* Monthly Blocks Panel */}
-      {activeSection === "monthly" && (
-        <div className="space-y-4">
-          {/* Real Central Optimizer Blocks */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
+      {/* 4. CONTENT DISPLAY (CARDS OR TABLE ROWS) */}
+      <div className="space-y-4">
+        {/* Banner with Scope Context */}
+        <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+          <div>
+            Showing <strong>{currentTabBlocks.length}</strong> {activeTab.toUpperCase()} planned blocks
+            {selectedCorridor !== "ALL" && ` in ${selectedCorridor}`}
+            {selectedDept !== "ALL" && ` · Dept: ${selectedDept}`}
+            {selectedStatus !== "ALL" && ` · Status: ${selectedStatus}`}
+            {selectedType !== "ALL" && ` · Type: ${selectedType}`}
+          </div>
+          <div className="text-[11px] text-slate-400">
+            Cadence Source: Planned blocks
+          </div>
+        </div>
+
+        {currentTabBlocks.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
+            <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
+              <Calendar className="w-7 h-7" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800">
+              No Planned Blocks Found in {activeTab.toUpperCase()} View
+            </h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+              No blocks match the active cadence tab (<strong>{activeTab.toUpperCase()}</strong>) and filter criteria.
+              Clear filters or click <strong>"Propose Block"</strong> to schedule a possession window.
+            </p>
+            <div className="mt-4 flex items-center justify-center space-x-2">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition-colors cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        ) : viewMode === "card" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {currentTabBlocks.map((blk) => (
+              <PlannedBlockCard
+                key={blk.id}
+                block={blk as any}
+                viewMode="card"
+                onOpenReasoning={(id) => setReasoningBlockId(id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-mono uppercase text-[11px]">
+                  <tr>
+                    <th className="p-3 pl-4">Block ID & Type</th>
+                    <th className="p-3">Corridor</th>
+                    <th className="p-3">Station / Location & KM</th>
+                    <th className="p-3">Department & Task</th>
+                    <th className="p-3">Planned Date</th>
+                    <th className="p-3">Window & Duration</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 pr-4 text-right">Reasoning</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {currentTabBlocks.map((blk) => (
+                    <PlannedBlockCard
+                      key={blk.id}
+                      block={blk as any}
+                      viewMode="row"
+                      onOpenReasoning={(id) => setReasoningBlockId(id)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 5. DECISION SUPPORT & REASONING MODAL */}
+      <BlockReasoningModal
+        isOpen={!!reasoningBlockId}
+        onClose={() => setReasoningBlockId(null)}
+        blockId={reasoningBlockId || undefined}
+      />
+
+      {/* 6. PROPOSE NEW BLOCK MODAL (PERSISTS CANONICALLY TO DATABASE) */}
+      {isNewBlockModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                  Central Optimizer Maintenance Blocks ({selectedCorridorFilter === "ALL" ? "All Corridors" : selectedCorridorFilter})
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Real multi-department possessory schedule generated by CP-SAT optimizer
+                <h3 className="font-bold text-slate-900 text-base">
+                  Propose Central Maintenance Block
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  Persists block record to Bhopal Division SQLite database
                 </p>
               </div>
               <button
                 type="button"
-                onClick={loadBackendBlocks}
-                className="px-2.5 py-1 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-50 font-medium flex items-center space-x-1 cursor-pointer"
+                onClick={() => setIsNewBlockModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 text-sm cursor-pointer"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingBackendBlocks ? "animate-spin" : ""}`} />
-                <span>Refresh Central Blocks</span>
+                ✕
               </button>
             </div>
 
-            {filteredBackendBlocks.length > 0 ? (
-              <RoleBlockTable
-                blocks={filteredBackendBlocks}
-                title="Divisional Scheduled Maintenance Blocks"
-                subtitle={`Displaying ${filteredBackendBlocks.length} planned possessions across ${selectedCorridorFilter === "ALL" ? "all corridors" : selectedCorridorFilter}`}
-                showDepartmentColumn={true}
-              />
-            ) : (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 font-mono">
-                No active blocks planned centrally in current schedule. Create new blocks in Block Planner.
+            {formError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-xs font-mono">
+                {formError}
               </div>
             )}
-          </div>
 
-          {monthlyBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <CalendarRange className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Monthly Blocks Scheduled
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                The divisional monthly block register is currently clean. Click <strong>"New Block"</strong> above to schedule a periodic possession window.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {monthlyBlocks.map(renderBlockCard)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Weekly Blocks Panel */}
-      {activeSection === "weekly" && (
-        <div className="space-y-4">
-          {weeklyBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <Calendar className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Weekly Blocks Scheduled
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                The weekly 7-day maintenance block register is currently clean. Click <strong>"New Block"</strong> above to plan a departmental possession.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {weeklyBlocks.map(renderBlockCard)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Critical Blocks Panel */}
-      {activeSection === "critical" && (
-        <div className="space-y-4">
-          {criticalBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 mb-3">
-                <Flame className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Critical / Emergency Blocks
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                Zero emergency track fracture rectifications or safety-critical possessions logged. Use <strong>"Critical Block"</strong> above to record urgent possessions.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {criticalBlocks.map(renderBlockCard)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Issue / Block Requests Panel */}
-      {activeSection === "issues" && (
-        <div className="space-y-4">
-          {visibleIssues.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <AlertTriangle className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Issues or Block Requisitions Reported
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                The divisional issue log is clean. Issues reported by corridor controllers and station masters will appear here for review and sanction.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visibleIssues.map((issue) => (
-                <div
-                  key={issue.id}
-                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-3 flex flex-col justify-between"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="font-bold text-slate-500">{issue.id}</span>
-                      <span className="px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                        {issue.status}
-                      </span>
-                    </div>
-                    <h4 className="font-bold text-slate-900 text-sm">{issue.title}</h4>
-                    <p className="text-xs text-slate-600 line-clamp-2">{issue.description}</p>
-                    <div className="flex flex-wrap gap-1 text-[10px] font-mono">
-                      <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-700">{issue.corridorId}</span>
-                      <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-700">{issue.sectionOrLocation}</span>
-                      <span className="px-1.5 py-0.5 bg-sky-50 text-sky-800 rounded font-bold">Block: {issue.blockTypeRequired || (issue.blockRequired ? "REQUIRED" : "NONE")}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 5. MODAL: CREATE NEW BLOCK */}
-      {isNewBlockModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                {blockType === "CRITICAL" || isCritical ? (
-                  <Flame className="w-5 h-5 text-rose-600" />
-                ) : (
-                  <Plus className="w-5 h-5 text-[#0b2545]" />
-                )}
-                <h3 className="font-bold text-slate-900 text-base">
-                  {isCritical ? "New Critical / Emergency Block" : "New Possession Block (COA Sanction)"}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsNewBlockModalOpen(false)}
-                className="p-1 hover:bg-slate-200 rounded-lg text-slate-500"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateBlock} className="p-4 sm:p-6 space-y-4 text-xs font-sans">
+            <form onSubmit={handleCreateBlockSubmit} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Corridor</label>
+                  <label className="block font-bold text-slate-700 mb-1">Target Corridor</label>
                   <select
-                    value={blockCorridorId}
-                    onChange={(e) => setBlockCorridorId(e.target.value)}
+                    value={newCorridorId}
+                    onChange={(e) => setNewCorridorId(e.target.value)}
                     className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
                   >
-                    {CORRIDORS_LIST.map((c) => (
+                    {ACTIVE_CORRIDORS.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.id} — {c.name}
+                        {c.id}: {c.name}
                       </option>
                     ))}
                   </select>
@@ -789,29 +663,29 @@ export const CoaBlockManagement: React.FC = () => {
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Block Type</label>
                   <select
-                    value={blockType}
-                    onChange={(e) => {
-                      const val = e.target.value as CorridorBlockType;
-                      setBlockType(val);
-                      if (val === "CRITICAL") setIsCritical(true);
-                    }}
+                    value={newBlockType}
+                    onChange={(e) => setNewBlockType(e.target.value)}
                     className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
                   >
-                    <option value="MONTHLY">Monthly Periodic Block</option>
-                    <option value="WEEKLY">Weekly Maintenance Block</option>
-                    <option value="CRITICAL">Critical / Emergency Block</option>
+                    <option value="PLANNED">PLANNED (Routine)</option>
+                    <option value="WEEKLY">WEEKLY (7-Day Cycle)</option>
+                    <option value="MONTHLY">MONTHLY (Periodic Overhaul)</option>
+                    <option value="EMERGENT">EMERGENT (Safety Critical)</option>
+                    <option value="RULING">RULING (Long Possessory)</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Title / Maintenance Description</label>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Maintenance Title / Scope of Work *
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Track renewal, OHE auto-tensioning overhaul, Point machine testing"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Deep Screening of Track, Point Machine Overhaul, OHE Tensioning"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full p-2.5 rounded-lg border border-slate-300 text-xs"
                 />
               </div>
@@ -820,50 +694,52 @@ export const CoaBlockManagement: React.FC = () => {
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Department</label>
                   <select
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value as any)}
+                    value={newDept}
+                    onChange={(e) => setNewDept(e.target.value)}
                     className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
                   >
-                    <option value="TRACK_PWAY">Track / P.Way</option>
-                    <option value="SIGNAL_SNT">Signal & S&T</option>
-                    <option value="TRACTION_OHE">Traction / OHE</option>
-                    <option value="JOINT">Joint Departmental</option>
+                    <option value="PWAY">P.Way (Civil Engineering)</option>
+                    <option value="TRD">TRD (25kV OHE Electrical)</option>
+                    <option value="SNT">S&T (Signaling & Telecom)</option>
+                    <option value="JOINT">Joint Multi-Department</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Affected Line / Track</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g., UP Main Line, Platform 2 Line, Loop Line 3"
-                    value={lineOrTrack}
-                    onChange={(e) => setLineOrTrack(e.target.value)}
-                    className="w-full p-2.5 rounded-lg border border-slate-300 text-xs"
-                  />
+                  <label className="block font-bold text-slate-700 mb-1">Track Name</label>
+                  <select
+                    value={newTrack}
+                    onChange={(e) => setNewTrack(e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs bg-white"
+                  >
+                    <option value="UP_MAIN">UP Main Line</option>
+                    <option value="DOWN_MAIN">DOWN Main Line</option>
+                    <option value="3RD_LINE">3rd Line / Quad Track</option>
+                    <option value="LOOP_LINE">Loop Line</option>
+                  </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Station or Section Location</label>
+                  <label className="block font-bold text-slate-700 mb-1">Section / Station</label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g., Mandideep – Barkhera KM 54"
-                    value={sectionOrStation}
-                    onChange={(e) => setSectionOrStation(e.target.value)}
+                    placeholder="e.g. Hoshangabad – Budni"
+                    value={newSection}
+                    onChange={(e) => setNewSection(e.target.value)}
                     className="w-full p-2.5 rounded-lg border border-slate-300 text-xs"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Scheduled Date</label>
+                  <label className="block font-bold text-slate-700 mb-1">Location KM</label>
                   <input
-                    type="date"
-                    required
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
+                    type="number"
+                    step="0.01"
+                    placeholder="25.00"
+                    value={newKm}
+                    onChange={(e) => setNewKm(parseFloat(e.target.value) || 0)}
                     className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono"
                   />
                 </div>
@@ -871,29 +747,32 @@ export const CoaBlockManagement: React.FC = () => {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Start Time</label>
+                  <label className="block font-bold text-slate-700 mb-1">Planned Date</label>
                   <input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    type="date"
+                    required
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
                     className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs"
                   />
                 </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    value={newStartTime}
+                    onChange={(e) => setNewStartTime(e.target.value)}
+                    className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs"
+                  />
+                </div>
+
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">End Time</label>
                   <input
                     type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Duration (Min)</label>
-                  <input
-                    type="number"
-                    value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                    value={newEndTime}
+                    onChange={(e) => setNewEndTime(e.target.value)}
                     className="w-full p-2.5 rounded-lg border border-slate-300 font-mono text-xs"
                   />
                 </div>
@@ -902,13 +781,13 @@ export const CoaBlockManagement: React.FC = () => {
               <div className="flex items-center space-x-2 pt-1">
                 <input
                   type="checkbox"
-                  id="coaTractionCut"
-                  checked={requiresTractionPowerCut}
-                  onChange={(e) => setRequiresTractionPowerCut(e.target.checked)}
+                  id="masterPowerCut"
+                  checked={newPowerCut}
+                  onChange={(e) => setNewPowerCut(e.target.checked)}
                   className="w-4 h-4 rounded text-[#0b2545]"
                 />
-                <label htmlFor="coaTractionCut" className="text-xs text-slate-700 font-medium">
-                  Requires 25 kV AC OHE traction power de-energization (Power Block)
+                <label htmlFor="masterPowerCut" className="text-xs text-slate-700 font-medium">
+                  Requires 25 kV AC OHE traction power isolation (Power Block)
                 </label>
               </div>
 
@@ -916,15 +795,16 @@ export const CoaBlockManagement: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsNewBlockModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0b2545] hover:bg-sky-900 text-white rounded-xl font-bold"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-[#0b2545] hover:bg-sky-900 text-white rounded-xl font-bold cursor-pointer disabled:opacity-50"
                 >
-                  Sanction & Schedule Block
+                  {submitting ? "Persisting..." : "Propose Block"}
                 </button>
               </div>
             </form>

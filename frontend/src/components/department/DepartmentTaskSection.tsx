@@ -17,9 +17,18 @@ import {
 import { DepartmentTask, TaskWorkflowStatus } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../services/api";
+import { formatDistanceKm, formatKmValue } from "../../utils/formatDistance";
+import { isDailyBlock, isWeeklyBlock, isMonthlyBlock } from "../../utils/plannedBlocksHelper";
 
-const TASK_WORKFLOW_STEPS: TaskWorkflowStatus[] = [
-  "Planned",
+const TASK_EXECUTION_STEPS: TaskWorkflowStatus[] = [
+  "Block Approved",
+  "Team Going",
+  "Work Started",
+  "Completed",
+];
+
+const LIFECYCLE_STEPS: TaskWorkflowStatus[] = [
+  "Awaiting COBO Sanction",
   "Block Approved",
   "Team Going",
   "Work Started",
@@ -29,7 +38,7 @@ const TASK_WORKFLOW_STEPS: TaskWorkflowStatus[] = [
 interface DepartmentTaskSectionProps {
   department: "PWAY" | "SNT" | "TRD";
   departmentName: string;
-  cadence: "WEEKLY" | "MONTHLY";
+  cadence: "CURRENT" | "WEEKLY" | "MONTHLY";
   storageKey: string;
   accentColor: "orange" | "cyan" | "amber";
   locationOptions?: string[];
@@ -45,6 +54,8 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
   const { user } = useAuth();
 
   const [backendBlocks, setBackendBlocks] = useState<any[]>([]);
+  const [plannedActivities, setPlannedActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [localOverrides, setLocalOverrides] = useState<Record<string, { status: TaskWorkflowStatus; reason?: string }>>(() => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -65,21 +76,32 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
     return {};
   });
 
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [blks, acts] = await Promise.all([
+        cadence !== "CURRENT"
+          ? api.getBlocks(undefined, undefined, department, undefined, undefined, true).catch(() => [])
+          : Promise.resolve([]),
+        api.getPlannedActivities({ department_id: department, cadence }).catch(() => [])
+      ]);
+      const filteredBlks = (blks || []).filter((b: any) => {
+        if (cadence === "WEEKLY") return isWeeklyBlock(b);
+        if (cadence === "MONTHLY") return isMonthlyBlock(b);
+        return isDailyBlock(b);
+      });
+      setBackendBlocks(filteredBlks);
+      setPlannedActivities(acts || []);
+    } catch (e) {
+      console.warn("Could not load tasks/activities for department", department, e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true;
-    const loadBlocks = async () => {
-      try {
-        const data = await api.getBlocks(undefined, undefined, department);
-        if (isMounted) {
-          setBackendBlocks(data);
-        }
-      } catch (e) {
-        console.warn("Could not load backend blocks for department", department, e);
-      }
-    };
-    loadBlocks();
-    return () => { isMounted = false; };
-  }, [department]);
+    loadData();
+  }, [department, cadence]);
 
   // Sync localOverrides to localStorage
   useEffect(() => {
@@ -90,17 +112,57 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
     }
   }, [localOverrides, storageKey]);
 
-  // Map backend blocks into tasks with localOverrides
-  const tasks: DepartmentTask[] = backendBlocks.map((b) => {
-    const override = localOverrides[b.id];
-    let initialStatus: TaskWorkflowStatus = "Planned";
-    if (b.status === "APPROVED" || b.status === "SELECTED") {
-      initialStatus = "Block Approved";
-    }
+  // Map planned activities into tasks
+  const plannedMapped: DepartmentTask[] = plannedActivities.map((a: any) => {
+    const override = localOverrides[a.id];
+    let statusText: TaskWorkflowStatus = "Block Approved";
+    if (a.status === "COMPLETED") statusText = "Completed";
+    else if (a.status === "IN_PROGRESS") statusText = "Work Started";
+    else if (a.is_due_now || a.status === "DUE_NOW") statusText = "Work Started";
 
-    const taskTitle = b.task_title || (b.task_id ? `Assigned Track Block for ${b.task_id}` : `Possession: ${b.corridor_id} ${b.track_name}`);
-    const secLoc = `${b.corridor_id} · ${b.section_name || b.section_id} · Track ${b.track_name} (KM ${b.location_km})`;
-    const targetDate = `${b.date || "2026-03-15"} (${b.requested_start_time} - ${b.requested_end_time})`;
+    const locDesc = `${a.corridor_id} · ${a.location_description} (KM ${Number(a.location_km).toFixed(2)}) · Track: ${a.track_name || "DOWN_MAIN"}`;
+    const dateLabel = a.scheduled_date === "2026-09-25" ? `Today, ${a.start_time}–${a.end_time}` : `${a.scheduled_date}, ${a.start_time}–${a.end_time}`;
+
+    return {
+      id: a.id,
+      department,
+      cadence,
+      title: a.title,
+      sectionOrLocation: locDesc,
+      targetDate: dateLabel,
+      priority: a.priority === "CRITICAL" ? "SAFETY_CRITICAL" : a.priority === "HIGH" ? "PRIORITY" : "ROUTINE",
+      assignedGangOrSupervisor: a.assigned_crew || "Department Maintenance Squad",
+      estimatedDurationHours: Math.round((a.duration_mins || 120) / 60),
+      description: a.description || "Scheduled preventive infrastructure maintenance.",
+      status: override ? override.status : statusText,
+      rescheduleReason: override ? override.reason : undefined,
+      createdAt: a.created_at || new Date().toISOString(),
+      createdBy: "Central Maintenance Planning Cell",
+      backendBlockStatus: "SANCTIONED",
+      isCoboApproved: true,
+      backendTaskId: a.id,
+    };
+  });
+
+  // Map backend blocks into tasks with localOverrides
+  const blockMapped: DepartmentTask[] = backendBlocks.map((b) => {
+    const override = localOverrides[b.id];
+    const isCoboApproved = b.status === "APPROVED" || b.status === "SELECTED";
+    
+    // Find the specific task for this department in bundled/associated tasks
+    const deptTask = b.tasks?.find((t: any) => t.department_id === department) || 
+      (b.task_id ? { id: b.task_id, status: b.task_status, title: b.task_title } : null);
+    
+    const isCompletedInDb = deptTask?.status === "COMPLETED";
+    const initialStatus: TaskWorkflowStatus = isCompletedInDb
+      ? "Completed"
+      : isCoboApproved
+      ? "Block Approved"
+      : "Awaiting COBO Sanction";
+
+    const taskTitle = deptTask?.title || b.task_title || (b.task_id ? `Assigned Track Block for ${b.task_id}` : `Possession: ${b.corridor_id} ${b.track_name}`);
+    const secLoc = `${b.corridor_id} · ${b.section_name || b.section_id} · Track ${b.track_name} (KM ${formatKmValue(b.location_km)})`;
+    const targetDate = `${b.date || "2026-09-25"} (${b.requested_start_time} - ${b.requested_end_time})`;
 
     return {
       id: b.id,
@@ -117,19 +179,61 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
       rescheduleReason: override ? override.reason : undefined,
       createdAt: b.created_at || new Date().toISOString(),
       createdBy: b.proposed_by || "Divisional Operations Control",
+      backendBlockStatus: b.status,
+      isCoboApproved,
+      backendTaskId: deptTask?.id || b.task_id,
+      completed_at: deptTask?.completed_at,
     };
   });
+
+  const tasks: DepartmentTask[] = [...plannedMapped, ...blockMapped];
 
   // Selected task drawer state
   const [selectedTask, setSelectedTask] = useState<DepartmentTask | null>(null);
   const [rescheduleReasonInput, setRescheduleReasonInput] = useState("");
   const [showRescheduleInput, setShowRescheduleInput] = useState(false);
 
-  const handleUpdateStatus = (taskId: string, newStatus: TaskWorkflowStatus, reason?: string) => {
+  const handleUpdateStatus = async (taskId: string, newStatus: TaskWorkflowStatus, reason?: string) => {
     setLocalOverrides((prev) => ({
       ...prev,
       [taskId]: { status: newStatus, reason },
     }));
+
+    const currentTask = tasks.find((t) => t.id === taskId);
+    const realBackendTaskId = currentTask?.backendTaskId || (taskId.startsWith("TASK-") ? taskId : undefined);
+
+    if (taskId.startsWith("ACT-")) {
+      try {
+        await api.updatePlannedActivityStatus(
+          taskId,
+          newStatus === "Completed" ? "COMPLETED" : "IN_PROGRESS"
+        );
+      } catch (e) {
+        console.warn("Could not sync planned activity status to backend:", e);
+      }
+    } else if (realBackendTaskId) {
+      if (newStatus === "Completed") {
+        try {
+          await api.completeTask(realBackendTaskId, {
+            completed_by: `${user?.name || "Field Engineer"} (${department})`,
+            notes: reason || `Work completed by ${department} field gang`,
+          });
+        } catch (e) {
+          console.warn("Could not sync task completion to backend:", e);
+        }
+      } else {
+        try {
+          await api.updateTaskStatus(
+            realBackendTaskId,
+            newStatus === "Work Started" || newStatus === "Team Going" ? "IN_PROGRESS" : "PENDING",
+            reason,
+            `${user?.name || "Field Engineer"} (${department})`
+          );
+        } catch (e) {
+          console.warn("Could not sync task status to backend:", e);
+        }
+      }
+    }
 
     if (selectedTask && selectedTask.id === taskId) {
       setSelectedTask((prev) =>
@@ -146,10 +250,13 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
     setRescheduleReasonInput("");
   };
 
-  const getNextStatus = (current: TaskWorkflowStatus): TaskWorkflowStatus | null => {
-    const idx = TASK_WORKFLOW_STEPS.indexOf(current);
-    if (idx >= 0 && idx < TASK_WORKFLOW_STEPS.length - 1) {
-      return TASK_WORKFLOW_STEPS[idx + 1];
+  const getNextStatus = (current: TaskWorkflowStatus, isCoboApproved: boolean = true): TaskWorkflowStatus | null => {
+    if (!isCoboApproved || current === "Awaiting COBO Sanction" || current === "Planned") {
+      return null;
+    }
+    const idx = TASK_EXECUTION_STEPS.indexOf(current);
+    if (idx >= 0 && idx < TASK_EXECUTION_STEPS.length - 1) {
+      return TASK_EXECUTION_STEPS[idx + 1];
     }
     return null;
   };
@@ -311,9 +418,9 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
                 </div>
 
                 <div className="grid grid-cols-5 gap-1.5 text-center">
-                  {TASK_WORKFLOW_STEPS.map((step, idx) => {
-                    const currentIdx = TASK_WORKFLOW_STEPS.indexOf(
-                      selectedTask.status === "Rescheduled" ? "Planned" : selectedTask.status
+                  {LIFECYCLE_STEPS.map((step, idx) => {
+                    const currentIdx = LIFECYCLE_STEPS.indexOf(
+                      selectedTask.status === "Rescheduled" ? "Awaiting COBO Sanction" : selectedTask.status
                     );
                     const isPassed = currentIdx >= idx && selectedTask.status !== "Rescheduled";
                     const isCurrent = selectedTask.status === step;
@@ -401,42 +508,56 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
                   Update Workflow Status
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Advance to next workflow step */}
-                  {getNextStatus(selectedTask.status) && (
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus(selectedTask.id, getNextStatus(selectedTask.status)!)}
-                      className="px-4 py-2 rounded-lg bg-[#0b2545] hover:bg-[#134074] text-white text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
-                    >
-                      <ArrowRight className="w-4 h-4" />
-                      <span>Advance to: {getNextStatus(selectedTask.status)}</span>
-                    </button>
-                  )}
+                {!selectedTask.isCoboApproved ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start space-x-2 text-xs text-amber-900">
+                    <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <span className="font-bold block text-amber-950 font-mono">
+                        AWAITING COBO BLOCK SANCTION
+                      </span>
+                      <p className="text-amber-800 leading-relaxed">
+                        This maintenance possession is in <strong>{selectedTask.backendBlockStatus || "PROPOSED"}</strong> status. Operational block sanction is held under the sole authority of the Chief of Block Officer (COBO) at the Joint Coordination Desk. Field teams cannot be dispatched until sanctioned.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Advance to next workflow step */}
+                    {getNextStatus(selectedTask.status, true) && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus(selectedTask.id, getNextStatus(selectedTask.status, true)!)}
+                        className="px-4 py-2 rounded-lg bg-[#0b2545] hover:bg-[#134074] text-white text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                      >
+                        <ArrowRight className="w-4 h-4" />
+                        <span>Dispatch / Advance: {getNextStatus(selectedTask.status, true)}</span>
+                      </button>
+                    )}
 
-                  {/* Reschedule Button */}
-                  {selectedTask.status !== "Completed" && (
-                    <button
-                      type="button"
-                      onClick={() => setShowRescheduleInput(!showRescheduleInput)}
-                      className="px-3 py-2 rounded-lg border border-purple-300 text-purple-900 bg-purple-50 hover:bg-purple-100 text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Reschedule Task</span>
-                    </button>
-                  )}
+                    {/* Reschedule Button */}
+                    {selectedTask.status !== "Completed" && (
+                      <button
+                        type="button"
+                        onClick={() => setShowRescheduleInput(!showRescheduleInput)}
+                        className="px-3 py-2 rounded-lg border border-purple-300 text-purple-900 bg-purple-50 hover:bg-purple-100 text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Request Re-plan / Reschedule</span>
+                      </button>
+                    )}
 
-                  {/* If already completed or rescheduled, option to re-plan */}
-                  {(selectedTask.status === "Completed" || selectedTask.status === "Rescheduled") && (
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatus(selectedTask.id, "Planned")}
-                      className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
-                    >
-                      Re-open / Set to Planned
-                    </button>
-                  )}
-                </div>
+                    {/* If already completed or rescheduled, option to re-open */}
+                    {(selectedTask.status === "Completed" || selectedTask.status === "Rescheduled") && (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus(selectedTask.id, "Block Approved")}
+                        className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
+                      >
+                        Re-open / Set to Approved
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* Reschedule Reason Box */}
                 {showRescheduleInput && (

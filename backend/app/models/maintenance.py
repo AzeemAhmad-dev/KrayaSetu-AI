@@ -139,11 +139,23 @@ class MaintenanceTask(Base):
     status = Column(String(50), default="PENDING")
     # Status: PENDING, PROPOSED, SCHEDULED, IN_PROGRESS, COMPLETED, RESCHEDULED, CANCELLED
 
+    completed_at = Column(DateTime, nullable=True)
+
+    block_id = Column(String(50), ForeignKey("blocks.id"), nullable=True)
     source_type = Column(String(30), default="SYNTHETIC")
+
+    # Per-task S-R-C-A-O numeric factor scores (0-100 scale).
+    # When populated, priority_service uses these directly instead of label-based mapping.
+    sev_score = Column(Float, nullable=True)
+    risk_score = Column(Float, nullable=True)
+    crit_score = Column(Float, nullable=True)
+    age_score = Column(Float, nullable=True)
+    opp_score = Column(Float, nullable=True)
 
     fault = relationship("FaultObservation", back_populates="tasks")
     crew = relationship("Crew", back_populates="assigned_tasks")
-    blocks = relationship("Block", back_populates="task")
+    blocks = relationship("Block", foreign_keys="[Block.task_id]", back_populates="task")
+    block_plan = relationship("Block", foreign_keys="[MaintenanceTask.block_id]", back_populates="associated_tasks")
 
 
 class Block(Base):
@@ -151,6 +163,10 @@ class Block(Base):
 
     id = Column(String(50), primary_key=True)
     task_id = Column(String(50), ForeignKey("maintenance_tasks.id"))
+    block_type = Column(String(30), default="PLANNED") # RULING, PLANNED, EMERGENT, SHADOW
+    planning_origin = Column(String(100), nullable=True) # e.g. ANNUAL_MAINTENANCE_PROGRAMME_2026, DIVISIONAL_WEEKLY_MAINTENANCE_PLAN, CRITICAL_DEFECT_EMERGENCY_INTERVENTION, JOINT_DEPARTMENTAL_COORDINATION_CELL
+    planning_date = Column(String(20), nullable=True) # e.g. "2026-05-15" or "2026-09-25"
+    execution_date = Column(String(20), nullable=True) # e.g. "2026-10-15" or "2026-09-27"
     corridor_id = Column(String(30), ForeignKey("corridors.id"))
     section_id = Column(String(50), ForeignKey("sections.id"))
     track_name = Column(String(50), default="DOWN_MAIN")
@@ -178,7 +194,8 @@ class Block(Base):
     approval_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    task = relationship("MaintenanceTask", back_populates="blocks")
+    task = relationship("MaintenanceTask", foreign_keys="[Block.task_id]", back_populates="blocks")
+    associated_tasks = relationship("MaintenanceTask", foreign_keys="[MaintenanceTask.block_id]", back_populates="block_plan")
 
 
 class OperationalRestriction(Base):
@@ -195,3 +212,27 @@ class OperationalRestriction(Base):
     reason = Column(String(200), nullable=False)
     active = Column(Boolean, default=True)
     issued_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PlannedActivity(Base):
+    __tablename__ = "planned_activities"
+
+    id = Column(String(50), primary_key=True)
+    department_id = Column(String(30), ForeignKey("departments.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    cadence = Column(String(30), nullable=False) # CURRENT, WEEKLY, MONTHLY
+    scheduled_date = Column(String(20), nullable=False) # e.g. "2026-09-25"
+    start_time = Column(String(10), nullable=False) # e.g. "20:00"
+    end_time = Column(String(10), nullable=False) # e.g. "21:30"
+    duration_mins = Column(Integer, default=90)
+    corridor_id = Column(String(30), ForeignKey("corridors.id"), nullable=False)
+    section_id = Column(String(50), ForeignKey("sections.id"), nullable=True)
+    location_km = Column(Float, nullable=False)
+    location_description = Column(String(200), nullable=False)
+    track_name = Column(String(50), default="DOWN_MAIN")
+    assigned_crew = Column(String(100), default="Department Maintenance Gang")
+    priority = Column(String(20), default="P2")
+    status = Column(String(50), default="SCHEDULED") # DUE_NOW, SCHEDULED, IN_PROGRESS, COMPLETED
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+

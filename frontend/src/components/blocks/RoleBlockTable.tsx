@@ -16,6 +16,7 @@ import {
   ChevronUp,
   Train
 } from "lucide-react";
+import { formatDistanceKm } from "../../utils/formatDistance";
 
 interface RoleBlockTableProps {
   blocks: BlockData[];
@@ -131,6 +132,52 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
     );
   };
 
+  const getBlockTypeBadge = (blockType?: string) => {
+    const bt = (blockType || "PLANNED").toUpperCase();
+    switch (bt) {
+      case "RULING":
+        return (
+          <span
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-100 text-indigo-900 border border-indigo-300 inline-flex items-center space-x-1"
+            title="Ruling Block: Long-term Annual Maintenance Programme 2026"
+          >
+            <span>🏛️</span>
+            <span>RULING</span>
+          </span>
+        );
+      case "EMERGENT":
+        return (
+          <span
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-100 text-rose-900 border border-rose-300 inline-flex items-center space-x-1"
+            title="Emergent Block: P1 Critical Safety Intervention"
+          >
+            <span>🚨</span>
+            <span>EMERGENT</span>
+          </span>
+        );
+      case "SHADOW":
+        return (
+          <span
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center space-x-1"
+            title="Shadow Block: Opportunistic multi-department possession"
+          >
+            <span>👥</span>
+            <span>SHADOW</span>
+          </span>
+        );
+      default:
+        return (
+          <span
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 inline-flex items-center space-x-1"
+            title="Planned Block: Divisional Maintenance Programme"
+          >
+            <span>📋</span>
+            <span>PLANNED</span>
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
       {(title || subtitle) && (
@@ -182,7 +229,10 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
                       <td className="py-3 px-3">
                         <div className="flex flex-col space-y-1">
                           <span className="font-mono font-black text-slate-900 text-xs">{b.id}</span>
-                          <div>{getPriorityBadge(b.task_priority)}</div>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {getBlockTypeBadge(b.block_type)}
+                            {getPriorityBadge(b.task_priority)}
+                          </div>
                           {b.task_id && (
                             <span className="text-[10px] font-mono text-slate-500">
                               Task: <strong>{b.task_id}</strong>
@@ -203,7 +253,7 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
                       <td className="py-3 px-3">
                         <div className="font-mono font-medium text-slate-800">{b.track_name}</div>
                         <div className="text-[11px] text-slate-500 font-mono">
-                          KM {b.location_km.toFixed(3)}
+                          {formatDistanceKm(b.location_km)}
                         </div>
                         {b.assigned_machine && (
                           <div className="text-[10px] text-sky-800 font-mono mt-0.5 truncate max-w-[150px]" title={b.assigned_machine}>
@@ -364,21 +414,61 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
                             </div>
 
                             <div className="p-2.5 bg-white rounded border border-slate-200">
-                              <span className="text-[10px] uppercase font-bold text-slate-500 font-mono">Participating Departments</span>
+                              <span className="text-[10px] uppercase font-bold text-slate-500 font-mono">Participating Departments & Origin</span>
                               <div className="mt-1 font-bold text-slate-800">{b.participating_departments || b.department_id || "P.Way"}</div>
                               <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                Proposed by: {b.proposed_by}
+                                Origin: <strong>{b.planning_origin || "DIVISIONAL_PLAN"}</strong>
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                Execution Date: <strong>{b.execution_date || b.date || "2026-09-25"}</strong>
                               </div>
                             </div>
 
                             <div className="p-2.5 bg-white rounded border border-slate-200">
                               <span className="text-[10px] uppercase font-bold text-slate-500 font-mono">Approval Audit Trail</span>
-                              <div className="mt-1 font-medium text-slate-800">{b.approval_notes || "Sanction pending review."}</div>
+                              <div className="mt-1 font-medium text-slate-800">
+                                {b.approval_notes && !b.approval_notes.trim().startsWith("{")
+                                  ? b.approval_notes
+                                  : "Sanction pending review."}
+                              </div>
                               <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                Created: {b.created_at ? new Date(b.created_at).toLocaleTimeString() : "—"}
+                                Proposed by: {b.proposed_by} • Created: {b.created_at ? new Date(b.created_at).toLocaleTimeString() : "—"}
                               </div>
                             </div>
                           </div>
+
+                          {/* Underlying Relational Tasks & Defects */}
+                          {b.tasks && b.tasks.length > 0 && (
+                            <div className="p-2.5 bg-white rounded border border-slate-200 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] uppercase font-bold text-slate-600 font-mono">
+                                  Underlying Relational Tasks & Defects ({b.tasks.length})
+                                </span>
+                                {b.block_type === "SHADOW" && (
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-300 rounded font-bold">
+                                    Opportunistic Multi-Department Synergy
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                {b.tasks.map((t: any, idx: number) => (
+                                  <div key={t.id || idx} className="p-2 bg-slate-50 rounded border border-slate-200 text-[11px] space-y-1">
+                                    <div className="flex items-center justify-between font-mono">
+                                      <span className="font-bold text-slate-800">{t.id}</span>
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-200 text-slate-700">
+                                        {t.department_id}
+                                      </span>
+                                    </div>
+                                    <p className="font-medium text-slate-900 line-clamp-1">{t.title}</p>
+                                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                                      <span>Priority: {t.priority}</span>
+                                      <span>{t.duration_hours || 2}h</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}
