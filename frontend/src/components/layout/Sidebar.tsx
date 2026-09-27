@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -25,7 +25,8 @@ import {
   Compass,
   AlertTriangle,
   ShieldCheck,
-  PhoneCall
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -57,6 +58,27 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 export const Sidebar: React.FC = () => {
   const { user, currentRole } = useAuth();
   const location = useLocation();
+
+  // Collapsible sidebar state with localStorage persistence
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("krayasetu_sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("krayasetu_sidebar_collapsed", String(next));
+      } catch (e) {
+        console.error("Failed to save sidebar state:", e);
+      }
+      return next;
+    });
+  };
 
   // Dynamically resolve active corridor ID for Corridor Master role
   const activeCorridorId =
@@ -100,7 +122,6 @@ export const Sidebar: React.FC = () => {
       case "TRAIN_PILOT":
         return "Promptly report visual track abnormalities, OHE sags/flashes, or signal anomalies for engineering verification.";
       default:
-        // Generic statutory fallback case: never empty or absent for any authenticated role
         return "Follow General & Subsidiary Rules (G&SR). All movements subject to divisional operating rules and line-clear clearances.";
     }
   };
@@ -108,32 +129,71 @@ export const Sidebar: React.FC = () => {
   const safetyDirectiveText = getSafetyDirective(user?.roleKey);
 
   return (
-    <aside className="w-64 bg-[var(--surface-card)] border-r border-[var(--border-subtle)] flex flex-col flex-shrink-0 min-h-[calc(100vh-4rem)] shadow-xs select-none transition-colors">
-      {/* Current Workspace Info */}
-      <div className="p-3.5 border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)]/60 flex-shrink-0">
-        <div className="flex items-center justify-between gap-1 mb-1.5">
-          <span className={`px-2.5 py-0.5 rounded-[var(--radius-xs)] text-xs font-bold border font-mono uppercase ${currentRole.badgeColor}`}>
-            {currentRole.name}
+    <aside
+      className={`${
+        isCollapsed ? "w-16" : "w-64"
+      } bg-[var(--surface-card)] border-r border-[var(--border-subtle)] flex flex-col flex-shrink-0 min-h-[calc(100vh-4rem)] shadow-xs select-none transition-all duration-200 ease-in-out`}
+    >
+      {/* Current Workspace Info / Header */}
+      {isCollapsed ? (
+        <div className="p-2 border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)]/60 flex flex-col items-center gap-2 flex-shrink-0">
+          <button
+            type="button"
+            onClick={toggleCollapse}
+            className="p-1.5 rounded-[var(--radius-md)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] transition-colors border border-[var(--border-subtle)]"
+            title="Expand Sidebar"
+            aria-label="Expand Sidebar"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <span
+            className={`px-1.5 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-bold border font-mono uppercase text-center ${currentRole.badgeColor}`}
+            title={`${currentRole.name} · ${currentRole.department}`}
+          >
+            {currentRole.name.slice(0, 3)}
           </span>
-          {user?.username && (
-            <span className="font-mono text-xs font-bold text-[var(--text-secondary)] bg-[var(--surface-tertiary)] px-2 py-0.5 rounded-[var(--radius-xs)] border border-[var(--border-subtle)]">
-              {user.username}
+        </div>
+      ) : (
+        <div className="p-3.5 border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)]/60 flex-shrink-0">
+          <div className="flex items-center justify-between gap-1 mb-1.5">
+            <span
+              className={`px-2.5 py-0.5 rounded-[var(--radius-xs)] text-xs font-bold border font-mono uppercase ${currentRole.badgeColor}`}
+            >
+              {currentRole.name}
             </span>
-          )}
+            <div className="flex items-center space-x-1">
+              {user?.username && (
+                <span className="font-mono text-xs font-bold text-[var(--text-secondary)] bg-[var(--surface-tertiary)] px-2 py-0.5 rounded-[var(--radius-xs)] border border-[var(--border-subtle)]">
+                  {user.username}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={toggleCollapse}
+                className="p-1 rounded-[var(--radius-md)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] transition-colors border border-[var(--border-subtle)] ml-1"
+                title="Collapse Sidebar"
+                aria-label="Collapse Sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="text-sm font-bold text-[var(--text-primary)] truncate" title={currentRole.department}>
+            {currentRole.department}
+          </div>
+          <div className="text-xs text-[var(--text-muted)] font-mono truncate mt-0.5">
+            {currentRole.division} · {currentRole.zone}
+          </div>
         </div>
-        <div className="text-sm font-bold text-[var(--text-primary)] truncate" title={currentRole.department}>
-          {currentRole.department}
-        </div>
-        <div className="text-xs text-[var(--text-muted)] font-mono truncate mt-0.5">
-          {currentRole.division} · {currentRole.zone}
-        </div>
-      </div>
+      )}
 
-      {/* Role-Specific Nav Links (Preserving exact items per role) */}
+      {/* Role-Specific Nav Links */}
       <nav className={`p-2.5 space-y-1.5 ${linkCount >= 6 ? "flex-1 overflow-y-auto" : "flex-shrink-0"}`}>
-        <div className="px-2.5 py-1 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider font-mono">
-          Assigned Workspaces ({linkCount})
-        </div>
+        {!isCollapsed && (
+          <div className="px-2.5 py-1 text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider font-mono">
+            Assigned Workspaces ({linkCount})
+          </div>
+        )}
 
         {currentRole.sidebarLinks.map((link, idx) => {
           const Icon = ICON_MAP[link.iconName] || LayoutDashboard;
@@ -178,6 +238,30 @@ export const Sidebar: React.FC = () => {
             isLinkActive = location.pathname === targetPath || location.pathname.startsWith(targetPath + "/");
           }
 
+          if (isCollapsed) {
+            return (
+              <Link
+                key={`${link.path}-${idx}`}
+                to={targetPath}
+                title={link.label}
+                className={`flex items-center justify-center p-2.5 rounded-[var(--radius-lg)] text-sm transition-all duration-150 relative group ${
+                  isLinkActive
+                    ? "bg-[var(--brand-navy)] text-white shadow-xs font-bold border border-[var(--brand-navy-border)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] font-medium border border-transparent"
+                }`}
+              >
+                <Icon
+                  className={`w-5 h-5 flex-shrink-0 ${
+                    isLinkActive ? "text-sky-300" : "text-[var(--text-muted)]"
+                  }`}
+                />
+                {link.badge && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-sky-500 ring-1 ring-white" />
+                )}
+              </Link>
+            );
+          }
+
           return (
             <Link
               key={`${link.path}-${idx}`}
@@ -213,63 +297,66 @@ export const Sidebar: React.FC = () => {
         })}
       </nav>
 
-      {/* 
-        Proportional Scaling Safety Protocol Callout:
-        - For 1-item sidebar (Train Pilot): Fills available vertical space with high-priority cab crew checklist & VHF contact.
-        - For 2-3 item sidebars (P.Way, TRD, S&T, Station Master): Fills space comfortably with statutory reference note.
-        - For 6-9 item sidebars (COA, Corridor Master): Sits neatly as a compact card at bottom of scrollable nav.
-      */}
-      <div
-        className={`m-2.5 rounded-[var(--radius-xl)] bg-[var(--status-warning-bg)] border border-[var(--status-warning-border)] text-[var(--status-warning-text)] text-xs shadow-xs transition-all ${
-          linkCount === 1
-            ? "flex-1 flex flex-col justify-between p-4 space-y-3"
-            : linkCount <= 3
-            ? "flex-1 flex flex-col justify-between p-3.5 space-y-2.5"
-            : "p-3 space-y-1.5 flex-shrink-0"
-        }`}
-      >
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5 font-bold text-[var(--status-warning-text)]">
-              <AlertTriangle className="w-4 h-4 text-[var(--status-warning)] flex-shrink-0" />
-              <span>Operational Safety Protocol</span>
+      {/* Operational Safety Protocol Callout */}
+      {isCollapsed ? (
+        <div
+          className="m-2 p-2 rounded-[var(--radius-lg)] bg-[var(--status-warning-bg)] border border-[var(--status-warning-border)] text-[var(--status-warning-text)] flex flex-col items-center justify-center cursor-help"
+          title={`Operational Safety Protocol (G&SR): ${safetyDirectiveText}`}
+        >
+          <AlertTriangle className="w-5 h-5 text-[var(--status-warning)]" />
+          <span className="text-[9px] font-mono font-bold mt-1">G&SR</span>
+        </div>
+      ) : (
+        <div
+          className={`m-2.5 rounded-[var(--radius-xl)] bg-[var(--status-warning-bg)] border border-[var(--status-warning-border)] text-[var(--status-warning-text)] text-xs shadow-xs transition-all ${
+            linkCount === 1
+              ? "flex-1 flex flex-col justify-between p-4 space-y-3"
+              : linkCount <= 3
+              ? "flex-1 flex flex-col justify-between p-3.5 space-y-2.5"
+              : "p-3 space-y-1.5 flex-shrink-0"
+          }`}
+        >
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5 font-bold text-[var(--status-warning-text)]">
+                <AlertTriangle className="w-4 h-4 text-[var(--status-warning)] flex-shrink-0" />
+                <span>Operational Safety Protocol</span>
+              </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-card)]/80 text-[var(--status-warning-text)] border border-[var(--status-warning-border)] font-bold">
+                G&SR
+              </span>
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-card)]/80 text-[var(--status-warning-text)] border border-[var(--status-warning-border)] font-bold">
-              G&SR
+
+            <p className="text-xs leading-relaxed text-[var(--status-warning-text)] font-sans">
+              {safetyDirectiveText}
+            </p>
+          </div>
+
+          {linkCount === 1 && (
+            <div className="p-3 rounded-[var(--radius-md)] bg-[var(--surface-card)]/80 border border-[var(--status-warning-border)]/80 text-[11px] font-mono text-[var(--text-secondary)] space-y-2">
+              <div className="font-bold text-[var(--text-primary)] flex items-center space-x-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                <span>Loco Pilot Safety Checkpoints:</span>
+              </div>
+              <ul className="space-y-1 text-[var(--text-muted)] pl-1">
+                <li>• Brake pipe pressure ≥ 5.0 kg/cm²</li>
+                <li>• Acknowledge caution orders & TSRs</li>
+                <li>• Continuous VCD vigilance cycling</li>
+                <li>• Report rail burns or OHE sparks</li>
+              </ul>
+            </div>
+          )}
+
+          <div className="pt-2 border-t border-[var(--status-warning-border)]/60 text-[10px] font-mono text-[var(--status-warning-text)] flex items-center justify-between">
+            <span className="opacity-90">
+              {linkCount === 1 ? "BPL Control Desk VHF" : "Statutory Directive"}
+            </span>
+            <span className="font-bold">
+              {linkCount === 1 ? "Ch. 12 (150.1 MHz)" : "WCR / BPL Div (2026)"}
             </span>
           </div>
-
-          <p className="text-xs leading-relaxed text-[var(--status-warning-text)] font-sans">
-            {safetyDirectiveText}
-          </p>
         </div>
-
-        {/* Extended Cab / Field Directives when sidebar has low item count (prevents awkward dead whitespace) */}
-        {linkCount === 1 && (
-          <div className="p-3 rounded-[var(--radius-md)] bg-[var(--surface-card)]/80 border border-[var(--status-warning-border)]/80 text-[11px] font-mono text-[var(--text-secondary)] space-y-2">
-            <div className="font-bold text-[var(--text-primary)] flex items-center space-x-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-              <span>Loco Pilot Safety Checkpoints:</span>
-            </div>
-            <ul className="space-y-1 text-[var(--text-muted)] pl-1">
-              <li>• Brake pipe pressure ≥ 5.0 kg/cm²</li>
-              <li>• Acknowledge caution orders & TSRs</li>
-              <li>• Continuous VCD vigilance cycling</li>
-              <li>• Report rail burns or OHE sparks</li>
-            </ul>
-          </div>
-        )}
-
-        {/* Footer line with emergency channel or statutory compliance badge */}
-        <div className="pt-2 border-t border-[var(--status-warning-border)]/60 text-[10px] font-mono text-[var(--status-warning-text)] flex items-center justify-between">
-          <span className="opacity-90">
-            {linkCount === 1 ? "BPL Control Desk VHF" : "Statutory Directive"}
-          </span>
-          <span className="font-bold">
-            {linkCount === 1 ? "Ch. 12 (150.1 MHz)" : "WCR / BPL Div (2026)"}
-          </span>
-        </div>
-      </div>
+      )}
     </aside>
   );
 };

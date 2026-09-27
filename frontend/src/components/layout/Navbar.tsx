@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Clock, UserCheck, LogOut, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Clock, UserCheck, LogOut, AlertTriangle, ShieldCheck, Sun, Moon } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { Button } from "../ui/Button";
 import {
   ModalDrawer,
@@ -21,6 +22,7 @@ interface Props {
 
 export const Navbar: React.FC<Props> = () => {
   const { user, currentRole, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [time, setTime] = useState<string>("");
   const [showDiscardConfirmModal, setShowDiscardConfirmModal] = useState<boolean>(false);
   const navigate = useNavigate();
@@ -172,6 +174,26 @@ export const Navbar: React.FC<Props> = () => {
                 {roleDisplayTitle}
               </span>
             </div>
+            
+            {/* Single Global Theme Toggle */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={toggleTheme}
+              leftIcon={
+                theme === "dark" ? (
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                ) : (
+                  <Moon className="w-3.5 h-3.5 text-sky-200" />
+                )
+              }
+              className="px-2.5 py-1 text-xs bg-[var(--brand-navy-hover)] text-sky-100 hover:text-white border-[var(--brand-canvas-blue)]/60"
+              title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+            >
+              <span className="hidden md:inline">
+                {theme === "dark" ? "Light" : "Dark"}
+              </span>
+            </Button>
 
             {/* Logout Button (Phase 1 Button Primitive) */}
             <Button

@@ -27,47 +27,13 @@ import { api } from "../services/api";
 import { BlockReasoningModal } from "../components/blocks/BlockReasoningModal";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatKmBadge, formatDistanceKm } from "../utils/formatDistance";
+import { useTheme } from "../context/ThemeContext";
 
 export const TrainPilotWorkspacePage: React.FC = () => {
   const { user } = useAuth();
 
-  // Theme state synchronized with document.documentElement
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlTheme = urlParams.get("theme");
-      if (urlTheme === "dark" || urlTheme === "light") return urlTheme;
-      const saved = localStorage.getItem("app-theme");
-      if (saved === "dark" || saved === "light") return saved;
-      if (document.documentElement.getAttribute("data-theme") === "dark") return "dark";
-    }
-    return "light";
-  });
-
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", theme);
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  }, [theme]);
-
-  const handleThemeToggle = () => {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
-    localStorage.setItem("app-theme", nextTheme);
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", nextTheme);
-      if (nextTheme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  };
+  // Global theme state from ThemeContext
+  const { theme } = useTheme();
 
   // Form State - Location
   const corridorList = Object.values(CORRIDORS_DATABASE);
@@ -291,15 +257,6 @@ export const TrainPilotWorkspacePage: React.FC = () => {
           <div className="px-3 py-1.5 bg-[var(--surface-secondary)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-secondary)]">
             Crew Base: <strong className="text-[var(--text-primary)]">Bhopal (BPL)</strong>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleThemeToggle}
-            leftIcon={theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
-            className="border-[var(--border-subtle)] text-[var(--text-secondary)] font-semibold"
-          >
-            <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-          </Button>
         </div>
       </div>
 

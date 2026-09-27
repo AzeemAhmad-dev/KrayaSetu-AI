@@ -4,6 +4,7 @@ import { api } from "../services/api";
 import { BlockData } from "../types";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
 import { useRole } from "../context/RoleContext";
+import { useTheme } from "../context/ThemeContext";
 import { useInvalidateCanonicalData } from "../hooks/useCanonicalData";
 import {
   Users,
@@ -162,40 +163,8 @@ export const CoordinationPage: React.FC = () => {
   const { currentRole, hasPermission } = useRole();
   const invalidateCanonicalData = useInvalidateCanonicalData();
 
-  // Active theme management with synchronized document.documentElement attribution
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlTheme = urlParams.get("theme");
-      if (urlTheme === "dark" || urlTheme === "light") return urlTheme;
-      const saved = localStorage.getItem("app-theme") || localStorage.getItem("coordination-theme");
-      if (saved === "dark" || saved === "light") return saved;
-      if (document.documentElement.getAttribute("data-theme") === "dark") return "dark";
-    }
-    return "light";
-  });
-
-  const handleThemeToggle = () => {
-    setTheme((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      if (typeof window !== "undefined") {
-        localStorage.setItem("app-theme", next);
-        localStorage.setItem("coordination-theme", next);
-      }
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", theme);
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  }, [theme]);
+  // Global theme state from ThemeContext
+  const { theme } = useTheme();
 
   const [blocks, setBlocks] = useState<BlockData[]>([]);
   const [completedTasks, setCompletedTasks] = useState<any[]>([]);
@@ -706,25 +675,6 @@ export const CoordinationPage: React.FC = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ProvenanceBadge type="REAL_PUBLIC" />
-
-          {/* Theme Toggle Button */}
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={handleThemeToggle}
-            leftIcon={
-              theme === "dark" ? (
-                <Sun className="w-3.5 h-3.5 text-[var(--status-warning)]" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-              )
-            }
-            className="text-xs font-bold"
-            title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
-          >
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
-          </Button>
 
           <Button
             asChild

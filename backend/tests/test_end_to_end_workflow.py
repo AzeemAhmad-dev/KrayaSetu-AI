@@ -209,7 +209,7 @@ def test_department_activity_log():
 
     # Verify the confirmed task appears in P.Way logs
     expected_task_id = f"TASK-{pway_fault['id'].replace('FAULT-', '')}"
-    task_events = [e for e in events_res if e["entity_id"] == expected_task_id or e.get("task_id") == expected_task_id]
+    task_events = [e for e in events_res if (e["entity_id"] == expected_task_id or e.get("task_id") == expected_task_id) and e.get("entity") == "TASK"]
     assert len(task_events) >= 1, f"Task {expected_task_id} must appear in P.Way activity log"
     ev = task_events[0]
     assert ev["actor"] == "Senior Divisional Engineer (Operating/Civil)"

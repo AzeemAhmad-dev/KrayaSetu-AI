@@ -10,6 +10,7 @@ import { getISTDateString } from "../utils/istDate";
 import { Button } from "../components/ui/Button";
 import { LoadingState } from "../components/ui/LoadingState";
 import { EmptyState } from "../components/ui/EmptyState";
+import { useTheme } from "../context/ThemeContext";
 import {
   CalendarRange,
   PlusCircle,
@@ -117,37 +118,7 @@ export const BlockPlannerPage: React.FC = () => {
   const simStatus = searchParams.get("simStatus");
   const simDropped = searchParams.get("simDropped");
 
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    const urlTheme = searchParams.get("theme");
-    if (urlTheme === "dark" || urlTheme === "light") return urlTheme;
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("block-planner-theme");
-      if (saved === "dark" || saved === "light") return saved;
-    }
-    return "light";
-  });
-
-  const handleThemeToggle = () => {
-    setTheme((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      if (typeof window !== "undefined") {
-        localStorage.setItem("block-planner-theme", next);
-      }
-      return next;
-    });
-  };
-
-  // Synchronize document.documentElement data-theme & class with active theme
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", theme);
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  }, [theme]);
+  const { theme } = useTheme();
 
   const [blocks, setBlocks] = useState<BlockData[]>([]);
   // The Division Block Ledger strictly displays blocks that have actually been proposed or are in active clearance workflow.
@@ -583,17 +554,6 @@ export const BlockPlannerPage: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Theme Toggle Button */}
-          <Button
-            variant="secondary"
-            onClick={handleThemeToggle}
-            leftIcon={theme === "dark" ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />}
-            className="text-xs sm:text-sm font-bold"
-            title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
-          >
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
-          </Button>
-
           {/* Regenerate 50 Blocks Button */}
           <Button
             variant="secondary"

@@ -5,8 +5,8 @@ import { Button } from "../ui/Button";
 import { Tabs, TabsList, TabsTrigger } from "../ui/Tabs";
 
 interface MareyHeaderProps {
-  theme: "vintage" | "dark";
-  onThemeToggle: () => void;
+  theme?: "vintage" | "dark" | "light";
+  onThemeToggle?: () => void;
   activeDirection: string;
   onDirectionChange: (dir: string) => void;
   activeCategory: string;
@@ -33,7 +33,7 @@ interface MareyHeaderProps {
 }
 
 export const MareyHeader: React.FC<MareyHeaderProps> = ({
-  theme,
+  theme = "vintage",
   onThemeToggle,
   activeDirection,
   onDirectionChange,
@@ -59,7 +59,7 @@ export const MareyHeader: React.FC<MareyHeaderProps> = ({
   onRefresh,
   onExport,
 }) => {
-  const isVintage = theme === "vintage";
+  const isVintage = theme !== "dark";
 
   return (
     <header
@@ -201,18 +201,6 @@ export const MareyHeader: React.FC<MareyHeaderProps> = ({
               </>
             )}
           </div>
-
-          {/* Theme Toggle Button */}
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={onThemeToggle}
-            className="h-8 text-xs font-medium"
-            title="Toggle between Vintage Archival Dispatcher and Dark Night Control-Room theme"
-          >
-            <span>{isVintage ? "🌙 Dark Room" : "📜 Vintage Parchment"}</span>
-          </Button>
 
           {/* Refresh Data */}
           <Button

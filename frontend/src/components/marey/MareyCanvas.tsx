@@ -15,7 +15,7 @@ interface MareyCanvasProps {
   onSelectTrain: (train: LiveRailwayTrain | null) => void;
   selectedBlock: BlockData | null;
   onSelectBlock: (block: BlockData | null) => void;
-  theme: "vintage" | "dark";
+  theme?: "vintage" | "dark" | "light";
   showScheduledPaths: boolean;
   showBlocks: boolean;
   activeDirection: string;
@@ -830,13 +830,23 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
     }
   };
 
-  // Wheel Zoom
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-    const newZoom = Math.max(0.7, Math.min(3.5, zoomLevel * zoomFactor));
-    onZoomChange(newZoom);
-  };
+  // Wheel Zoom with guaranteed non-passive event listener to prevent browser page scrolling
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+      const newZoom = Math.max(0.7, Math.min(3.5, zoomLevel * zoomFactor));
+      onZoomChange(newZoom);
+    };
+
+    canvas.addEventListener("wheel", handleNativeWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener("wheel", handleNativeWheel);
+    };
+  }, [zoomLevel, onZoomChange]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full min-h-[650px] select-none overflow-hidden font-sans">
@@ -847,7 +857,6 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onClick={handleClick}
-        onWheel={handleWheel}
         className="w-full h-full block cursor-grab active:cursor-grabbing"
       />
 

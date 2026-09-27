@@ -6,10 +6,11 @@ import { fetchActiveTrains, LiveRailwayTrain } from "../services/railwayApi";
 import { useMareyBlocks } from "../hooks/useCanonicalData";
 import { BlockData } from "../types";
 import { getISTDateString, getISTTimeString } from "../utils/istDate";
+import { useTheme } from "../context/ThemeContext";
 
 export const MareyDiagramPage: React.FC = () => {
-  // Theme state: defaults to vintage archival dispatcher parchment
-  const [theme, setTheme] = useState<"vintage" | "dark">("vintage");
+  // Global theme state from ThemeContext
+  const { theme } = useTheme();
 
   // Operational filter states
   const [activeDirection, setActiveDirection] = useState<string>("ALL");
@@ -110,24 +111,7 @@ export const MareyDiagramPage: React.FC = () => {
     }
   }, [blocks, selectedBlock]);
 
-  // Synchronize document.documentElement data-theme & class with active theme
-  useEffect(() => {
-    const isDark = theme === "dark";
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
-      if (isDark) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  }, [theme]);
-
   // Handlers
-  const handleThemeToggle = () => {
-    setTheme((prev) => (prev === "vintage" ? "dark" : "vintage"));
-  };
-
   const handleZoomIn = () => {
     setZoomLevel((prev) => Math.min(3.0, Math.round((prev + 0.15) * 100) / 100));
   };
@@ -192,7 +176,6 @@ export const MareyDiagramPage: React.FC = () => {
       {/* 1. ARCHIVAL / MODERN HEADER & CONTROLS */}
       <MareyHeader
         theme={theme}
-        onThemeToggle={handleThemeToggle}
         activeDirection={activeDirection}
         onDirectionChange={setActiveDirection}
         activeCategory={activeCategory}

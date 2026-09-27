@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo, useEffect, useCallback } from "react"
 import { BlockData, TrainMovementData } from "./types";
 import { formatDistanceKm } from "./utils/formatDistance";
 import { getISTDateString, getISTTimeString } from "./utils/istDate";
+import { useTheme } from "./context/ThemeContext";
 import {
   Clock,
   AlertTriangle,
@@ -126,13 +127,15 @@ export const GanttDashboard: React.FC<GanttDashboardProps> = ({
   onOpenReasoning,
   onRunOptimizer,
   optimizing = false,
-  theme = "dark",
+  theme,
   onProposeFromSchedule,
   proposedTaskIds,
   proposingTaskId,
 }) => {
-  // Theme inherited directly from parent page prop
-  const isDark = theme === "dark";
+  // Theme inherited directly from parent page prop or centralized ThemeContext
+  const globalTheme = useTheme();
+  const effectiveTheme = theme || globalTheme.theme;
+  const isDark = effectiveTheme === "dark";
   const isWhite = !isDark;
 
   // Timeline zoom: 15min (3px/min), 1hour (1.2px/min), 24hour (0.55px/min)
@@ -157,6 +160,36 @@ export const GanttDashboard: React.FC<GanttDashboardProps> = ({
   // Timeline viewport DOM ref for scrolling
   const timelineScrollRef = useRef<HTMLDivElement>(null);
   const [hoveredItem, setHoveredItem] = useState<{ item: TimelineItem; x: number; y: number } | null>(null);
+
+  // Non-passive wheel event listener to enable zoom while preventing browser page scroll
+  useEffect(() => {
+    const el = timelineScrollRef.current;
+    if (!el) return;
+
+    const handleWheelZoom = (e: WheelEvent) => {
+      // Prevent browser page from scrolling up/down
+      e.preventDefault();
+
+      // Vertical wheel movement cycles zoom scale
+      if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
+        if (e.deltaY < 0) {
+          // Zoom in: 24hour -> 1hour -> 15min
+          setZoomLevel((prev) => (prev === "24hour" ? "1hour" : "15min"));
+        } else if (e.deltaY > 0) {
+          // Zoom out: 15min -> 1hour -> 24hour
+          setZoomLevel((prev) => (prev === "15min" ? "1hour" : "24hour"));
+        }
+      } else {
+        // Horizontal wheel delta scrolls the timeline horizontally
+        el.scrollLeft += e.deltaX;
+      }
+    };
+
+    el.addEventListener("wheel", handleWheelZoom, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", handleWheelZoom);
+    };
+  }, []);
 
   // Pixel scaling per minute based on zoom
   const pxPerMin = useMemo(() => {
@@ -858,12 +891,12 @@ export const GanttDashboard: React.FC<GanttDashboardProps> = ({
       {/* ============================================================== */}
       {/* MAIN TWO-COLUMN SPLIT (Left: Timeline "2", Right: Work "3")   */}
       {/* ============================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[640px] relative">
+      <div className="grid grid-cols-1 lg:grid-cols-12 lg:h-[680px] min-h-[640px] relative border-b border-[var(--border-subtle)]">
         {/* ============================================================ */}
         {/* LEFT / CENTER PANEL: GANTT RESOURCE TIMELINE (Section 2)    */}
         {/* ============================================================ */}
         <div
-          className="lg:col-span-8 xl:col-span-9 border-r flex flex-col overflow-hidden transition-colors border-[var(--border-subtle)] bg-[var(--surface-body)]"
+          className="lg:col-span-8 xl:col-span-9 border-r flex flex-col h-full min-h-0 overflow-hidden transition-colors border-[var(--border-subtle)] bg-[var(--surface-body)]"
         >
           {/* Timeline Planning Horizon Banner */}
           <div
@@ -948,8 +981,7 @@ export const GanttDashboard: React.FC<GanttDashboardProps> = ({
           {/* 2-COLUMN GANTT GRID (Column A: Fixed Lane Labels, Column B: Horizontally Scrollable Timeline) */}
           {/* ============================================================== */}
           <div
-            className="flex-1 flex overflow-y-auto overflow-x-hidden relative"
-            style={{ minHeight: "520px" }}
+            className="flex-1 min-h-0 flex overflow-y-auto overflow-x-hidden relative"
           >
             {/* COLUMN A: FIXED RESOURCE / LANE COLUMN (w-64 min-w-[256px] max-w-[256px] shrink-0 border-r) */}
             <div
@@ -1209,11 +1241,11 @@ export const GanttDashboard: React.FC<GanttDashboardProps> = ({
         {/* RIGHT PANEL: SCHEDULED & DEFERRED WORK (Section 3)           */}
         {/* ============================================================ */}
         <div
-          className="lg:col-span-4 xl:col-span-3 flex flex-col h-full overflow-hidden transition-colors bg-[var(--surface-card)]"
+          className="lg:col-span-4 xl:col-span-3 flex flex-col h-[600px] lg:h-full max-h-[680px] min-h-0 overflow-hidden transition-colors bg-[var(--surface-card)]"
         >
           {/* Section 3 Header & Tabs */}
           <div
-            className="border-b px-3.5 py-2.5 flex items-center justify-between transition-colors bg-[var(--surface-secondary)] border-[var(--border-subtle)]"
+            className="border-b px-3.5 py-2.5 flex items-center justify-between transition-colors bg-[var(--surface-secondary)] border-[var(--border-subtle)] flex-shrink-0"
           >
             <div className="flex items-center space-x-2">
               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">

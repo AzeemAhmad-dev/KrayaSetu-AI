@@ -21,41 +21,11 @@ import { api } from "../services/api";
 import { BlockData } from "../types";
 import { RoleBlockTable } from "../components/blocks/RoleBlockTable";
 import { Button, Tabs, TabsList, TabsTrigger } from "../components/ui";
+import { useTheme } from "../context/ThemeContext";
 
 export const EngineeringPWayControl: React.FC = () => {
-  // Theme state synchronized with document.documentElement
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlTheme = urlParams.get("theme");
-      if (urlTheme === "dark" || urlTheme === "light") return urlTheme;
-      const saved = localStorage.getItem("app-theme");
-      if (saved === "dark" || saved === "light") return saved;
-      if (document.documentElement.getAttribute("data-theme") === "dark") return "dark";
-    }
-    return "light";
-  });
-
-  const handleThemeToggle = () => {
-    setTheme((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      if (typeof window !== "undefined") {
-        localStorage.setItem("app-theme", next);
-      }
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", theme);
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  }, [theme]);
+  // Global theme state from ThemeContext
+  const { theme } = useTheme();
 
   // Navigation State: Infrastructure workspace (main) vs dedicated Department Control workspace
   const [activeWorkspace, setActiveWorkspace] = useState<"infrastructure" | "control">("infrastructure");
@@ -136,18 +106,6 @@ export const EngineeringPWayControl: React.FC = () => {
                 TRACK / P.WAY WORKSPACE & ASSET DIRECTORY (BPL DIVISION)
               </h1>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleThemeToggle}
-              leftIcon={theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
-              className="border-[var(--border-subtle)] text-[var(--text-secondary)] font-semibold"
-            >
-              <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-            </Button>
           </div>
         </div>
 

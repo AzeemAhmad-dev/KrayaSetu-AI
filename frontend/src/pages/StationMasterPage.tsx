@@ -7,6 +7,7 @@ import { StationSelectionModal } from "../components/station/StationSelectionMod
 import { StationControlTab } from "../components/station/StationControlTab";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
 import { Tabs, TabsList, TabsTrigger, Button } from "../components/ui";
+import { useTheme } from "../context/ThemeContext";
 import {
   Building2,
   ArrowRightLeft,
@@ -88,43 +89,8 @@ export const StationMasterPage: React.FC = () => {
     navigate(`/station-master/${newStationCode.toUpperCase()}${suffix}`);
   };
 
-  // Theme state synchronized with document.documentElement
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlTheme = urlParams.get("theme");
-      if (urlTheme === "dark" || urlTheme === "light") return urlTheme;
-      const saved = localStorage.getItem("app-theme");
-      if (saved === "dark" || saved === "light") return saved;
-      if (document.documentElement.getAttribute("data-theme") === "dark") return "dark";
-    }
-    return "light";
-  });
-
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", theme);
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  }, [theme]);
-
-  const handleThemeToggle = () => {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
-    localStorage.setItem("app-theme", nextTheme);
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", nextTheme);
-      if (nextTheme === "dark") {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
-  };
+  // Global theme state from ThemeContext
+  const { theme } = useTheme();
 
   const platforms = infrastructure.tracks.filter((t) => t.platformNumber);
   const otherTracks = infrastructure.tracks.filter((t) => !t.platformNumber);
@@ -164,17 +130,8 @@ export const StationMasterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Action: Station Selection Switcher & Theme Toggle */}
+          {/* Action: Station Selection Switcher */}
           <div className="flex items-center space-x-3">
-            <Button
-              variant="secondary"
-              size="default"
-              onClick={handleThemeToggle}
-              leftIcon={theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
-              className="border-[var(--border-subtle)] text-[var(--text-secondary)] font-semibold"
-            >
-              <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-            </Button>
             <Button
               variant="primary"
               size="default"

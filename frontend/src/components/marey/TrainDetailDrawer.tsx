@@ -8,18 +8,18 @@ interface TrainDetailDrawerProps {
   selectedTrain: LiveRailwayTrain | null;
   selectedBlock: BlockData | null;
   onClose: () => void;
-  theme: "vintage" | "dark";
+  theme?: "vintage" | "dark" | "light";
 }
 
 export const TrainDetailDrawer: React.FC<TrainDetailDrawerProps> = ({
   selectedTrain,
   selectedBlock,
   onClose,
-  theme,
+  theme = "vintage",
 }) => {
   if (!selectedTrain && !selectedBlock) return null;
 
-  const isVintage = theme === "vintage";
+  const isVintage = theme !== "dark";
 
   return (
     <div
