@@ -1209,7 +1209,7 @@ export const GanttDashboard: React.FC<GanttDashboardProps> = ({
         {/* RIGHT PANEL: SCHEDULED & DEFERRED WORK (Section 3)           */}
         {/* ============================================================ */}
         <div
-          className="lg:col-span-4 xl:col-span-3 flex flex-col overflow-hidden transition-colors bg-[var(--surface-card)]"
+          className="lg:col-span-4 xl:col-span-3 flex flex-col h-full overflow-hidden transition-colors bg-[var(--surface-card)]"
         >
           {/* Section 3 Header & Tabs */}
           <div
@@ -1255,7 +1255,7 @@ export const GanttDashboard: React.FC<GanttDashboardProps> = ({
 
           {/* Cards List Container */}
           <div
-            className="flex-1 overflow-y-auto p-3 space-y-2.5 max-h-[640px] scrollbar-thin bg-[var(--surface-body)]"
+            className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5 scrollbar-thin bg-[var(--surface-body)]"
           >
             {/* TAB 1: SCHEDULED WORK CARDS */}
             {activeTab === "scheduled" && (
