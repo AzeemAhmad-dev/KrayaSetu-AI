@@ -14,9 +14,14 @@ from backend.app.config import settings
 from backend.app.database import engine, Base
 import backend.app.models
 from backend.app.routers import network, trains, maintenance, blocks, scenarios, events, planning, railway, analytics
+from backend.app.services.database_seeder import ensure_database_seeded
 
-# Ensure all database tables exist
+# Ensure all database tables exist and baseline topology/trains/blocks are populated
 Base.metadata.create_all(bind=engine)
+try:
+    ensure_database_seeded()
+except Exception as _e:
+    pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -94,6 +99,10 @@ def health_check():
         "provenance_enforced": True
     }
 
+@app.post("/api/admin/ensure-seeded")
+def trigger_ensure_seeded():
+    return ensure_database_seeded()
+
 @app.get("/")
 def root_status():
     return {
@@ -106,3 +115,4 @@ def root_status():
 @app.get("/health")
 def root_health():
     return health_check()
+

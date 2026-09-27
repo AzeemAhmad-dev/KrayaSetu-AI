@@ -12,20 +12,37 @@ const rawApiUrl = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "
 export const API_BASE = rawApiUrl === "/api" || rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 65000); // 65s for cloud cold-start resilience
 
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(errData.detail || `Request failed with status ${res.status}`);
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      signal: options.signal || controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+      ...options,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(errData.detail || `Request failed with status ${res.status}`);
+    }
+
+    return res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error(`Request to ${endpoint} timed out after 65s. The cloud backend may be waking up from sleep.`);
+    }
+    if (err.message && err.message.includes("Failed to fetch")) {
+      throw new Error(`Unable to reach backend service at ${API_BASE}. The server may be waking up or offline.`);
+    }
+    throw err;
   }
-
-  return res.json();
 }
 
 export const api = {

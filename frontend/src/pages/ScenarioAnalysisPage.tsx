@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { api } from "../services/api";
 import { BlockData, TrainMovementData, ScenarioData } from "../types";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
 import { formatDistanceKm } from "../utils/formatDistance";
+import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
 import {
   Clock,
   Train,
@@ -13,7 +15,8 @@ import {
   Sliders,
   Layers,
   AlertOctagon,
-  Info
+  Info,
+  WifiOff,
 } from "lucide-react";
 
 interface Props {
@@ -105,14 +108,52 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
   const [activeScenarioId, setActiveScenarioId] = useState<string>(activeScenario || "NORMAL");
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [telemetryError, setTelemetryError] = useState<string | null>(null);
+  const [blocksError, setBlocksError] = useState<string | null>(null);
+  const [isWakingUp, setIsWakingUp] = useState<boolean>(false);
+  const [wakeElapsed, setWakeElapsed] = useState<number>(0);
+  const wakeTimerRef = useRef<any>(null);
+
   const [feedback, setFeedback] = useState<{
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
 
   const loadData = async (fetchScenarios = false) => {
+    setLoading(true);
+    setTelemetryError(null);
+    setBlocksError(null);
+    setIsWakingUp(false);
+    setWakeElapsed(0);
+
+    // If request takes > 3.5s, signal possible cold start on Render free tier
+    if (wakeTimerRef.current) clearInterval(wakeTimerRef.current);
+    const startTs = Date.now();
+    wakeTimerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTs) / 1000);
+      setWakeElapsed(elapsed);
+      if (elapsed >= 4) {
+        setIsWakingUp(true);
+      }
+    }, 1000);
+
     try {
-      const promises: Promise<any>[] = [api.getTrainMovements(), api.getBlocks(undefined, undefined, undefined, undefined, undefined, true)];
+      // Query canonical candidate/planned blocks directly without operational_only=true
+      const promises: [Promise<TrainMovementData[]>, Promise<BlockData[]>, Promise<any>?] = [
+        api.getTrainMovements().catch((err: any) => {
+          console.error("Failed to load train movements:", err);
+          const msg = err?.message || "Failed to reach live telemetry stream";
+          setTelemetryError(msg);
+          return [];
+        }),
+        api.getBlocks().catch((err: any) => {
+          console.error("Failed to load planned maintenance blocks:", err);
+          const msg = err?.message || "Failed to load planned maintenance blocks";
+          setBlocksError(msg);
+          return [];
+        }),
+      ];
+
       if (fetchScenarios) {
         promises.push(
           api.getScenarios().catch((err) => {
@@ -121,9 +162,14 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
           })
         );
       }
+
       const [movRes, blkRes, scenRes] = await Promise.all(promises);
-      setMovements(movRes || []);
-      setBlocks(blkRes || []);
+
+      if (wakeTimerRef.current) clearInterval(wakeTimerRef.current);
+      setIsWakingUp(false);
+
+      if (movRes) setMovements(movRes);
+      if (blkRes) setBlocks(blkRes);
 
       if (scenRes && Array.isArray(scenRes.scenarios) && scenRes.scenarios.length > 0) {
         setScenarios(scenRes.scenarios);
@@ -131,8 +177,11 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
           setActiveScenarioId(scenRes.active_scenario_id);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (wakeTimerRef.current) clearInterval(wakeTimerRef.current);
+      setIsWakingUp(false);
       console.error("Failed to load operational telemetry", err);
+      setTelemetryError(err?.message || "Operational telemetry stream unavailable.");
     } finally {
       setLoading(false);
     }
@@ -140,6 +189,9 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
 
   useEffect(() => {
     loadData(true);
+    return () => {
+      if (wakeTimerRef.current) clearInterval(wakeTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -160,10 +212,16 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
         onScenarioChange(scenarioId);
       }
 
-      // Re-fetch operational telemetry immediately so KPI cards and lists refresh
+      // Re-fetch operational telemetry and evaluated planned blocks (without operational_only filter)
       const [movRes, blkRes] = await Promise.all([
-        api.getTrainMovements(),
-        api.getBlocks(undefined, undefined, undefined, undefined, undefined, true),
+        api.getTrainMovements().catch((err) => {
+          setTelemetryError(err?.message || "Failed to refresh train movements.");
+          return [];
+        }),
+        api.getBlocks().catch((err) => {
+          setBlocksError(err?.message || "Failed to refresh planned blocks.");
+          return [];
+        }),
       ]);
       setMovements(movRes || []);
       setBlocks(blkRes || []);
@@ -183,7 +241,7 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
 
       setFeedback({
         type: "success",
-        message: `Scenario "${scenarioName}" (${scenarioId}) applied successfully. Operational telemetry recomputed: ${trainCount} trains tracked, ${blockCount} blocks evaluated.`,
+        message: `Scenario "${scenarioName}" (${scenarioId}) applied successfully. Operational telemetry recomputed: ${trainCount} trains tracked, ${blockCount} blocks evaluated for path conflicts.`,
       });
     } catch (err: any) {
       console.error("Failed to apply scenario:", err);
@@ -200,9 +258,34 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
 
   if (loading) {
     return (
-      <div className="p-8 text-center text-slate-500 font-mono flex items-center justify-center space-x-2">
-        <RefreshCw className="w-5 h-5 text-sky-600 animate-spin" />
-        <span>Loading Simulation & Telemetry Lab...</span>
+      <div className="p-8 max-w-xl mx-auto my-16 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md text-center space-y-4 font-mono">
+        <div className="flex justify-center">
+          <div className="p-3 bg-sky-50 dark:bg-sky-950/50 rounded-xl border border-sky-200 dark:border-sky-800">
+            <RefreshCw className="w-8 h-8 text-sky-600 dark:text-sky-400 animate-spin" />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            {isWakingUp ? "Waking Up Cloud Backend Service..." : "Connecting to Simulation & Telemetry Lab..."}
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+            {isWakingUp
+              ? `Backend service is booting up from cold sleep (Render free tier). This initial spin-up can take 30–60 seconds on cloud hosting. Keeping connection alive (${wakeElapsed}s elapsed)...`
+              : "Retrieving live train path movements, scheduled timetable traversals, and canonical block conflict matrix..."}
+          </p>
+        </div>
+        {isWakingUp && (
+          <div className="pt-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => loadData(true)}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              Force Reconnect Attempt
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -394,6 +477,31 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
         )}
       </div>
 
+      {/* Prominent Stream Error Banner if either endpoint failed */}
+      {(telemetryError || blocksError) && (
+        <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-900 text-xs font-mono space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center space-x-2 font-bold">
+              <WifiOff className="w-4 h-4 text-red-600 flex-shrink-0" />
+              <span>Backend Telemetry or Maintenance Block Service Offline</span>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => loadData(false)}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              Retry Connection
+            </Button>
+          </div>
+          <p className="text-[11px] text-red-700 leading-relaxed">
+            {telemetryError && <span><strong>Train Telemetry:</strong> {telemetryError}. </span>}
+            {blocksError && <span><strong>Block Registry:</strong> {blocksError}. </span>}
+            If the cloud backend (Render) was sleeping, spin-up may take 30–60 seconds on the free tier.
+          </p>
+        </div>
+      )}
+
       {/* Operational Simulation KPI Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs">
@@ -401,10 +509,18 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
             <Activity className="w-3.5 h-3.5 text-sky-600" />
             <span>Monitored Services</span>
           </div>
-          <div className="text-xl font-black text-slate-900 mt-1 font-mono">
-            {movements.length} Trains
+          <div className="text-xl font-black mt-1 font-mono flex items-center gap-1.5">
+            {telemetryError ? (
+              <span className="text-red-600 text-sm flex items-center gap-1">
+                <WifiOff className="w-4 h-4" /> Stream Offline
+              </span>
+            ) : (
+              <span className="text-slate-900">{movements.length} Trains</span>
+            )}
           </div>
-          <span className="text-[10px] text-slate-400">Sectional active tracking</span>
+          <span className="text-[10px] text-slate-400">
+            {telemetryError ? "Connection / cold-start error" : "Sectional active tracking"}
+          </span>
         </div>
 
         <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs">
@@ -413,9 +529,11 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
             <span>Delayed Services (&gt;15m)</span>
           </div>
           <div className="text-xl font-black text-amber-600 mt-1 font-mono">
-            {delayedTrains.length} Services
+            {telemetryError ? "—" : `${delayedTrains.length} Services`}
           </div>
-          <span className="text-[10px] text-slate-400">Max delay: +{maxDelay}m</span>
+          <span className="text-[10px] text-slate-400">
+            {telemetryError ? "Awaiting telemetry stream" : `Max delay: +${maxDelay}m`}
+          </span>
         </div>
 
         <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs">
@@ -424,9 +542,11 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
             <span>Active Block Conflicts</span>
           </div>
           <div className="text-xl font-black text-red-600 mt-1 font-mono">
-            {conflictingBlocks.length} Conflicts
+            {blocksError ? "—" : `${conflictingBlocks.length} Conflicts`}
           </div>
-          <span className="text-[10px] text-slate-400">Requires precedence regulation</span>
+          <span className="text-[10px] text-slate-400">
+            {blocksError ? "Awaiting conflict matrix" : "Requires precedence regulation"}
+          </span>
         </div>
 
         <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs">
@@ -434,10 +554,20 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
             <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
             <span>Planned Blocks Viable</span>
           </div>
-          <div className="text-xl font-black text-emerald-600 mt-1 font-mono">
-            {blocks.length - conflictingBlocks.length} / {blocks.length}
+          <div className="text-xl font-black mt-1 font-mono flex items-center gap-1.5">
+            {blocksError ? (
+              <span className="text-red-600 text-sm flex items-center gap-1">
+                <AlertOctagon className="w-4 h-4" /> Unavailable
+              </span>
+            ) : (
+              <span className="text-emerald-600">
+                {blocks.length - conflictingBlocks.length} / {blocks.length}
+              </span>
+            )}
           </div>
-          <span className="text-[10px] text-slate-400">Clear path windows</span>
+          <span className="text-[10px] text-slate-400">
+            {blocksError ? "Block registry query failed" : "Clear path windows"}
+          </span>
         </div>
       </div>
 
@@ -448,50 +578,80 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
             <span className="font-bold text-slate-800 text-xs uppercase tracking-wider font-mono flex items-center">
               <Train className="w-4 h-4 text-sky-600 mr-1.5" />
-              Train Path Telemetry & Section Traversal ({movements.length} Trains)
+              Train Path Telemetry & Section Traversal ({telemetryError ? "Offline" : `${movements.length} Trains`})
             </span>
             <ProvenanceBadge type="SIMULATED" size="sm" />
           </div>
 
-          <div className="space-y-2 max-h-96 overflow-y-auto pr-1 text-xs">
-            {movements.map((tm) => (
-              <div
-                key={tm.train_number}
-                className="p-2.5 rounded border border-slate-100 hover:border-slate-300 transition-colors bg-slate-50/50"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-bold font-mono text-slate-900">{tm.train_number}</span>
-                    <span className="text-slate-600 ml-1.5 font-medium">{tm.train_name}</span>
-                  </div>
-                  <span
-                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                      tm.delay_minutes > 120
-                        ? "bg-red-100 text-red-800"
-                        : tm.delay_minutes > 20
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-emerald-100 text-emerald-800"
-                    }`}
-                  >
-                    {tm.delay_minutes > 0 ? `+${tm.delay_minutes}m (${tm.delay_category})` : "ON TIME"}
-                  </span>
-                </div>
-
-                <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between font-mono">
-                  <span>Location: {tm.current_location}</span>
-                  <span>
-                    Sched: {tm.scheduled_time} &rarr; <span className="font-bold text-slate-800">Est: {tm.estimated_time}</span>
-                  </span>
-                </div>
-
-                {tm.hold_reason && (
-                  <div className="mt-1.5 text-[10px] bg-amber-50 text-amber-900 p-1.5 rounded border border-amber-200">
-                    <span className="font-bold">Hold:</span> {tm.hold_reason} ({tm.hold_location})
-                  </div>
-                )}
+          {telemetryError ? (
+            <div className="p-6 text-center space-y-3 rounded-lg border border-red-200 bg-red-50/50">
+              <WifiOff className="w-8 h-8 text-red-500 mx-auto" />
+              <div className="space-y-1">
+                <p className="font-bold text-xs text-red-900">
+                  Telemetry Stream Unavailable
+                </p>
+                <p className="text-[11px] text-red-700 max-w-sm mx-auto">
+                  {telemetryError}
+                </p>
               </div>
-            ))}
-          </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => loadData(false)}
+                leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                Retry Telemetry Stream
+              </Button>
+            </div>
+          ) : movements.length === 0 ? (
+            <div className="py-8">
+              <EmptyState
+                icon={<Train className="w-8 h-8 text-slate-400" />}
+                title="Zero Active Train Movements"
+                description="Live telemetry stream is connected, but zero train movements are currently active on this section."
+              />
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto pr-1 text-xs">
+              {movements.map((tm) => (
+                <div
+                  key={tm.train_number}
+                  className="p-2.5 rounded border border-slate-100 hover:border-slate-300 transition-colors bg-slate-50/50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold font-mono text-slate-900">{tm.train_number}</span>
+                      <span className="text-slate-600 ml-1.5 font-medium">{tm.train_name}</span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                        tm.delay_minutes > 120
+                          ? "bg-red-100 text-red-800"
+                          : tm.delay_minutes > 20
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {tm.delay_minutes > 0 ? `+${tm.delay_minutes}m (${tm.delay_category})` : "ON TIME"}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between font-mono">
+                    <span>Location: {tm.current_location}</span>
+                    <span>
+                      Sched: {tm.scheduled_time} &rarr; <span className="font-bold text-slate-800">Est: {tm.estimated_time}</span>
+                    </span>
+                  </div>
+
+                  {tm.hold_reason && (
+                    <div className="mt-1.5 text-[10px] bg-amber-50 text-amber-900 p-1.5 rounded border border-amber-200">
+                      <span className="font-bold">Hold:</span> {tm.hold_reason} ({tm.hold_location})
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Dynamic Block Conflict Impact */}
@@ -499,68 +659,98 @@ export const ScenarioAnalysisPage: React.FC<Props> = ({
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
             <span className="font-bold text-slate-800 text-xs uppercase tracking-wider font-mono flex items-center">
               <Clock className="w-4 h-4 text-amber-600 mr-1.5" />
-              Maintenance Block Viability & Conflict Analysis ({blocks.length} Blocks)
+              Maintenance Block Viability & Conflict Analysis ({blocksError ? "Offline" : `${blocks.length} Blocks`})
             </span>
             <ProvenanceBadge type="DERIVED" size="sm" />
           </div>
 
-          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-            {blocks.map((b) => (
-              <div
-                key={b.id}
-                className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs text-xs space-y-1.5"
-              >
-                <div className="flex items-center justify-between font-bold">
-                  <span className="font-mono text-slate-900">{b.id}</span>
-                  <span
-                    className={`font-mono text-[10px] px-2 py-0.5 rounded font-bold ${
-                      b.conflict_status === "CONFLICT"
-                        ? "bg-red-100 text-red-800"
-                        : b.conflict_status === "POTENTIAL CONFLICT"
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-emerald-100 text-emerald-800"
-                    }`}
-                  >
-                    {b.conflict_status}
-                  </span>
-                </div>
-
-                <div className="text-[11px] text-slate-600 font-medium">
-                  Track {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time}
-                </div>
-
-                <p className="text-[11px] text-slate-600 leading-snug">
-                  {b.conflict_summary}
+          {blocksError ? (
+            <div className="p-6 text-center space-y-3 rounded-lg border border-red-200 bg-red-50/50">
+              <AlertOctagon className="w-8 h-8 text-red-500 mx-auto" />
+              <div className="space-y-1">
+                <p className="font-bold text-xs text-red-900">
+                  Block Viability Service Unavailable
                 </p>
-
-                {(() => {
-                  const rawCt: any = b.conflicting_trains;
-                  const ctList: any[] = Array.isArray(rawCt)
-                    ? rawCt
-                    : typeof rawCt === "string" && rawCt.trim().startsWith("[")
-                    ? (() => {
-                        try {
-                          return JSON.parse(rawCt);
-                        } catch {
-                          return [];
-                        }
-                      })()
-                    : [];
-
-                  if (!ctList || ctList.length === 0) return null;
-
-                  return (
-                    <div className="mt-1 pt-1 border-t border-slate-100 text-[10px] text-red-700 font-mono">
-                      Direct Collision with:{" "}
-                      {ctList
-                        .map((ct: any) => `${ct.train_name || ct.train_number} (${ct.estimated_time || ct.scheduled_time || "En Route"})`)
-                        .join(", ")}
-                    </div>
-                  );
-                })()}
+                <p className="text-[11px] text-red-700 max-w-sm mx-auto">
+                  {blocksError}
+                </p>
               </div>
-            ))}
-          </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => loadData(false)}
+                leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                Retry Block Query
+              </Button>
+            </div>
+          ) : blocks.length === 0 ? (
+            <div className="py-8">
+              <EmptyState
+                icon={<Clock className="w-8 h-8 text-slate-400" />}
+                title="Zero Maintenance Blocks Registered"
+                description="No maintenance blocks are currently scheduled or planned for evaluation in this corridor window."
+              />
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {blocks.map((b) => (
+                <div
+                  key={b.id}
+                  className="p-3 rounded-lg border border-slate-200 bg-white shadow-2xs text-xs space-y-1.5"
+                >
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="font-mono text-slate-900">{b.id}</span>
+                    <span
+                      className={`font-mono text-[10px] px-2 py-0.5 rounded font-bold ${
+                        b.conflict_status === "CONFLICT"
+                          ? "bg-red-100 text-red-800"
+                          : b.conflict_status === "POTENTIAL CONFLICT"
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {b.conflict_status}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-600 font-medium">
+                    Track {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time}
+                  </div>
+
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    {b.conflict_summary}
+                  </p>
+
+                  {(() => {
+                    const rawCt: any = b.conflicting_trains;
+                    const ctList: any[] = Array.isArray(rawCt)
+                      ? rawCt
+                      : typeof rawCt === "string" && rawCt.trim().startsWith("[")
+                      ? (() => {
+                          try {
+                            return JSON.parse(rawCt);
+                          } catch {
+                            return [];
+                          }
+                        })()
+                      : [];
+
+                    if (!ctList || ctList.length === 0) return null;
+
+                    return (
+                      <div className="mt-1 pt-1 border-t border-slate-100 text-[10px] text-red-700 font-mono">
+                        Direct Collision with:{" "}
+                        {ctList
+                          .map((ct: any) => `${ct.train_name || ct.train_number} (${ct.estimated_time || ct.scheduled_time || "En Route"})`)
+                          .join(", ")}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
