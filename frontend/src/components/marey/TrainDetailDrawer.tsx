@@ -23,7 +23,7 @@ export const TrainDetailDrawer: React.FC<TrainDetailDrawerProps> = ({
 
   return (
     <div
-      className={`fixed top-0 right-0 h-full w-full sm:w-[450px] shadow-2xl z-50 overflow-y-auto border-l transition-transform duration-300 ${
+      className={`fixed top-16 right-0 h-[calc(100%-4rem)] w-full sm:w-[450px] shadow-2xl z-50 overflow-y-auto border-l transition-transform duration-300 ${
         isVintage
           ? "bg-[#faf6ee] text-[#1c1917] border-[#c9beaa]"
           : "bg-[#0b1120] text-slate-100 border-slate-800"

@@ -7,6 +7,7 @@ import { useRole } from "../context/RoleContext";
 import { BlockReasoningModal } from "../components/blocks/BlockReasoningModal";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceKm } from "../utils/formatDistance";
+import { useTheme } from "../context/ThemeContext";
 import {
   useCanonicalBlocks,
   useTrainMovements,
@@ -41,12 +42,17 @@ import {
   Calendar,
   CalendarRange,
 } from "lucide-react";
+import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
+import { DepartmentBadge, LockTypeBadge } from "../components/ui/Badge";
 
 export const DivisionalOperationsControl: React.FC = () => {
   const { currentRole } = useRole();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const invalidateCanonicalData = useInvalidateCanonicalData();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   // React Query hooks — data survives navigation (staleTime=Infinity for canonical data)
   const { data: trainsData, isLoading: trainsLoading } = useTrainMovements();
@@ -111,7 +117,6 @@ export const DivisionalOperationsControl: React.FC = () => {
     try {
       const res = await api.regenerateCanonicalBlocks();
       setResetMessage(res.message || "50 planning blocks regenerated successfully.");
-      // Invalidate canonical data cache — useQuery hooks will automatically refetch
       await invalidateCanonicalData();
       setTimeout(() => setResetMessage(null), 6000);
     } catch (err: any) {
@@ -138,14 +143,56 @@ export const DivisionalOperationsControl: React.FC = () => {
     return t.priority_tier === selectedTierFilter;
   });
 
+  // Tier badge color helper — uses status tokens
+  const tierBadgeStyle = (tier: string) => {
+    if (tier === "CRITICAL") return { background: "var(--status-danger)", color: "var(--text-inverse)", border: "transparent" };
+    if (tier === "HIGH") return { background: "var(--status-warning-bg)", color: "var(--status-warning-text)", border: "var(--status-warning-border)" };
+    if (tier === "MEDIUM") return { background: "var(--status-info-bg)", color: "var(--status-info-text)", border: "var(--status-info-border)" };
+    return { background: "var(--surface-secondary)", color: "var(--text-muted)", border: "var(--border-subtle)" };
+  };
+
+  // Block status badge style
+  const blockStatusStyle = (status: string) => {
+    if (status === "APPROVED" || status === "SANCTIONED") return { background: "var(--status-success-bg)", color: "var(--status-success-text)", border: "var(--status-success-border)" };
+    if (status === "PENDING_APPROVAL" || status === "PENDING") return { background: "var(--status-warning-bg)", color: "var(--status-warning-text)", border: "var(--status-warning-border)" };
+    if (status === "REJECTED") return { background: "var(--status-danger-bg)", color: "var(--status-danger-text)", border: "var(--status-danger-border)" };
+    if (status === "SELECTED") return { background: "var(--status-info-bg)", color: "var(--status-info-text)", border: "var(--status-info-border)" };
+    if (status === "PROPOSED") return { background: "var(--lock-shadow-bg)", color: "var(--lock-shadow-text)", border: "var(--lock-shadow-border)" };
+    return { background: "var(--surface-secondary)", color: "var(--text-muted)", border: "var(--border-subtle)" };
+  };
+
+  // Conflict status style
+  const conflictStyle = (status: string) => {
+    if (status === "CONFLICT") return { background: "var(--status-danger-bg)", color: "var(--status-danger-text)", border: "var(--status-danger-border)" };
+    if (status === "POTENTIAL CONFLICT") return { background: "var(--status-warning-bg)", color: "var(--status-warning-text)", border: "var(--status-warning-border)" };
+    return { background: "var(--status-success-bg)", color: "var(--status-success-text)", border: "var(--status-success-border)" };
+  };
+
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
-      {/* 1. Header Banner */}
-      <div className="bg-gradient-to-r from-[#1e1b4b] via-[#2e1065] to-[#0f172a] rounded-2xl p-6 text-white shadow-md border border-purple-900/60">
+    <div
+      className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6"
+      style={{ color: "var(--text-primary)" }}
+    >
+      {/* ====================================================================
+          1. EXECUTIVE COMMAND HEADER
+          ==================================================================== */}
+      <div
+        className="rounded-2xl p-6 shadow-md border"
+        style={{
+          background: isDark
+            ? "linear-gradient(to right, #1e1b4b, #2e1065, #0f172a)"
+            : "linear-gradient(to right, #1e1b4b, #2e1065, #0f172a)",
+          borderColor: "rgba(147,51,234,0.35)",
+          color: "#ffffff",
+        }}
+      >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center space-x-2">
-              <span className="px-2.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-purple-400 text-purple-950 font-mono">
+              <span
+                className="px-2.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider font-mono"
+                style={{ background: "var(--dept-coa-bg)", color: "var(--dept-coa-text)" }}
+              >
                 Central Operations Control Desk
               </span>
               <span className="text-xs text-purple-200 font-mono">Bhopal Division · SIH 26027</span>
@@ -161,63 +208,76 @@ export const DivisionalOperationsControl: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <ProvenanceBadge type="REAL_PUBLIC" />
 
-            {/* Regenerate 50 Blocks Button */}
-            <button
+            {/* Regenerate 50 Blocks — secondary/neutral */}
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleRegenerateCanonical}
               disabled={resetting}
-              className={`px-3.5 py-1.5 bg-purple-700/80 hover:bg-purple-600 text-purple-100 text-xs font-bold rounded-lg border border-purple-400/50 shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer ${
-                resetting ? "opacity-60 cursor-not-allowed" : ""
-              }`}
+              isLoading={resetting}
+              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
               title="Generate a new validated 50-block planning scenario"
+              className="border-purple-400/50 !bg-purple-700/80 !text-purple-100 hover:!bg-purple-600"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${resetting ? "animate-spin text-purple-300" : ""}`} />
-              <span>{resetting ? "Validating & Promoting..." : "Regenerate 50 Blocks"}</span>
-            </button>
+              {resetting ? "Validating & Promoting..." : "Regenerate 50 Blocks"}
+            </Button>
+
+            {/* Open Full Baseline Analysis → /baseline-comparison */}
             <Link
               to="/baseline-comparison"
-              className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer border border-emerald-400/40"
-              title="View Independent Baseline vs Co-located Optimizer Comparison"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer border border-emerald-400/40"
+              style={{ background: "linear-gradient(to right, #059669, #0d9488)" }}
+              title="Open Full Baseline Analysis — Independent vs Co-located Optimizer"
             >
               <GitMerge className="w-4 h-4 text-emerald-200" />
               <span>Downtime Saved: {hoursSaved.toFixed(1)}h (-{pctReduction.toFixed(0)}%)</span>
             </Link>
+
             <Link
               to="/marey-diagram"
-              className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer border border-amber-400/40"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer border border-amber-400/40"
+              style={{ background: "linear-gradient(to right, #d97706, #e11d48)" }}
               title="Launch Live Indian Railways Marey (train-time-distance) Diagram"
             >
               <TrendingUp className="w-4 h-4 text-amber-200" />
               <span>Live Marey Diagram</span>
             </Link>
-            <Link
-              to="/block-planner"
-              className="px-4 py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer"
+
+            {/* Run CP-SAT Optimizer — success variant */}
+            <Button
+              variant="success"
+              size="sm"
+              onClick={() => navigate("/block-planner")}
+              leftIcon={<Cpu className="w-4 h-4" />}
+              title="Launch 8.0s CP-SAT Solver"
             >
-              <Cpu className="w-4 h-4 text-sky-200" />
-              <span>Launch 8.0s CP-SAT Solver</span>
-            </Link>
+              Launch 8.0s CP-SAT Solver
+            </Button>
           </div>
         </div>
 
-        {/* Demo Notification Toast */}
+        {/* Regeneration Toast */}
         {resetMessage && (
           <div
-            className={`mt-4 p-2.5 rounded-lg text-xs flex items-center space-x-2 animate-fadeIn ${
-              resetMessage.startsWith("Error")
-                ? "bg-rose-950/80 border border-rose-500/60 text-rose-200"
-                : "bg-emerald-950/80 border border-emerald-500/60 text-emerald-200"
-            }`}
+            className="mt-4 p-2.5 rounded-lg text-xs flex items-center space-x-2"
+            style={{
+              background: resetMessage.startsWith("Error")
+                ? "rgba(127,29,29,0.8)"
+                : "rgba(6,78,59,0.8)",
+              border: `1px solid ${resetMessage.startsWith("Error") ? "rgba(239,68,68,0.6)" : "rgba(52,211,153,0.5)"}`,
+              color: resetMessage.startsWith("Error") ? "#fca5a5" : "#6ee7b7",
+            }}
           >
             {resetMessage.startsWith("Error") ? (
-              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: "#f87171" }} />
             ) : (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: "#34d399" }} />
             )}
             <span>{resetMessage}</span>
           </div>
         )}
 
-        {/* 2. Interactive Workflow Stepper */}
+        {/* Workflow Stepper */}
         <div className="mt-5 pt-4 border-t border-purple-800/60">
           <div className="text-[11px] font-mono text-purple-300 uppercase tracking-wider mb-2 font-bold flex items-center space-x-1.5">
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
@@ -231,58 +291,45 @@ export const DivisionalOperationsControl: React.FC = () => {
                 <div className="text-[10px] text-purple-200">S-R-C-A-O Priority Queue</div>
               </div>
             </div>
-            <Link
-              to="/block-planner"
-              className="bg-slate-900/60 hover:bg-purple-900/40 border border-slate-700/60 hover:border-purple-400/60 rounded-lg p-2.5 transition-all flex items-center space-x-2 group"
-            >
-              <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 font-bold flex items-center justify-center text-[11px] flex-shrink-0 group-hover:bg-sky-500 group-hover:text-white">2</span>
-              <div>
-                <div className="font-bold text-slate-200 group-hover:text-white text-[11px]">2. OPTIMIZE</div>
-                <div className="text-[10px] text-slate-400">8.0s CP-SAT Window</div>
-              </div>
-            </Link>
-            <Link
-              to="/block-planner"
-              className="bg-slate-900/60 hover:bg-purple-900/40 border border-slate-700/60 hover:border-purple-400/60 rounded-lg p-2.5 transition-all flex items-center space-x-2 group"
-            >
-              <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 font-bold flex items-center justify-center text-[11px] flex-shrink-0 group-hover:bg-sky-500 group-hover:text-white">3</span>
-              <div>
-                <div className="font-bold text-slate-200 group-hover:text-white text-[11px]">3. REVIEW</div>
-                <div className="text-[10px] text-slate-400">Explainable Reasoning</div>
-              </div>
-            </Link>
-            <Link
-              to="/coordination"
-              className="bg-slate-900/60 hover:bg-purple-900/40 border border-slate-700/60 hover:border-purple-400/60 rounded-lg p-2.5 transition-all flex items-center space-x-2 group"
-            >
-              <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 font-bold flex items-center justify-center text-[11px] flex-shrink-0 group-hover:bg-purple-400 group-hover:text-purple-950">4</span>
-              <div>
-                <div className="font-bold text-slate-200 group-hover:text-white text-[11px]">4. COORDINATE</div>
-                <div className="text-[10px] text-slate-400">Multi-Dept Joint Desk</div>
-              </div>
-            </Link>
-            <Link
-              to="/coordination"
-              className="bg-slate-900/60 hover:bg-purple-900/40 border border-slate-700/60 hover:border-purple-400/60 rounded-lg p-2.5 transition-all flex items-center space-x-2 group"
-            >
-              <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 font-bold flex items-center justify-center text-[11px] flex-shrink-0 group-hover:bg-emerald-400 group-hover:text-emerald-950">5</span>
-              <div>
-                <div className="font-bold text-slate-200 group-hover:text-white text-[11px]">5. SELECT</div>
-                <div className="text-[10px] text-slate-400">Operational Planning</div>
-              </div>
-            </Link>
+            {[
+              { step: 2, label: "OPTIMIZE", sub: "8.0s CP-SAT Window", to: "/block-planner" },
+              { step: 3, label: "REVIEW", sub: "Explainable Reasoning", to: "/block-planner" },
+              { step: 4, label: "COORDINATE", sub: "Multi-Dept Joint Desk", to: "/coordination" },
+              { step: 5, label: "SELECT", sub: "Operational Planning", to: "/coordination" },
+            ].map(({ step, label, sub, to }) => (
+              <Link
+                key={step}
+                to={to}
+                className="bg-slate-900/60 hover:bg-purple-900/40 border border-slate-700/60 hover:border-purple-400/60 rounded-lg p-2.5 transition-all flex items-center space-x-2 group"
+              >
+                <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 font-bold flex items-center justify-center text-[11px] flex-shrink-0 group-hover:bg-purple-400 group-hover:text-purple-950">{step}</span>
+                <div>
+                  <div className="font-bold text-slate-200 group-hover:text-white text-[11px]">{step}. {label}</div>
+                  <div className="text-[10px] text-slate-400">{sub}</div>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* 2.5 Executive Impact Banner: Total Asset Downtime Saved */}
-      <div className="bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white rounded-2xl p-5 border border-emerald-500/40 shadow-md relative overflow-hidden">
+      {/* ====================================================================
+          2. SIH26027 IMPACT BANNER — DOWNTIME SAVED
+          ==================================================================== */}
+      <div
+        className="text-white rounded-2xl p-5 border shadow-md relative overflow-hidden"
+        style={{
+          background: "linear-gradient(to right, #022c22, #134e4a, #0f172a)",
+          borderColor: "rgba(52,211,153,0.25)",
+        }}
+      >
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-emerald-500/5 -skew-x-12 pointer-events-none" />
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center space-x-1">
-                <GitMerge className="w-3.5 h-3.5 text-emerald-400 mr-1" />
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border flex items-center space-x-1"
+                style={{ background: "rgba(52,211,153,0.15)", color: "#6ee7b7", borderColor: "rgba(52,211,153,0.3)" }}>
+                <GitMerge className="w-3.5 h-3.5 mr-1" style={{ color: "#34d399" }} />
                 <span>CROSS-DEPARTMENT COORDINATION IMPACT</span>
               </span>
               <span className="text-xs text-slate-300 font-mono">P.Way · TRD · S&T Shared Corridor Windows</span>
@@ -290,7 +337,7 @@ export const DivisionalOperationsControl: React.FC = () => {
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex flex-wrap items-baseline gap-3">
               <span>{hoursSaved.toFixed(1)} Hours Asset Downtime Saved</span>
-              <span className="text-emerald-400 text-xl sm:text-2xl font-black">
+              <span className="text-xl sm:text-2xl font-black" style={{ color: "#34d399" }}>
                 (-{pctReduction.toFixed(1)}% Track Possession Reduction)
               </span>
             </h2>
@@ -301,21 +348,24 @@ export const DivisionalOperationsControl: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="grid grid-cols-2 gap-2 text-center text-xs font-mono">
-              <div className="bg-slate-800/80 border border-rose-500/40 rounded-xl p-2.5">
-                <div className="text-[10px] uppercase text-rose-400 font-bold">Uncoordinated Baseline</div>
-                <div className="text-lg font-black text-rose-300">{baselineHours.toFixed(1)}h</div>
+              <div className="rounded-xl p-2.5 border" style={{ background: "rgba(30,41,59,0.8)", borderColor: "rgba(239,68,68,0.3)" }}>
+                <div className="text-[10px] uppercase font-bold" style={{ color: "var(--status-danger)" }}>Uncoordinated Baseline</div>
+                <div className="text-lg font-black" style={{ color: "#fca5a5" }}>{baselineHours.toFixed(1)}h</div>
                 <div className="text-[10px] text-slate-400">{baselineWindows} Windows</div>
               </div>
-              <div className="bg-slate-800/80 border border-emerald-500/40 rounded-xl p-2.5">
-                <div className="text-[10px] uppercase text-emerald-400 font-bold">KrayaSetu AI Plan</div>
-                <div className="text-lg font-black text-emerald-300">{optimizedHours.toFixed(1)}h</div>
+              <div className="rounded-xl p-2.5 border" style={{ background: "rgba(30,41,59,0.8)", borderColor: "rgba(52,211,153,0.3)" }}>
+                <div className="text-[10px] uppercase font-bold" style={{ color: "#34d399" }}>KrayaSetu AI Plan</div>
+                <div className="text-lg font-black" style={{ color: "#6ee7b7" }}>{optimizedHours.toFixed(1)}h</div>
                 <div className="text-[10px] text-slate-400">{optimizedBlocks} Blocks</div>
               </div>
             </div>
 
+            {/* "Open Full Baseline Analysis" link — requirement #9 */}
             <Link
               to="/baseline-comparison"
-              className="px-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center space-x-2 transition-all cursor-pointer group"
+              className="inline-flex items-center gap-2 px-4 py-3 font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer group"
+              style={{ background: "var(--status-success)", color: "#042f2e" }}
+              title="Open Full Baseline Analysis"
             >
               <span>View Side-by-Side Comparison</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
@@ -324,117 +374,131 @@ export const DivisionalOperationsControl: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Real-Time Operational KPI Strip */}
+      {/* ====================================================================
+          3. KPI DASHBOARD GRID — 8 CARDS
+          ==================================================================== */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-3.5 border border-emerald-300 shadow-xs">
-          <span className="text-[10px] font-bold uppercase font-mono text-emerald-800 flex items-center justify-between">
+        {/* Downtime Saved */}
+        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--status-success-bg)", borderColor: "var(--status-success-border)" }}>
+          <span className="text-[10px] font-bold uppercase font-mono flex items-center justify-between" style={{ color: "var(--status-success-text)" }}>
             <span>Downtime Saved</span>
-            <GitMerge className="w-3 h-3 text-emerald-600" />
+            <GitMerge className="w-3 h-3" />
           </span>
-          <div className="text-xl font-black text-emerald-700 mt-1">
+          <div className="text-xl font-black mt-1" style={{ color: "var(--status-success)" }}>
             {hoursSaved.toFixed(1)}h
           </div>
-          <span className="text-[10px] text-emerald-700 font-mono font-semibold">
+          <span className="text-[10px] font-mono font-semibold" style={{ color: "var(--status-success-text)" }}>
             -{pctReduction.toFixed(1)}% ({windowsEliminated} Outages Avoided)
           </span>
         </div>
 
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs">
-          <span className="text-[10px] font-bold uppercase font-mono text-slate-500">Tasks Analyzed</span>
-          <div className="text-xl font-black text-slate-900 mt-1">
+        {/* Tasks Analyzed */}
+        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--text-muted)" }}>Tasks Analyzed</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--text-primary)" }}>
             {dashSummary?.tasks_analyzed ?? priorityTasks.length}
           </div>
-          <span className="text-[10px] text-slate-500 font-mono">Bhopal Division</span>
+          <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>Bhopal Division</span>
         </div>
 
-        <div className="bg-white rounded-xl p-3.5 border border-red-200 bg-red-50/30 shadow-xs">
-          <span className="text-[10px] font-bold uppercase font-mono text-red-600">Critical Tier</span>
-          <div className="text-xl font-black text-red-700 mt-1">
+        {/* Critical Tier */}
+        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--status-danger-bg)", borderColor: "var(--status-danger-border)" }}>
+          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-danger)" }}>Critical Tier</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--status-danger)" }}>
             {dashSummary?.priority_distribution?.CRITICAL ?? priorityTasks.filter((t: any) => t.priority_tier === "CRITICAL").length}
           </div>
-          <span className="text-[10px] text-red-600 font-mono truncate block">
+          <span className="text-[10px] font-mono truncate block" style={{ color: "var(--status-danger)" }}>
             {dashSummary?.critical_task
               ? `${dashSummary.critical_task.id} (${Number(dashSummary.critical_task.score).toFixed(1)})`
               : (priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")
-                ? `${priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")?.task_id} (${Number(priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")?.total_score).toFixed(1)})`
+                ? `${priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")?.task_id}`
                 : "Active")}
           </span>
         </div>
 
-        <div className="bg-white rounded-xl p-3.5 border border-amber-200 bg-amber-50/30 shadow-xs">
-          <span className="text-[10px] font-bold uppercase font-mono text-amber-700">High Tier</span>
-          <div className="text-xl font-black text-amber-700 mt-1">
+        {/* High Tier */}
+        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--status-warning-bg)", borderColor: "var(--status-warning-border)" }}>
+          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-warning-text)" }}>High Tier</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--status-warning)" }}>
             {dashSummary?.priority_distribution?.HIGH ?? priorityTasks.filter((t: any) => t.priority_tier === "HIGH").length}
           </div>
-          <span className="text-[10px] text-amber-600 font-mono">Score 70.0 – 89.9</span>
+          <span className="text-[10px] font-mono" style={{ color: "var(--status-warning-text)" }}>Score 70.0 – 89.9</span>
         </div>
 
-        <div className="bg-white rounded-xl p-3.5 border border-blue-200 bg-blue-50/30 shadow-xs">
-          <span className="text-[10px] font-bold uppercase font-mono text-blue-700">Medium Tier</span>
-          <div className="text-xl font-black text-blue-700 mt-1">
+        {/* Medium Tier */}
+        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--status-info-bg)", borderColor: "var(--status-info-border)" }}>
+          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-info-text)" }}>Medium Tier</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--status-info)" }}>
             {dashSummary?.priority_distribution?.MEDIUM ?? priorityTasks.filter((t: any) => t.priority_tier === "MEDIUM").length}
           </div>
-          <span className="text-[10px] text-blue-600 font-mono">Score 45.0 – 69.9</span>
+          <span className="text-[10px] font-mono" style={{ color: "var(--status-info-text)" }}>Score 45.0 – 69.9</span>
         </div>
 
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs">
-          <span className="text-[10px] font-bold uppercase font-mono text-slate-500">Low Tier</span>
-          <div className="text-xl font-black text-slate-700 mt-1">
+        {/* Low Tier */}
+        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--text-muted)" }}>Low Tier</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--text-secondary)" }}>
             {dashSummary?.priority_distribution?.LOW ?? priorityTasks.filter((t: any) => t.priority_tier === "LOW").length}
           </div>
-          <span className="text-[10px] text-slate-500 font-mono">Routine Upkeep</span>
+          <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>Routine Upkeep</span>
         </div>
 
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-xs">
-          <span className="text-[10px] font-bold uppercase font-mono text-slate-500">Blocks Proposed</span>
-          <div className="text-xl font-black text-slate-900 mt-1">
+        {/* Blocks Proposed */}
+        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--text-muted)" }}>Blocks Proposed</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--text-primary)" }}>
             {ledgerBlocks.length}
           </div>
-          <span className="text-[10px] text-slate-500 font-mono">
+          <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>
             {ledgerBlocks.filter((b) => b.status === "APPROVED" || b.status === "SANCTIONED").length} Sanctioned
           </span>
         </div>
 
-        <div className="bg-white rounded-xl p-3.5 border border-emerald-200 bg-emerald-50/30 shadow-xs">
-          <span className="text-[10px] font-bold uppercase font-mono text-emerald-700">Tasks Scheduled</span>
-          <div className="text-xl font-black text-emerald-700 mt-1">
+        {/* Tasks Scheduled */}
+        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--status-success-bg)", borderColor: "var(--status-success-border)" }}>
+          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-success-text)" }}>Tasks Scheduled</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--status-success)" }}>
             {ledgerBlocks.filter((b) => b.status === "SCHEDULED" || b.status === "APPROVED" || b.status === "SANCTIONED").length}
           </div>
-          <span className="text-[10px] text-emerald-600 font-mono">CP-SAT Optimized</span>
+          <span className="text-[10px] font-mono" style={{ color: "var(--status-success-text)" }}>CP-SAT Optimized</span>
         </div>
       </div>
 
-      {/* 4. Priority Tasks & Network Decision Center */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-4 bg-gradient-to-r from-slate-50 via-purple-50/30 to-white border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      {/* ====================================================================
+          4. DECISION RATIONALE DESK — S-R-C-A-O PRIORITY QUEUE
+          ==================================================================== */}
+      <div className="rounded-2xl border shadow-xs overflow-hidden" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+        <div className="p-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-3"
+          style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)" }}>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="p-1 rounded bg-purple-100 text-purple-800">
+              <span className="p-1 rounded" style={{ background: "var(--dept-coa-bg)", color: "var(--dept-coa-text)" }}>
                 <Sliders className="w-4 h-4" />
               </span>
-              <h2 className="text-sm font-bold text-slate-900 tracking-wide">
+              <h2 className="text-sm font-bold tracking-wide" style={{ color: "var(--text-primary)" }}>
                 OPERATIONAL PRIORITY QUEUE — S-R-C-A-O INTELLIGENCE
               </h2>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-purple-900">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
+                style={{ background: "var(--dept-coa-bg)", color: "var(--dept-coa-text)" }}>
                 {dashSummary?.tasks_analyzed ?? priorityTasks.length} Tasks Evaluated
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Deterministic scoring formula: <span className="font-mono font-semibold text-slate-700">0.35·Severity + 0.25·EscalationRisk + 0.20·Criticality + 0.10·Age + 0.10·Opportunity</span>
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
+              Deterministic scoring formula: <span className="font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>0.35·Severity + 0.25·EscalationRisk + 0.20·Criticality + 0.10·Age + 0.10·Opportunity</span>
             </p>
           </div>
 
-          {/* Tier Filters */}
-          <div className="flex items-center space-x-1.5 self-start md:self-auto bg-slate-100 p-1 rounded-lg">
+          {/* Tier Filters — tab-style, no truncation (5 short labels: ALL, CRITICAL, HIGH, MEDIUM, LOW) */}
+          <div className="flex items-center space-x-1 self-start md:self-auto p-1 rounded-lg" style={{ background: "var(--surface-tertiary)" }}>
             {(["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"] as const).map((tier) => (
               <button
                 key={tier}
                 onClick={() => setSelectedTierFilter(tier)}
-                className={`px-2.5 py-1 text-xs font-bold rounded cursor-pointer transition-colors ${
-                  selectedTierFilter === tier
-                    ? "bg-white text-purple-900 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                className="px-2.5 py-1 text-xs font-bold rounded cursor-pointer transition-colors whitespace-nowrap"
+                style={selectedTierFilter === tier
+                  ? { background: "var(--surface-card)", color: "var(--dept-coa-text)", boxShadow: "var(--shadow-xs)" }
+                  : { background: "transparent", color: "var(--text-muted)" }
+                }
               >
                 {tier}
               </button>
@@ -446,7 +510,8 @@ export const DivisionalOperationsControl: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-mono text-[11px] uppercase tracking-wider">
+              <tr className="border-b text-[11px] uppercase tracking-wider font-mono"
+                style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)", color: "var(--text-muted)" }}>
                 <th className="py-2.5 px-3">Rank & Task</th>
                 <th className="py-2.5 px-3">Corridor & Asset</th>
                 <th className="py-2.5 px-3">Department</th>
@@ -455,39 +520,43 @@ export const DivisionalOperationsControl: React.FC = () => {
                 <th className="py-2.5 px-3 text-right">Decision Support</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-sans">
+            <tbody className="divide-y font-sans" style={{ borderColor: "var(--border-subtle)" }}>
               {filteredTasks.slice(0, 15).map((task: any, idx: number) => {
                 const isTask0001 = task.task_id === "TASK-0001";
                 const isCritical = task.priority_tier === "CRITICAL";
                 const isHigh = task.priority_tier === "HIGH";
+                const tierStyle = tierBadgeStyle(task.priority_tier);
 
                 return (
                   <tr
                     key={task.task_id}
-                    className={`transition-colors ${
-                      isTask0001
-                        ? "bg-red-50/70 hover:bg-red-100/60 border-l-4 border-l-red-600 font-medium"
+                    className="transition-colors"
+                    style={{
+                      background: isTask0001
+                        ? "var(--status-danger-bg)"
                         : isCritical
-                        ? "bg-red-50/30 hover:bg-red-50/60 border-l-4 border-l-red-500"
+                        ? `color-mix(in srgb, var(--status-danger-bg) 50%, transparent)`
+                        : "transparent",
+                      borderLeft: isTask0001
+                        ? `4px solid var(--status-danger)`
+                        : isCritical
+                        ? `4px solid var(--status-danger)`
                         : isHigh
-                        ? "hover:bg-amber-50/40 border-l-4 border-l-amber-400"
-                        : "hover:bg-slate-50 border-l-4 border-l-transparent"
-                    }`}
+                        ? `4px solid var(--status-warning)`
+                        : `4px solid transparent`,
+                    }}
                   >
                     {/* Rank & ID */}
                     <td className="py-3 px-3">
                       <div className="flex items-center space-x-2">
-                        <span
-                          className={`font-mono text-xs font-black ${
-                            isTask0001 ? "text-red-700" : isHigh ? "text-amber-700" : "text-slate-600"
-                          }`}
-                        >
+                        <span className="font-mono text-xs font-black" style={{ color: isCritical ? "var(--status-danger)" : isHigh ? "var(--status-warning)" : "var(--text-muted)" }}>
                           #{task.priority_rank || idx + 1}
                         </span>
                         <div className="flex flex-col">
-                          <span className="font-mono font-bold text-slate-900">{task.task_id}</span>
+                          <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>{task.task_id}</span>
                           {isTask0001 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-red-600 text-white animate-pulse">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black text-white animate-pulse"
+                              style={{ background: "var(--status-danger)" }}>
                               #1 TOP CRITICAL SAFETY HAZARD
                             </span>
                           )}
@@ -497,35 +566,26 @@ export const DivisionalOperationsControl: React.FC = () => {
 
                     {/* Corridor & Asset */}
                     <td className="py-3 px-3">
-                      <div className="font-medium text-slate-900">{task.corridor_id}</div>
-                      <div className="text-[11px] text-slate-500 font-mono">
+                      <div className="font-medium" style={{ color: "var(--text-primary)" }}>{task.corridor_id}</div>
+                      <div className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>
                         {task.track_name} · {formatDistanceKm(task.location_km)}
                       </div>
                     </td>
 
-                    {/* Dept */}
+                    {/* Dept — DepartmentBadge primitive */}
                     <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                        {task.department_id || "P.Way"}
-                      </span>
+                      <DepartmentBadge department={task.department_id || "PWAY"} size="sm" />
                     </td>
 
-                    {/* S-R-C-A-O Score */}
+                    {/* Score + tier badge */}
                     <td className="py-3 px-3">
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm font-black font-mono text-slate-900">
+                        <span className="text-sm font-black font-mono" style={{ color: "var(--text-primary)" }}>
                           {Number(task.priority_score).toFixed(2)}
                         </span>
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                            isCritical
-                              ? "bg-red-600 text-white"
-                              : isHigh
-                              ? "bg-amber-100 text-amber-800 border border-amber-300"
-                              : task.priority_tier === "MEDIUM"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
+                          className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                          style={tierStyle}
                         >
                           {task.priority_tier}
                         </span>
@@ -535,41 +595,40 @@ export const DivisionalOperationsControl: React.FC = () => {
                     {/* Factor Breakdown */}
                     <td className="py-3 px-3">
                       <div className="flex flex-wrap items-center gap-1 text-[10px] font-mono">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700" title="Severity (35%)">
-                          S: {task.components?.severity?.score ?? "--"}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700" title="Escalation Risk (25%)">
-                          R: {task.components?.escalation_risk?.score ?? "--"}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700" title="Criticality (20%)">
-                          C: {task.components?.criticality?.score ?? "--"}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700" title="Age (10%)">
-                          A: {task.components?.age?.score ?? "--"}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700" title="Opportunity (10%)">
-                          O: {task.components?.opportunity?.score ?? "--"}
-                        </span>
+                        {["severity", "escalation_risk", "criticality", "age", "opportunity"].map((key, i) => (
+                          <span key={key} className="px-1.5 py-0.5 rounded"
+                            style={{ background: "var(--surface-secondary)", color: "var(--text-secondary)" }}
+                            title={["Severity (35%)", "Escalation Risk (25%)", "Criticality (20%)", "Age (10%)", "Opportunity (10%)"][i]}>
+                            {["S","R","C","A","O"][i]}: {task.components?.[key]?.score ?? "--"}
+                          </span>
+                        ))}
                       </div>
                     </td>
 
-                    {/* Action */}
+                    {/* Actions */}
                     <td className="py-3 px-3 text-right">
                       <div className="inline-flex items-center space-x-1.5 justify-end">
+                        {/* "Why this task?" — judge-facing explainability, prominent styling */}
                         <button
                           onClick={() => setModalTaskId(task.task_id)}
-                          className="px-2.5 py-1.5 rounded bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-bold transition-colors inline-flex items-center space-x-1 cursor-pointer"
-                          title="Explain Why this task was prioritized"
+                          className="px-2.5 py-1.5 rounded border text-xs font-bold transition-colors inline-flex items-center space-x-1 cursor-pointer"
+                          style={{
+                            background: "var(--dept-coa-bg)",
+                            color: "var(--dept-coa-text)",
+                            borderColor: "var(--dept-coa-border)",
+                          }}
+                          title="Explain why this task was prioritized — AI reasoning trail"
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                          <Sparkles className="w-3.5 h-3.5" />
                           <span>Why this task?</span>
                         </button>
                         <Link
                           to={`/block-planner?taskId=${task.task_id}`}
-                          className="px-2.5 py-1.5 rounded bg-[#0b2545] hover:bg-[#134074] text-white text-xs font-bold transition-colors inline-flex items-center space-x-1 cursor-pointer shadow-xs"
+                          className="px-2.5 py-1.5 rounded text-white text-xs font-bold transition-colors inline-flex items-center space-x-1 cursor-pointer shadow-xs"
+                          style={{ background: "var(--brand-navy)" }}
                           title={`Plan Maintenance Block for ${task.task_id}`}
                         >
-                          <Calendar className="w-3.5 h-3.5 text-sky-200" />
+                          <Calendar className="w-3.5 h-3.5 text-sky-300" />
                           <span>Plan Block →</span>
                         </Link>
                       </div>
@@ -581,38 +640,44 @@ export const DivisionalOperationsControl: React.FC = () => {
           </table>
         </div>
 
-        {/* Optimizer Call to Action */}
-        <div className="p-4 bg-gradient-to-r from-sky-50 via-indigo-50 to-purple-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+        {/* CP-SAT CTA Footer */}
+        <div className="p-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3"
+          style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)" }}>
           <div className="flex items-center space-x-2">
-            <Cpu className="w-5 h-5 text-sky-700 flex-shrink-0" />
+            <Cpu className="w-5 h-5 flex-shrink-0" style={{ color: "var(--status-info)" }} />
             <div>
-              <div className="text-xs font-bold text-slate-900">
+              <div className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
                 Ready to schedule high-priority maintenance into real railway timetable gaps?
               </div>
-              <div className="text-[11px] text-slate-600">
+              <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
                 Feed prioritized tasks (including TASK-0001) to the 8.0s bounded OR-Tools CP-SAT solver.
               </div>
             </div>
           </div>
-          <Link
-            to="/block-planner"
-            className="px-4 py-2 bg-sky-700 hover:bg-sky-800 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-colors cursor-pointer flex-shrink-0"
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => navigate("/block-planner")}
+            rightIcon={<ArrowRight className="w-4 h-4" />}
+            className="flex-shrink-0"
           >
-            <span>Generate Optimization Plan (8.0s)</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+            Generate Optimization Plan (8.0s)
+          </Button>
         </div>
       </div>
 
-      {/* 5. Main Split: Pending Sanctions (Left) & Delayed Passenger Surveillance (Right) */}
+      {/* ====================================================================
+          5. SPLIT: PENDING SANCTIONS + PASSENGER SURVEILLANCE
+          ==================================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left: Pending Sanctions (7 cols) */}
+        {/* Left: Division Block Ledger — Pending Sanctions (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="rounded-2xl border shadow-xs overflow-hidden" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+            <div className="p-3.5 border-b flex items-center justify-between"
+              style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)" }}>
               <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-purple-600" />
-                <span className="font-bold text-slate-800 text-xs tracking-wide">
+                <ShieldCheck className="w-4 h-4" style={{ color: "var(--dept-coa)" }} />
+                <span className="font-bold text-xs tracking-wide" style={{ color: "var(--text-primary)" }}>
                   EXECUTIVE BLOCK SANCTIONS AWAITING DOM CLEARANCE ({pendingBlocks.length})
                 </span>
               </div>
@@ -620,67 +685,79 @@ export const DivisionalOperationsControl: React.FC = () => {
             </div>
 
             {loading ? (
-              <div className="p-8 text-center text-slate-400 text-xs font-mono">Loading sanction requests...</div>
+              <div className="p-8 text-center text-xs font-mono" style={{ color: "var(--text-muted)" }}>Loading sanction requests...</div>
             ) : pendingBlocks.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 text-xs space-y-2">
-                <div>No pending blocks requiring master sanction.</div>
-                <div className="text-[11px] text-slate-400">
-                  Generate blocks via the CP-SAT Optimizer in Block Planner or review Joint Coordination.
-                </div>
+              <div className="p-6">
+                <EmptyState
+                  icon={<ShieldCheck className="w-8 h-8 stroke-[1.5]" />}
+                  title="All Clear — No Pending Sanctions"
+                  description="No maintenance blocks are awaiting DOM executive clearance. Generate blocks via the CP-SAT Optimizer in Block Planner or review the Joint Coordination Desk."
+                  actionLabel="Launch Block Planner"
+                  onAction={() => navigate("/block-planner")}
+                />
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
                 {pendingBlocks.map((b) => (
-                  <div key={b.id} className="p-4 hover:bg-slate-50/60 transition-colors">
+                  <div key={b.id} className="p-4 transition-colors hover:bg-[var(--surface-secondary)]">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center space-x-2">
-                        <span className="font-bold font-mono text-slate-900 text-sm">{b.id}</span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-amber-100 text-amber-800">
-                          {b.protection_type}
-                        </span>
+                        <span className="font-bold font-mono text-sm" style={{ color: "var(--text-primary)" }}>{b.id}</span>
+                        {/* Lock-type badge via LockTypeBadge primitive */}
+                        <LockTypeBadge type={b.block_type || b.protection_type || "PLANNED"} size="sm" />
                         {b.power_isolation_required && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 flex items-center space-x-1">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center space-x-1"
+                            style={{ background: "var(--status-warning-bg)", color: "var(--status-warning-text)", border: "1px solid var(--status-warning-border)" }}>
                             <Zap className="w-3 h-3" />
                             <span>25kV ISO</span>
                           </span>
                         )}
                       </div>
-                      <span className="text-xs text-slate-500 font-mono">Dept: {b.proposed_by}</span>
+                      <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>Dept: {b.proposed_by}</span>
                     </div>
 
-                    <div className="text-xs font-semibold text-slate-800 mt-1">
+                    <div className="text-xs font-semibold mt-1" style={{ color: "var(--text-secondary)" }}>
                       Corridor: {b.corridor_id} · Track: {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time} - {b.requested_end_time} ({b.duration_mins}m)
                     </div>
 
-                    <p className="text-xs text-slate-600 mt-1 leading-relaxed bg-slate-50 p-2 rounded border border-slate-100">
+                    <p className="text-xs mt-1 leading-relaxed p-2 rounded border"
+                      style={{ color: "var(--text-secondary)", background: "var(--surface-secondary)", borderColor: "var(--border-subtle)" }}>
                       {b.conflict_summary || "Inter-departmental block proposed for infrastructure safety."}
                     </p>
 
-                    <div className="mt-3 pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                    <div className="mt-3 pt-2 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2"
+                      style={{ borderColor: "var(--border-subtle)" }}>
                       <input
                         type="text"
                         placeholder="DOM executive remarks..."
                         value={executiveNotes[b.id] || ""}
                         onChange={(e) => setExecutiveNotes({ ...executiveNotes, [b.id]: e.target.value })}
-                        className="text-xs p-1.5 border border-slate-300 rounded bg-white flex-1"
+                        className="text-xs p-1.5 border rounded flex-1"
+                        style={{ borderColor: "var(--border-medium)", background: "var(--surface-card)", color: "var(--text-primary)" }}
                       />
                       <div className="flex items-center space-x-2 flex-shrink-0">
-                        <button
+                        {/* REJECT — destructive variant */}
+                        <Button
+                          variant="destructive"
+                          size="sm"
                           onClick={() => handleMasterSanction(b.id, "REJECT")}
                           disabled={actioningId === b.id}
-                          className="px-3 py-1.5 rounded border border-red-300 hover:bg-red-50 text-red-700 text-xs font-semibold flex items-center space-x-1 cursor-pointer"
+                          isLoading={actioningId === b.id}
+                          leftIcon={<XCircle className="w-3.5 h-3.5" />}
                         >
-                          <XCircle className="w-3.5 h-3.5" />
-                          <span>Reject</span>
-                        </button>
-                        <button
+                          Reject
+                        </Button>
+                        {/* APPROVE — success variant */}
+                        <Button
+                          variant="success"
+                          size="sm"
                           onClick={() => handleMasterSanction(b.id, "APPROVE")}
                           disabled={actioningId === b.id}
-                          className="px-3.5 py-1.5 rounded bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold shadow-xs flex items-center space-x-1 cursor-pointer"
+                          isLoading={actioningId === b.id}
+                          leftIcon={<CheckCircle className="w-3.5 h-3.5" />}
                         >
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          <span>Sanction Block</span>
-                        </button>
+                          Sanction Block
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -690,35 +767,39 @@ export const DivisionalOperationsControl: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Delayed Passenger Surveillance & Freight Regulation (5 cols) */}
+        {/* Right: Delayed Passenger Surveillance (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="rounded-2xl border shadow-xs overflow-hidden" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+            <div className="p-3.5 border-b flex items-center justify-between"
+              style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)" }}>
               <div className="flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 text-amber-600" />
-                <span className="font-bold text-slate-800 text-xs tracking-wide">
+                <AlertCircle className="w-4 h-4" style={{ color: "var(--status-warning)" }} />
+                <span className="font-bold text-xs tracking-wide" style={{ color: "var(--text-primary)" }}>
                   PASSENGER DELAY SURVEILLANCE ({delayedTrains.length})
                 </span>
               </div>
               <ProvenanceBadge type="REAL_PUBLIC" size="sm" />
             </div>
 
-            <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
+            <div className="divide-y max-h-[300px] overflow-y-auto" style={{ borderColor: "var(--border-subtle)" }}>
               {delayedTrains.length === 0 ? (
-                <div className="p-6 text-center text-slate-500 text-xs">All passenger trains operating within schedule tolerances.</div>
+                <div className="p-6 text-center text-xs" style={{ color: "var(--text-muted)" }}>
+                  All passenger trains operating within schedule tolerances.
+                </div>
               ) : (
                 delayedTrains.map((t) => (
-                  <div key={t.train_number} className="p-3 hover:bg-slate-50 text-xs">
+                  <div key={t.train_number} className="p-3 hover:bg-[var(--surface-secondary)] text-xs transition-colors">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold font-mono text-slate-900">{t.train_number} - {t.train_name}</span>
-                      <span className="px-2 py-0.5 rounded font-mono font-bold bg-amber-100 text-amber-800 text-[10px]">
+                      <span className="font-bold font-mono" style={{ color: "var(--text-primary)" }}>{t.train_number} - {t.train_name}</span>
+                      <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px]"
+                        style={{ background: "var(--status-warning-bg)", color: "var(--status-warning-text)" }}>
                         +{t.delay_minutes}m delay
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
+                    <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                       Section: {t.current_section_id || t.current_location || "Bhopal Section"} · Speed: {t.speed_kmph} km/h
                     </div>
-                    <div className="text-[11px] text-slate-600 mt-1 font-mono">
+                    <div className="text-[11px] mt-1 font-mono" style={{ color: "var(--text-secondary)" }}>
                       Priority Rank: {t.priority} ({t.service_type || t.train_type})
                     </div>
                   </div>
@@ -727,18 +808,19 @@ export const DivisionalOperationsControl: React.FC = () => {
             </div>
           </div>
 
-          {/* Freight Regulation Strategies */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono flex items-center space-x-1.5">
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
+          {/* Freight Regulation */}
+          <div className="rounded-2xl border p-4 shadow-xs space-y-2" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+            <h3 className="text-xs font-bold uppercase tracking-wider font-mono flex items-center space-x-1.5"
+              style={{ color: "var(--text-secondary)" }}>
+              <TrendingUp className="w-4 h-4" style={{ color: "var(--status-success)" }} />
               <span>Freight Regulation & Precedence Policy</span>
             </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               When high-priority passenger services (e.g. 12002 Shatabdi, 12626 Kerala) experience downstream sectional delays, freight rakes on loop tracks (Vidisha/Gulabganj) are held to prevent compounding bottlenecks.
             </p>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-500">Active Regulated Freight Rakes:</span>
-              <span className="font-mono font-bold text-slate-800">
+            <div className="pt-2 border-t flex items-center justify-between text-xs" style={{ borderColor: "var(--border-subtle)" }}>
+              <span style={{ color: "var(--text-muted)" }}>Active Regulated Freight Rakes:</span>
+              <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>
                 {freightTrains.filter(f => f.status === "REGULATED").length} of {freightTrains.length}
               </span>
             </div>
@@ -746,53 +828,60 @@ export const DivisionalOperationsControl: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Complete Divisional Blocks Ledger */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* ====================================================================
+          6. COMPLETE DIVISIONAL BLOCKS LEDGER
+          ==================================================================== */}
+      <div className="rounded-2xl border shadow-xs overflow-hidden" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+        <div className="p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)" }}>
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-lg bg-[#0b2545] text-white">
+            <div className="p-2 rounded-lg text-white" style={{ background: "var(--brand-navy)" }}>
               <CalendarRange className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="font-bold text-slate-900 text-sm tracking-wide uppercase font-mono">
+                <h2 className="font-bold text-sm tracking-wide uppercase font-mono" style={{ color: "var(--text-primary)" }}>
                   Divisional Blocks Ledger
                 </h2>
-                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold"
+                  style={{ background: "var(--status-info-bg)", color: "var(--status-info-text)", border: "1px solid var(--status-info-border)" }}>
                   {ledgerBlocks.length} Active Records
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
                 Central register of all scheduled, proposed, approved, and selected possession windows across Bhopal Division
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Link
-              to="/block-planner"
-              className="px-3 py-1.5 bg-[#0b2545] hover:bg-[#134074] text-white text-xs font-bold rounded-lg transition-colors flex items-center space-x-1 shadow-xs"
-            >
-              <Calendar className="w-3.5 h-3.5 text-sky-200" />
-              <span>Open Block Planner →</span>
-            </Link>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => navigate("/block-planner")}
+            leftIcon={<Calendar className="w-3.5 h-3.5 text-sky-300" />}
+          >
+            Open Block Planner →
+          </Button>
         </div>
 
         {ledgerBlocks.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 space-y-2">
-            <Calendar className="w-10 h-10 mx-auto text-slate-300" />
-            <div className="text-sm font-bold text-slate-700">0 Divisional Blocks Currently Registered</div>
-            <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-              Use "Plan Block →" on any Priority Queue item above or launch the CP-SAT Optimizer in Block Planner to schedule maintenance blocks.
-            </p>
+          <div className="p-8">
+            <EmptyState
+              icon={<CalendarRange className="w-8 h-8 stroke-[1.5]" />}
+              title="No Divisional Blocks Registered"
+              description="Use 'Plan Block →' on any Priority Queue item above or launch the CP-SAT Optimizer in Block Planner to schedule maintenance possession windows."
+              actionLabel="Go to Block Planner"
+              onAction={() => navigate("/block-planner")}
+              advisoryNote="Blocks in PLANNED/DRAFT state are filtered out of the ledger until formally proposed."
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-mono text-[11px] uppercase tracking-wider">
+              <thead className="border-b text-[11px] uppercase tracking-wider font-mono"
+                style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)", color: "var(--text-muted)" }}>
                 <tr>
-                  <th className="py-2.5 px-3">Block ID & Priority</th>
+                  <th className="py-2.5 px-3">Block ID & Type</th>
                   <th className="py-2.5 px-3">Originating Task</th>
                   <th className="py-2.5 px-3">Corridor & Section</th>
                   <th className="py-2.5 px-3">Track & Location</th>
@@ -803,52 +892,48 @@ export const DivisionalOperationsControl: React.FC = () => {
                   <th className="py-2.5 px-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-sans">
+              <tbody className="divide-y font-sans" style={{ borderColor: "var(--border-subtle)" }}>
                 {ledgerBlocks.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={b.id} className="transition-colors hover:bg-[var(--surface-secondary)]">
                     <td className="py-3 px-3 font-mono">
-                      <div className="font-bold text-slate-900">{b.id}</div>
-                      {b.task_priority && (
-                        <span className={`text-[10px] font-bold uppercase ${
-                          b.task_priority === "CRITICAL" ? "text-red-700" : b.task_priority === "HIGH" ? "text-amber-700" : "text-slate-500"
-                        }`}>
-                          {b.task_priority} Priority
-                        </span>
-                      )}
+                      <div className="font-bold" style={{ color: "var(--text-primary)" }}>{b.id}</div>
+                      {/* LockTypeBadge primitive for block type */}
+                      <LockTypeBadge type={b.block_type || "PLANNED"} size="sm" />
                     </td>
                     <td className="py-3 px-3">
                       {b.task_id ? (
                         <div className="space-y-0.5">
-                          <span className="font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                          <span className="font-mono font-bold text-[11px] px-1.5 py-0.5 rounded"
+                            style={{ background: "var(--surface-secondary)", color: "var(--text-secondary)" }}>
                             {b.task_id}
                           </span>
-                          <div className="text-[11px] text-slate-600 truncate max-w-[200px]" title={b.task_title || ""}>
+                          <div className="text-[11px] truncate max-w-[200px]" style={{ color: "var(--text-muted)" }} title={b.task_title || ""}>
                             {b.task_title || "Track Maintenance Task"}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-slate-400 font-mono text-[11px]">Direct Proposal</span>
+                        <span className="font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>Direct Proposal</span>
                       )}
                     </td>
                     <td className="py-3 px-3">
-                      <div className="font-medium text-slate-900">{b.corridor_id}</div>
-                      <div className="text-[11px] text-slate-500 font-mono">{b.section_name || b.section_id}</div>
+                      <div className="font-medium" style={{ color: "var(--text-primary)" }}>{b.corridor_id}</div>
+                      <div className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{b.section_name || b.section_id}</div>
                     </td>
                     <td className="py-3 px-3 font-mono">
-                      <div className="text-slate-800 font-semibold">{b.track_name}</div>
-                      <div className="text-[11px] text-slate-500">{formatDistanceKm(b.location_km)}</div>
+                      <div className="font-semibold" style={{ color: "var(--text-secondary)" }}>{b.track_name}</div>
+                      <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{formatDistanceKm(b.location_km)}</div>
                     </td>
                     <td className="py-3 px-3 font-mono">
-                      <div className="font-bold text-slate-900">{b.requested_start_time} – {b.requested_end_time}</div>
-                      <div className="text-[11px] text-slate-500">{b.duration_mins} mins</div>
+                      <div className="font-bold" style={{ color: "var(--text-primary)" }}>{b.requested_start_time} – {b.requested_end_time}</div>
+                      <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{b.duration_mins} mins</div>
                     </td>
                     <td className="py-3 px-3">
                       <div className="flex flex-wrap items-center gap-1">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                          {b.participating_departments || b.department_id || "PWAY"}
-                        </span>
+                        {/* DepartmentBadge primitive */}
+                        <DepartmentBadge department={b.participating_departments || b.department_id || "PWAY"} size="sm" />
                         {b.power_isolation_required && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center space-x-1">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold flex items-center space-x-1"
+                            style={{ background: "var(--status-warning-bg)", color: "var(--status-warning-text)", border: "1px solid var(--status-warning-border)" }}>
                             <Zap className="w-2.5 h-2.5" />
                             <span>TRD OHE ISO</span>
                           </span>
@@ -856,40 +941,25 @@ export const DivisionalOperationsControl: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                        b.conflict_status === "CONFLICT"
-                          ? "bg-red-100 text-red-800 border border-red-200"
-                          : b.conflict_status === "POTENTIAL CONFLICT"
-                          ? "bg-amber-100 text-amber-800 border border-amber-200"
-                          : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                      }`}>
-                        {b.conflict_status}
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                        style={conflictStyle(b.conflict_status || "OK")}>
+                        {b.conflict_status || "OK"}
                       </span>
                     </td>
                     <td className="py-3 px-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                        b.status === "PROPOSED"
-                          ? "bg-indigo-50 text-indigo-800 border-indigo-200"
-                          : b.status === "PENDING_APPROVAL"
-                          ? "bg-amber-50 text-amber-800 border-amber-200"
-                          : b.status === "APPROVED"
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                          : b.status === "SELECTED"
-                          ? "bg-sky-50 text-sky-800 border-sky-200"
-                          : b.status === "REJECTED"
-                          ? "bg-red-50 text-red-800 border-red-200"
-                          : "bg-slate-100 text-slate-700 border-slate-200"
-                      }`}>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                        style={blockStatusStyle(b.status)}>
                         {b.status}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right">
-                      <Link
-                        to="/block-planner"
-                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-[#0b2545] hover:text-white text-slate-700 text-xs font-bold transition-colors inline-flex items-center space-x-1 cursor-pointer border border-slate-300"
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate("/block-planner")}
                       >
-                        <span>Manage →</span>
-                      </Link>
+                        Manage →
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -899,7 +969,11 @@ export const DivisionalOperationsControl: React.FC = () => {
         )}
       </div>
 
-      {/* 6. Block Reasoning Modal for "Why this task?" */}
+      {/* ====================================================================
+          7. "WHY THIS TASK?" — DECISION RATIONALE MODAL
+          Renders via BlockReasoningModal — judge-facing explainability feature.
+          Styled consistently (modal uses surface tokens via ModalDrawer primitive).
+          ==================================================================== */}
       <BlockReasoningModal
         isOpen={!!modalTaskId}
         onClose={() => setModalTaskId(null)}
