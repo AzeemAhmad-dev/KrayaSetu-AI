@@ -355,10 +355,68 @@ All 14 verification screenshots were captured with Playwright against the live r
      - Updated `scripts/capture_phase7_screenshots.cjs` to explicitly await the network response (`page.waitForResponse(r => r.url().includes('/maintenance/faults') && r.status() === 200)`), wait for the submit button to return to its un-disabled `"Log Activity"` state, await the success banner (`text=successfully logged`), and wait for the `Total Recorded` badge to strictly increment (`waitForFunction(prev => count > prev)`).
      - Both `04c_train_pilot_action_before.png` and `04d_train_pilot_action_after.png` were re-captured with identical viewport framing centered on the Activity Log section.
      - `04c` visually verifies the initial count (`Total Recorded: 0` with clean `EmptyState`), and `04d` visually verifies the updated count (`Total Recorded: 11`), the cleared form, the un-disabled `"Log Activity"` button, and the brand-new observation record (`FAULT-20260927073534`: *"Loco Cab Observ: Spark at mast 126/4 near Home Signal..."*) at the top of the feed.
-6. **Train Telemetry & Scenario Analysis Blocks Clarification**:
-   - **Train Telemetry Loading**: When the backend server (`uvicorn backend.app.main:app`) is offline or restarting, Vite's `/api` proxy returns connection errors that the frontend catches gracefully, defaulting the trains list to `[]` (resulting in "0 Monitored Trains"). With the backend running, `GET /api/train-movements` serves all 14 active trains across Bhopal Division (Vande Bharat 20171/20172, Shatabdi 12001/12002, GT Express 12615/12616, Punjab Mail 12137, Chhattisgarh Express 18237, Indore-Gwalior 11125, and freight rakes) with real-time live or simulated section telemetry.
-   - **Block Structure Semantics**: On `/scenario-analysis`, the page deliberately calls `api.getBlocks(..., operational_only=true)` to display only sanctioned, active operational possessions (e.g., `BLK-OPT-001` and `BLK-OPT-002`) impacting active line-clear dispatch. In contrast, `/block-planner` and `/coordination` display the complete 50-block canonical dataset and candidate proposals across all four maintenance categories (Ruling, Planned, Emergent, Shadow).
+6. **Train Pilot Observation-Logging Playwright Synchronization Resolution**:
+   - Verification confirmed that observation logging is fully operational and database-persisted. The screenshot script was updated to wait for the complete HTTP response, button re-enablement, and count increment before snapping `04d_train_pilot_action_after.png`, proving genuine database persistence from `Total Recorded: 0` to `Total Recorded: 11`.
 
 ---
 
+## 9. Live Cloud Deployment Investigation & Telemetry Bug Resolution
+
+### 9.1 Root Cause Analysis on Live Deployment (`kraya-setu-ai.vercel.app` & `krayasetu-ai.onrender.com`)
+
+An investigation into the "0 Trains" and "weird blocks" report on the live deployed site (`https://kraya-setu-ai.vercel.app/scenario-analysis`) revealed three compounding root causes:
+
+1. **Unseeded SQLite Database on Render Cloud**:
+   - The local SQLite database (`krayasetu.db`) is gitignored per security and repository cleanliness practices.
+   - When the backend container deployed on Render, `Base.metadata.create_all()` created blank database tables.
+   - The original seeding pipeline was fragmented: `seed_database.py` (which populated corridors, stations, and trains from JSON) was separated from `populate_four_block_dataset.py` (which generated canonical blocks). Because Render only executed canonical block regeneration, the live database had 50 blocks, but **0 corridors and 0 trains** (`/api/corridors` = `[]`, `/api/trains` = `[]`, `/api/train-movements` = `[]`).
+
+2. **Silent Failure & Indistinguishable Error State in Frontend**:
+   - Render's free tier spins down services after 15 minutes of inactivity; cold boots require 30–60+ seconds.
+   - In `ScenarioAnalysisPage.tsx`, `loadData()` caught errors with a basic `console.error` and fell back to empty arrays `[]`. As a result, connection timeouts, cloud cold starts, HTTP failures, and a genuine "zero trains" response rendered identically as `"0 Trains"` with no user feedback.
+
+3. **"Weird Blocks" Filter Discrepancy Against Master Specification**:
+   - Per `SIH26027_Master_Spec_v4.md` and `backend/app/routers/scenarios.py`, the scenario engine evaluates downstream conflicts for candidate maintenance blocks in `PLANNED` status against disrupted train trajectories.
+   - However, `ScenarioAnalysisPage.tsx` previously passed `operational_only=true` to `api.getBlocks()`, which filters for `Block.status.in_(["APPROVED", "SANCTIONED", "ACTIVE", "COMPLETED", "SELECTED"])`.
+   - In the canonical dataset, all 33 routine maintenance blocks are in `PLANNED` status; filtering by `operational_only=true` stripped out all 33 planned blocks and left only 0 or 1 emergent block (`BLOCK-EMG-001`), producing a sparse and bizarrely truncated block conflict matrix.
+   - Furthermore, the page's KPI card explicitly displays `"Planned Blocks Viable: {blocks.length - conflictingBlocks.length} / {blocks.length}"`, proving that the entire planned candidate block set was intended to be loaded and evaluated.
+
+### 9.2 Engineering Fixes Implemented
+
+1. **Automated Database Seeder Service (`backend/app/services/database_seeder.py`)**:
+   - Developed an idempotent `ensure_database_seeded()` service that verifies whether corridors, stations, trains, and blocks exist. If missing, it automatically seeds all 5 corridors, 14 canonical trains, scheduled timetables, live train movements, and 50 canonical blocks directly on application startup.
+   - Wired into `backend/app/main.py` on startup and exposed via `POST /api/admin/ensure-seeded`.
+
+2. **Cloud-Resilient API Client (`frontend/src/services/api.ts`)**:
+   - Added a 65-second `AbortController` timeout to handle cloud backend cold starts gracefully without abrupt browser connection drops.
+   - Added descriptive, user-friendly error messages distinguishing between network timeouts, server cold boots, and offline states.
+
+3. **Explicit State Architecture in `ScenarioAnalysisPage.tsx`**:
+   - **Cold-Start Waking Notice**: Added a dedicated waking-up loader with elapsed timer and a force-reconnect button when Render is spinning up.
+   - **Distinct Stream Error State**: Added `--status-danger` / destructive error containers with `<WifiOff>` / `<AlertOctagon>` icons, explicit error messages, and retry buttons for both Train Telemetry and Block Viability panels.
+   - **Genuine Empty State**: Rendered `<EmptyState>` primitive only when the telemetry stream successfully returns zero items, framing it clearly as track availability.
+   - **Full Scenario Evaluation**: Removed `operational_only=true`, allowing the scenario simulation lab to query all 50 planned and candidate blocks to evaluate viability against train paths.
+
+### 9.3 Live Production Verification
+
+Commits were pushed to `https://github.com/AzeemAhmad-dev/KrayaSetu-AI` (`main`), triggering automated deployments on Render and Vercel:
+
+1. **Live Render Backend (`https://krayasetu-ai.onrender.com`)**:
+   - `/api/summary`: 5 Corridors, 14 Trains, 50 Blocks, 64 Tasks.
+   - `/api/corridors`: 5 Corridors returned (HTTP 200).
+   - `/api/trains`: 14 Trains returned (HTTP 200).
+   - `/api/train-movements`: 9 active train movements returned (HTTP 200).
+   - `/api/blocks`: 50 canonical maintenance blocks returned (HTTP 200).
+
+2. **Live Vercel Frontend (`https://kraya-setu-ai.vercel.app/scenario-analysis`)**:
+   - Verified and captured in `phase_7_screenshots/07_live_scenario_analysis.png`:
+     - **Monitored Services**: `9 Trains` actively tracked across Bhopal Division (Shatabdi Express 12001/12002, Vande Bharat 20171/20172, GT Express 12615, etc.).
+     - **Planned Blocks Viable**: `50 / 50` clear path windows evaluated.
+     - **Active Block Conflicts**: `0 Conflicts` under standard timetable execution.
+     - **Train Path Telemetry**: Full section traversals, current locations (Vidisha Main Line, Bina Junction, Bhopal Junction), and live delay minutes rendered cleanly.
+     - **Maintenance Block Viability**: Full 50-block conflict impact matrix rendered with track names, chainage (km), and operational time slots.
+
+---
+
+TRAIN TELEMETRY BUG RESOLVED
 **PHASE 7 COMPLETE**
