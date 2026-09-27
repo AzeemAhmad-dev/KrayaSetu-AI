@@ -125,28 +125,81 @@ async function capture() {
   const logTab = await page.$('button:has-text("Log En-Route Observation")');
   if (logTab) {
     await logTab.click();
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(1000);
   }
+
+  // Wait for initial logs count to load
+  await page.waitForFunction(() => {
+    const label = Array.from(document.querySelectorAll('span')).find(s => s.textContent.includes('Total Recorded:'));
+    return label && label.nextElementSibling && !isNaN(parseInt(label.nextElementSibling.textContent.trim(), 10));
+  }, { timeout: 15000 });
+
+  const countBefore = await page.evaluate(() => {
+    const label = Array.from(document.querySelectorAll('span')).find(s => s.textContent.includes('Total Recorded:'));
+    return label && label.nextElementSibling ? parseInt(label.nextElementSibling.textContent.trim(), 10) : 0;
+  });
+  // Scroll to Activity Log section to show initial count and card before action
+  const logSectionHeading = await page.$('text=Train Pilot Activity Log');
+  if (logSectionHeading) {
+    await logSectionHeading.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+  }
+
   console.log('Capturing 04c_train_pilot_action_before.png...');
   await page.screenshot({ path: path.join(OUTPUT_DIR, '04c_train_pilot_action_before.png') });
+
+  // Scroll back up to the form to fill it
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(500);
 
   // Fill in observation form & submit
   console.log('Filling observation form...');
   await page.fill('input[placeholder*="Outer yard"]', 'Near Up Loop Turnout #12');
   await page.fill('input[placeholder*="KM 824"]', '126.8');
   await page.fill('input[placeholder*="Up Line between"]', 'Bhopal – Habibganj (RKMP) Line');
-  await page.fill('textarea[placeholder*="Describe what you observed"]', 'Observed slight OHE spark and track surface roughness on UP mainline prior to signal S-42.');
+  await page.fill('textarea[placeholder*="Describe what you observed"]', 'Loco Cab Observ: Spark at mast 126/4 near Home Signal. Track surface roughness observed on UP mainline prior to signal S-42.');
   
   // Check P.Way department checkbox
   const pwayCheckbox = await page.$('input[type="checkbox"]');
   if (pwayCheckbox) await pwayCheckbox.check();
 
-  console.log('Submitting observation...');
+  console.log('Submitting observation and waiting for network response and UI state update...');
   const submitBtn = await page.$('button:has-text("Log Activity")');
   if (submitBtn) {
-    await submitBtn.click();
-    await page.waitForTimeout(2000);
+    const [response] = await Promise.all([
+      page.waitForResponse(res => res.url().includes('/maintenance/faults') && res.status() === 200, { timeout: 15000 }),
+      submitBtn.click()
+    ]);
+    console.log(`Network response received from /maintenance/faults: HTTP ${response.status()}`);
+
+    // Wait for the submit button to finish transmitting and return to normal clickable state
+    await page.waitForSelector('button:has-text("Log Activity"):not([disabled])', { timeout: 15000 });
+    console.log('Button has returned to normal "Log Activity" state (not disabled/transmitting).');
+
+    // Wait for the success banner
+    await page.waitForSelector('text=successfully logged', { timeout: 15000 });
+    console.log('Success banner verified visible.');
+
+    // Wait for the Activity Log count to increment
+    await page.waitForFunction((prev) => {
+      const label = Array.from(document.querySelectorAll('span')).find(s => s.textContent.includes('Total Recorded:'));
+      const count = label && label.nextElementSibling ? parseInt(label.nextElementSibling.textContent.trim(), 10) : 0;
+      return count > prev;
+    }, countBefore, { timeout: 15000 });
+
+    const countAfter = await page.evaluate(() => {
+      const label = Array.from(document.querySelectorAll('span')).find(s => s.textContent.includes('Total Recorded:'));
+      return label && label.nextElementSibling ? parseInt(label.nextElementSibling.textContent.trim(), 10) : 0;
+    });
+    console.log(`Activity Log count successfully incremented from ${countBefore} to ${countAfter}!`);
   }
+
+  // Scroll to Activity Log section to show incremented count and new card
+  if (logSectionHeading) {
+    await logSectionHeading.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(500);
+  }
+
   console.log('Capturing 04d_train_pilot_action_after.png...');
   await page.screenshot({ path: path.join(OUTPUT_DIR, '04d_train_pilot_action_after.png') });
 
