@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { MareyCanvas } from "../components/marey/MareyCanvas";
 import { MareyHeader } from "../components/marey/MareyHeader";
 import { TrainDetailDrawer } from "../components/marey/TrainDetailDrawer";
@@ -28,6 +28,14 @@ export const MareyDiagramPage: React.FC = () => {
   // Data states: Train data (independent live telemetry) and Maintenance Blocks (strictly proposed/sanctioned)
   const [trains, setTrains] = useState<LiveRailwayTrain[]>([]);
   const { data: blocks = [], refetch: refetchBlocks } = useMareyBlocks();
+
+  // Filter blocks strictly to Bhopal-Itarsi-Bina corridor (CORR-01 & CORR-02)
+  const mareyCorridorBlocks = useMemo(() => {
+    return blocks.filter((b) => {
+      if (!b.corridor_id) return true;
+      return ["CORR-01", "CORR-02"].includes(b.corridor_id.toUpperCase());
+    });
+  }, [blocks]);
 
   const [selectedDate, setSelectedDate] = useState<string>(() => getISTDateString());
   const isToday = selectedDate === getISTDateString();
@@ -204,7 +212,7 @@ export const MareyDiagramPage: React.FC = () => {
         onDateChange={setSelectedDate}
         isToday={isToday}
         totalTrainsCount={trains.length}
-        totalBlocksCount={blocks.length}
+        totalBlocksCount={mareyCorridorBlocks.length}
         isLoading={isLoading}
         onRefresh={async () => {
           await Promise.all([loadTrains(), refetchBlocks()]);
@@ -229,7 +237,7 @@ export const MareyDiagramPage: React.FC = () => {
       <main className="flex-1 w-full h-[calc(100vh-130px)] min-h-[650px] relative overflow-hidden flex flex-col">
         <MareyCanvas
           trains={trains}
-          blocks={blocks}
+          blocks={mareyCorridorBlocks}
           selectedTrain={selectedTrain}
           onSelectTrain={handleSelectTrain}
           selectedBlock={selectedBlock}

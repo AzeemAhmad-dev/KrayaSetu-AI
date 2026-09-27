@@ -36,6 +36,25 @@ function distToSegment(px: number, py: number, x1: number, y1: number, x2: numbe
   return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
 }
 
+/**
+ * Maps block section chainage onto the unified 0-231 km Bina-Itarsi Marey axis:
+ * - CORR-02 (Bhopal to Bina, 0-143 km): Bhopal is 0 km, Bina is 143 km.
+ *   On Marey: Bina is 0 km (Y=0), Bhopal is 138 km (Y=138).
+ * - CORR-01 (Itarsi to Bhopal, 0-92 km): Itarsi is 0 km, Bhopal is 92 km.
+ *   On Marey: Bhopal is 138 km (Y=138), Itarsi is 231 km (Y=231).
+ */
+export function getBlockMareyKm(blk: BlockData): number {
+  const rawKm = typeof blk.location_km === "number" ? blk.location_km : 138;
+  const corr = (blk.corridor_id || "").toUpperCase();
+  if (corr === "CORR-02") {
+    return Math.max(0, Math.min(138, 138 - rawKm));
+  }
+  if (corr === "CORR-01") {
+    return Math.max(138, Math.min(TOTAL_CORRIDOR_KM, 231 - rawKm));
+  }
+  return Math.max(0, Math.min(TOTAL_CORRIDOR_KM, rawKm));
+}
+
 export const MareyCanvas: React.FC<MareyCanvasProps> = ({
   trains,
   blocks,
@@ -264,6 +283,8 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
         // Exclude unproposed canonical candidate blocks
         if (blk.status === "PLANNED" || blk.approval_status === "DRAFT") return false;
         if (!["PROPOSED", "PENDING_APPROVAL", "APPROVED", "SANCTIONED", "ACTIVE", "COMPLETED", "SELECTED"].includes(blk.status)) return false;
+        // Strictly include only blocks on the Bhopal-Itarsi-Bina corridor (CORR-01 and CORR-02)
+        if (blk.corridor_id && !["CORR-01", "CORR-02"].includes(blk.corridor_id.toUpperCase())) return false;
         if (!selectedDate) return true;
         const bDate = blk.execution_date || blk.scheduled_date || blk.date;
         return !bDate || bDate === selectedDate;
@@ -279,7 +300,7 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
         const x2 = timeToX(endH, plotWidth);
         const boxWidth = Math.max(16, x2 - x1);
 
-        const centerKm = blk.location_km || 138;
+        const centerKm = getBlockMareyKm(blk);
         const startKm = Math.max(0, centerKm - 4);
         const endKm = Math.min(TOTAL_CORRIDOR_KM, centerKm + 4);
         const y1 = kmToY(startKm, plotHeight);
@@ -756,6 +777,7 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
       for (const b of blocks) {
         if (b.status === "PLANNED" || b.approval_status === "DRAFT") continue;
         if (!["PROPOSED", "PENDING_APPROVAL", "APPROVED", "SANCTIONED", "ACTIVE", "COMPLETED", "SELECTED"].includes(b.status)) continue;
+        if (b.corridor_id && !["CORR-01", "CORR-02"].includes(b.corridor_id.toUpperCase())) continue;
         if (selectedDate) {
           const bDate = b.execution_date || b.scheduled_date || b.date;
           if (bDate && bDate !== selectedDate) continue;
@@ -767,7 +789,7 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
 
         const bx1 = timeToX(sh, plotWidth);
         const bx2 = timeToX(eh, plotWidth);
-        const centerKm = b.location_km || 138;
+        const centerKm = getBlockMareyKm(b);
         const by1 = kmToY(centerKm - 4, plotHeight);
         const by2 = kmToY(centerKm + 4, plotHeight);
 
