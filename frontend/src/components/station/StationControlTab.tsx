@@ -818,7 +818,7 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* MODAL: SUBMIT ISSUE / BLOCK REQUEST                             */}
       {/* ============================================================== */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-card)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden text-[var(--text-primary)]">
             <div className="p-4 sm:p-5 bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -1023,8 +1023,8 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* DRAWER: INSPECT SUBMITTED REQUEST                               */}
       {/* ============================================================== */}
       {selectedRequest && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[var(--surface-card)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden flex flex-col max-h-[90vh] text-[var(--text-primary)]">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[var(--surface-card)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden flex flex-col max-h-[calc(100vh-6rem)] text-[var(--text-primary)]">
             <div className="p-4 sm:p-5 bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
                 <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
@@ -1098,7 +1098,7 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* DRAWER: INSPECT BLOCK (VIEW ONLY)                               */}
       {/* ============================================================== */}
       {selectedBlock && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[var(--surface-card)] w-full max-w-md rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden flex flex-col text-[var(--text-primary)]">
             <div className="p-4 sm:p-5 bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center space-x-2">

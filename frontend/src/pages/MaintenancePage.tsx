@@ -296,8 +296,8 @@ export const MaintenancePage: React.FC = () => {
 
       {/* Modal for Logging New Observation */}
       {showNewModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-lg w-full p-5 shadow-lg border border-slate-200">
+        <div className="fixed top-16 inset-x-0 bottom-0 bg-black/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[calc(100vh-6rem)] overflow-y-auto p-5 shadow-lg border border-slate-200">
             <h3 className="text-base font-bold text-slate-900 mb-3">Log Field Observation</h3>
             <form onSubmit={handleCreateObservation} className="space-y-3 text-xs">
               <div>

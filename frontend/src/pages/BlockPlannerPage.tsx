@@ -61,21 +61,19 @@ export const getSolverHonestyState = (result: any, simParam?: string | null): So
     return "INFEASIBLE";
   }
 
+  if (solverStatus === "OPTIMAL" || status === "OPTIMAL_SCHEDULE_FOUND" || status === "OPTIMAL") {
+    return "OPTIMAL";
+  }
+
   if (
     solverStatus === "FALLBACK" ||
     solverStatus === "FALLBACK_GREEDY" ||
     solverName.includes("GREEDY") ||
     solverName.includes("HEURISTIC") ||
-    fallbackStage.includes("PASS_2") ||
-    fallbackStage.includes("PASS_3") ||
     status.includes("FALLBACK") ||
     status.includes("HEURISTIC")
   ) {
     return "FALLBACK_HEURISTIC";
-  }
-
-  if (solverStatus === "OPTIMAL" || status === "OPTIMAL_SCHEDULE_FOUND" || status === "OPTIMAL") {
-    return "OPTIMAL";
   }
 
   return "FEASIBLE";
@@ -113,7 +111,7 @@ const formatTrackLine = (track?: string) => {
 };
 
 export const BlockPlannerPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlTaskId = searchParams.get("taskId");
   const simStatus = searchParams.get("simStatus");
   const simDropped = searchParams.get("simDropped");
@@ -248,6 +246,13 @@ export const BlockPlannerPage: React.FC = () => {
   const effectiveOptResult = simulatedOptResult || optResult;
 
   const handleRegenerateCanonical = async () => {
+    // Clear simulation query params so regenerated live data isn't shadowed by simulated state
+    if (searchParams.has("simStatus") || searchParams.has("simDropped")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("simStatus");
+      next.delete("simDropped");
+      setSearchParams(next);
+    }
     setResetting(true);
     try {
       const res = await api.regenerateCanonicalBlocks();
@@ -506,6 +511,13 @@ export const BlockPlannerPage: React.FC = () => {
   };
 
   const handleRunOptimizer = async () => {
+    // Clear simulation query params so live solver results are displayed immediately
+    if (searchParams.has("simStatus") || searchParams.has("simDropped")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("simStatus");
+      next.delete("simDropped");
+      setSearchParams(next);
+    }
     setOptimizing(true);
     try {
       const res = await api.optimizeBlocks({
@@ -594,12 +606,27 @@ export const BlockPlannerPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
           <Button
             size="sm"
+            variant={!simStatus ? "primary" : "secondary"}
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("simStatus");
+              next.delete("simDropped");
+              setSearchParams(next);
+              setResetting((p) => !p);
+            }}
+            className="h-6 px-2 py-0 text-[10px] font-bold"
+            title="Use live OR-Tools CP-SAT solver results"
+          >
+            ● LIVE SOLVER
+          </Button>
+          <Button
+            size="sm"
             variant={simStatus === "OPTIMAL" ? "success" : "secondary"}
             onClick={() => {
               const next = new URLSearchParams(searchParams);
               next.set("simStatus", "OPTIMAL");
               next.delete("simDropped");
-              window.history.replaceState({}, "", `?${next.toString()}`);
+              setSearchParams(next);
               setResetting((p) => !p);
             }}
             className="h-6 px-2 py-0 text-[10px] font-bold"
@@ -613,7 +640,7 @@ export const BlockPlannerPage: React.FC = () => {
               const next = new URLSearchParams(searchParams);
               next.set("simStatus", "FEASIBLE");
               next.delete("simDropped");
-              window.history.replaceState({}, "", `?${next.toString()}`);
+              setSearchParams(next);
               setResetting((p) => !p);
             }}
             className="h-6 px-2 py-0 text-[10px] font-bold"
@@ -627,7 +654,7 @@ export const BlockPlannerPage: React.FC = () => {
               const next = new URLSearchParams(searchParams);
               next.set("simStatus", "FALLBACK_HEURISTIC");
               next.delete("simDropped");
-              window.history.replaceState({}, "", `?${next.toString()}`);
+              setSearchParams(next);
               setResetting((p) => !p);
             }}
             className="h-6 px-2 py-0 text-[10px] font-bold"
@@ -641,7 +668,7 @@ export const BlockPlannerPage: React.FC = () => {
               const next = new URLSearchParams(searchParams);
               next.set("simStatus", "INFEASIBLE");
               next.delete("simDropped");
-              window.history.replaceState({}, "", `?${next.toString()}`);
+              setSearchParams(next);
               setResetting((p) => !p);
             }}
             className="h-6 px-2 py-0 text-[10px] font-bold"
@@ -659,7 +686,7 @@ export const BlockPlannerPage: React.FC = () => {
                 next.set("simDropped", "2");
                 if (!next.get("simStatus")) next.set("simStatus", "OPTIMAL");
               }
-              window.history.replaceState({}, "", `?${next.toString()}`);
+              setSearchParams(next);
               setResetting((p) => !p);
             }}
             className="h-6 px-2 py-0 text-[10px] font-bold"
@@ -674,16 +701,50 @@ export const BlockPlannerPage: React.FC = () => {
                 const next = new URLSearchParams(searchParams);
                 next.delete("simStatus");
                 next.delete("simDropped");
-                window.history.replaceState({}, "", `?${next.toString()}`);
+                setSearchParams(next);
                 setResetting((p) => !p);
               }}
-              className="h-6 px-2 py-0 text-[10px]"
+              className="h-6 px-2 py-0 text-[10px] font-bold border-amber-400 text-amber-900 dark:text-amber-200"
             >
-              Reset Simulator
+              Exit Simulator (Live Data)
             </Button>
           )}
         </div>
       </div>
+
+      {/* Prominent Demo Simulation Mode Banner */}
+      {simStatus && (
+        <div className="bg-amber-500/10 border-2 border-amber-500/80 p-3.5 rounded-[var(--radius-xl)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-150">
+          <div className="flex items-start sm:items-center space-x-3 text-amber-950 dark:text-amber-100">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0 animate-pulse" />
+            <div>
+              <div className="font-bold uppercase tracking-wider text-[11px] font-mono text-amber-900 dark:text-amber-200 flex flex-wrap items-center gap-2">
+                <span>SIMULATED DEMO STATE ACTIVE: {simStatus}</span>
+                <span className="bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-200 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                  SIMULATED — NOT REAL SOLVER RUN
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 leading-relaxed font-sans">
+                Displaying client-side simulated scenario to inspect mathematical solver attribution. Live CP-SAT solver is bypassed while in simulation mode.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete("simStatus");
+              next.delete("simDropped");
+              setSearchParams(next);
+              handleRunOptimizer();
+            }}
+            className="shrink-0 font-bold"
+          >
+            Exit Simulation & Run Live CP-SAT →
+          </Button>
+        </div>
+      )}
 
       {/* Active CP-SAT Solving State Banner */}
       {optimizing && (
@@ -1710,8 +1771,8 @@ export const BlockPlannerPage: React.FC = () => {
 
       {/* Multi-Department Coordination Dossier Modal */}
       {selectedDossierBlock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="p-4 sm:p-5 bg-gradient-to-r from-indigo-900 to-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -1895,8 +1956,8 @@ export const BlockPlannerPage: React.FC = () => {
 
       {/* Deferred Tasks Detailed Inspection Modal */}
       {showDeferred && effectiveOptResult?.deferred_tasks && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh] overflow-hidden">
+        <div className="fixed top-16 inset-x-0 bottom-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[calc(100vh-6rem)] overflow-hidden">
             {/* Modal Header */}
             <div className="p-4 bg-red-600 text-white flex items-center justify-between">
               <div className="flex items-center space-x-2">

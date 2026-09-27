@@ -1240,7 +1240,7 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       {/* MODAL: CREATE NEW BLOCK (WEEKLY / MONTHLY / CRITICAL)          */}
       {/* ============================================================== */}
       {isNewBlockModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
             <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -1481,7 +1481,7 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       {/* MODAL: EDIT / UPDATE BLOCK                                     */}
       {/* ============================================================== */}
       {isEditBlockModalOpen && blockToEdit && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
             <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -1576,7 +1576,7 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       {/* MODAL: RAISE CORRIDOR ISSUE                                    */}
       {/* ============================================================== */}
       {isIssueModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
             <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -1770,8 +1770,8 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       {/* DRAWER: BLOCK DETAILS & STATUS MANAGEMENT                      */}
       {/* ============================================================== */}
       {selectedBlock && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-6rem)]">
             <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
                 <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-slate-200 text-slate-800">
@@ -1895,8 +1895,8 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       {/* DRAWER: ISSUE DETAILS                                          */}
       {/* ============================================================== */}
       {selectedIssue && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed top-16 inset-x-0 bottom-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-6rem)]">
             <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
                 <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-slate-200 text-slate-800">

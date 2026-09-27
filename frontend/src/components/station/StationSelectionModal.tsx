@@ -39,8 +39,8 @@ export const StationSelectionModal: React.FC<StationSelectionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs font-sans animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed top-16 inset-x-0 bottom-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs font-sans animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[calc(100vh-6rem)]">
         {/* Modal Header */}
         <div className="bg-[#0b2545] text-white p-5 sm:p-6 border-b border-[#134074] relative">
           {allowDismiss && onClose && (

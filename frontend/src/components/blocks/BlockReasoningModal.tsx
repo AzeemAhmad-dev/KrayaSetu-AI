@@ -129,8 +129,8 @@ export const BlockReasoningModal: React.FC<BlockReasoningModalProps> = ({
   const comps = prio?.components;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed top-16 inset-x-0 bottom-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="bg-gradient-to-r from-sky-900 via-indigo-900 to-slate-900 text-white p-4 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">

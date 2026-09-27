@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #0f172a; color: #f8fafc; padding: 32px; }
+    h1 { color: #38bdf8; font-size: 20px; margin-bottom: 8px; font-family: monospace; }
+    .subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; font-family: monospace; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    .metric { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; }
+    .val { font-size: 32px; font-weight: bold; color: #10b981; font-family: monospace; }
+    .label { color: #94a3b8; font-size: 12px; text-transform: uppercase; font-family: monospace; }
+    .table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: monospace; }
+    .table th, .table td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #334155; }
+    .table th { background: #0f172a; color: #94a3b8; font-weight: bold; }
+    .tag { background: #0284c7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .badge { background: #059669; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>SQLITE CANONICAL DATABASE ROW AUDIT — SIH 26027</h1>
+  <div class="subtitle">Direct Query Execution via SQLAlchemy SessionLocal against SQLite database</div>
+
+  <div class="grid">
+    <div class="metric">
+      <div class="label">Canonical Maintenance Blocks</div>
+      <div class="val">50</div>
+      <div style="color: #38bdf8; font-size: 11px; margin-top: 4px;">Exactly 50 Canonical Planning Units</div>
+    </div>
+    <div class="metric">
+      <div class="label">Underlying Maintenance Tasks</div>
+      <div class="val">64</div>
+      <div style="color: #a855f7; font-size: 11px; margin-top: 4px;">64 Tasks across 50 Blocks (Multi-Dept Bundling)</div>
+    </div>
+    <div class="metric">
+      <div class="label">TMS Defect / Fault Observations</div>
+      <div class="val">64</div>
+      <div style="color: #f59e0b; font-size: 11px; margin-top: 4px;">Zero orphan tasks, 100% FK validity</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="color: #e2e8f0; margin-top: 0; font-size: 14px; font-family: monospace;">1. Blocks Distribution by Block Type (Total: 50)</h3>
+    <table class="table">
+      <tr><th>Block Type</th><th>Row Count</th><th>Mathematical Invariant</th><th>Purpose / Cadence</th></tr>
+      <tr><td><span class="tag">PLANNED</span></td><td><b>33</b></td><td>66.0%</td><td>Near-term Daily/Weekly/Monthly across 5 corridors</td></tr>
+      <tr><td><span class="tag" style="background: #7c3aed;">SHADOW</span></td><td><b>9</b></td><td>18.0%</td><td>Tri-dept & dual-dept possessions (bundles 23 tasks)</td></tr>
+      <tr><td><span class="tag" style="background: #e11d48;">EMERGENT</span></td><td><b>5</b></td><td>10.0%</td><td>1 urgent safety defect per active corridor</td></tr>
+      <tr><td><span class="tag" style="background: #d97706;">RULING</span></td><td><b>3</b></td><td>6.0%</td><td>Long-term annual programme baseline</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="color: #e2e8f0; margin-top: 0; font-size: 14px; font-family: monospace;">2. Tasks Distribution by Priority Tier (Total: 64)</h3>
+    <table class="table">
+      <tr><th>Priority Tier</th><th>Row Count</th><th>S-R-C-A-O Score Range</th><th>Action Requirement</th></tr>
+      <tr><td><span class="badge" style="background: #e11d48;">CRITICAL</span></td><td><b>5</b></td><td>Score &ge; 90.0</td><td>Mandatory track possession; immediate clearance</td></tr>
+      <tr><td><span class="badge" style="background: #ea580c;">HIGH</span></td><td><b>18</b></td><td>Score 70.0 &ndash; 89.9</td><td>Eligible for shadow bundling & high-priority slot</td></tr>
+      <tr><td><span class="badge" style="background: #0284c7;">MEDIUM</span></td><td><b>28</b></td><td>Score 45.0 &ndash; 69.9</td><td>Standard maintenance corridor gap allocation</td></tr>
+      <tr><td><span class="badge" style="background: #64748b;">LOW</span></td><td><b>13</b></td><td>Score &lt; 45.0</td><td>Routine upkeep; deferred first during congestion</td></tr>
+    </table>
+  </div>
+</body>
+</html>

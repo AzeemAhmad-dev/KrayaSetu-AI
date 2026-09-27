@@ -143,6 +143,9 @@ export const DivisionalOperationsControl: React.FC = () => {
     return t.priority_tier === selectedTierFilter;
   });
 
+  const [showAllTasks, setShowAllTasks] = useState(true);
+  const displayedTasks = showAllTasks ? filteredTasks : filteredTasks.slice(0, 15);
+
   // Tier badge color helper — uses status tokens
   const tierBadgeStyle = (tier: string) => {
     if (tier === "CRITICAL") return { background: "var(--status-danger)", color: "var(--text-inverse)", border: "transparent" };
@@ -471,7 +474,7 @@ export const DivisionalOperationsControl: React.FC = () => {
         <div className="p-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-3"
           style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)" }}>
           <div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="p-1 rounded" style={{ background: "var(--dept-coa-bg)", color: "var(--dept-coa-text)" }}>
                 <Sliders className="w-4 h-4" />
               </span>
@@ -480,8 +483,23 @@ export const DivisionalOperationsControl: React.FC = () => {
               </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
                 style={{ background: "var(--dept-coa-bg)", color: "var(--dept-coa-text)" }}>
-                {dashSummary?.tasks_analyzed ?? priorityTasks.length} Tasks Evaluated
+                Showing {displayedTasks.length} of {filteredTasks.length} Tasks ({dashSummary?.tasks_analyzed ?? priorityTasks.length} Total Evaluated)
               </span>
+              {filteredTasks.length > 15 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllTasks((prev) => !prev)}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer transition-colors border"
+                  style={{
+                    background: "var(--surface-card)",
+                    color: "var(--text-secondary)",
+                    borderColor: "var(--border-medium)",
+                  }}
+                  title={showAllTasks ? "Show only top 15 highest ranked tasks" : `View all ${filteredTasks.length} tasks in table`}
+                >
+                  {showAllTasks ? "Collapse to Top 15" : `View All (${filteredTasks.length}) →`}
+                </button>
+              )}
             </div>
             <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
               Deterministic scoring formula: <span className="font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>0.35·Severity + 0.25·EscalationRisk + 0.20·Criticality + 0.10·Age + 0.10·Opportunity</span>
@@ -507,9 +525,9 @@ export const DivisionalOperationsControl: React.FC = () => {
         </div>
 
         {/* Priority Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[580px] overflow-y-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead>
+            <thead className="sticky top-0 z-10 shadow-2xs">
               <tr className="border-b text-[11px] uppercase tracking-wider font-mono"
                 style={{ background: "var(--surface-secondary)", borderColor: "var(--border-subtle)", color: "var(--text-muted)" }}>
                 <th className="py-2.5 px-3">Rank & Task</th>
@@ -521,7 +539,7 @@ export const DivisionalOperationsControl: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y font-sans" style={{ borderColor: "var(--border-subtle)" }}>
-              {filteredTasks.slice(0, 15).map((task: any, idx: number) => {
+              {displayedTasks.map((task: any, idx: number) => {
                 const isTask0001 = task.task_id === "TASK-0001";
                 const isCritical = task.priority_tier === "CRITICAL";
                 const isHigh = task.priority_tier === "HIGH";
