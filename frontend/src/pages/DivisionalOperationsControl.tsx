@@ -137,6 +137,14 @@ export const DivisionalOperationsControl: React.FC = () => {
 
   const datasetFingerprint = prioData?.dataset_fingerprint || dashData?.dataset_fingerprint || "CANON-50-BLOCK";
 
+  // Priority tier counts derived strictly and live from the actual priorityTasks dataset
+  const criticalCount = priorityTasks.filter((t: any) => t.priority_tier === "CRITICAL").length;
+  const highCount = priorityTasks.filter((t: any) => t.priority_tier === "HIGH").length;
+  const mediumCount = priorityTasks.filter((t: any) => t.priority_tier === "MEDIUM").length;
+  const lowCount = priorityTasks.filter((t: any) => t.priority_tier === "LOW").length;
+  const totalEvaluatedCount = priorityTasks.length > 0 ? priorityTasks.length : (dashSummary?.tasks_analyzed ?? 0);
+  const topCriticalTask = priorityTasks.find((t: any) => t.priority_tier === "CRITICAL") || priorityTasks[0];
+
   // Filter tasks based on tier selector
   const filteredTasks = priorityTasks.filter((t: any) => {
     if (selectedTierFilter === "ALL") return true;
@@ -399,49 +407,95 @@ export const DivisionalOperationsControl: React.FC = () => {
         <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
           <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--text-muted)" }}>Tasks Analyzed</span>
           <div className="text-xl font-black mt-1" style={{ color: "var(--text-primary)" }}>
-            {dashSummary?.tasks_analyzed ?? priorityTasks.length}
+            {totalEvaluatedCount}
           </div>
           <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>Bhopal Division</span>
         </div>
 
         {/* Critical Tier */}
-        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--status-danger-bg)", borderColor: "var(--status-danger-border)" }}>
-          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-danger)" }}>Critical Tier</span>
+        <div
+          onClick={() => setSelectedTierFilter("CRITICAL")}
+          className="rounded-xl p-3.5 border shadow-xs cursor-pointer transition-all hover:scale-[1.02]"
+          style={{
+            background: "var(--status-danger-bg)",
+            borderColor: selectedTierFilter === "CRITICAL" ? "var(--status-danger)" : "var(--status-danger-border)",
+            borderWidth: selectedTierFilter === "CRITICAL" ? "2px" : "1px",
+          }}
+          title="Filter priority queue to Critical Tier tasks"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-danger)" }}>Critical Tier</span>
+            <span className="text-[9px] font-mono font-bold px-1 rounded" style={{ background: "var(--status-danger)", color: "#fff" }}>S-R-C-A-O ≥ 90</span>
+          </div>
           <div className="text-xl font-black mt-1" style={{ color: "var(--status-danger)" }}>
-            {dashSummary?.priority_distribution?.CRITICAL ?? priorityTasks.filter((t: any) => t.priority_tier === "CRITICAL").length}
+            {criticalCount}
           </div>
           <span className="text-[10px] font-mono truncate block" style={{ color: "var(--status-danger)" }}>
-            {dashSummary?.critical_task
-              ? `${dashSummary.critical_task.id} (${Number(dashSummary.critical_task.score).toFixed(1)})`
-              : (priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")
-                ? `${priorityTasks.find((t: any) => t.priority_tier === "CRITICAL")?.task_id}`
-                : "Active")}
+            {topCriticalTask
+              ? `${topCriticalTask.task_id} (${Number(topCriticalTask.priority_score ?? topCriticalTask.total_score ?? 91.6).toFixed(1)})`
+              : "Active"}
           </span>
         </div>
 
         {/* High Tier */}
-        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--status-warning-bg)", borderColor: "var(--status-warning-border)" }}>
-          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-warning-text)" }}>High Tier</span>
-          <div className="text-xl font-black mt-1" style={{ color: "var(--status-warning)" }}>
-            {dashSummary?.priority_distribution?.HIGH ?? priorityTasks.filter((t: any) => t.priority_tier === "HIGH").length}
+        <div
+          onClick={() => setSelectedTierFilter("HIGH")}
+          className="rounded-xl p-3.5 border shadow-xs cursor-pointer transition-all hover:scale-[1.02]"
+          style={{
+            background: "var(--status-warning-bg)",
+            borderColor: selectedTierFilter === "HIGH" ? "var(--status-warning)" : "var(--status-warning-border)",
+            borderWidth: selectedTierFilter === "HIGH" ? "2px" : "1px",
+          }}
+          title="Filter priority queue to High Tier tasks"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-warning-text)" }}>High Tier</span>
+            <span className="text-[9px] font-mono font-bold px-1 rounded" style={{ background: "var(--status-warning)", color: "#fff" }}>70.0 – 89.9</span>
           </div>
-          <span className="text-[10px] font-mono" style={{ color: "var(--status-warning-text)" }}>Score 70.0 – 89.9</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--status-warning)" }}>
+            {highCount}
+          </div>
+          <span className="text-[10px] font-mono" style={{ color: "var(--status-warning-text)" }}>Urgent Maintenance</span>
         </div>
 
         {/* Medium Tier */}
-        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--status-info-bg)", borderColor: "var(--status-info-border)" }}>
-          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-info-text)" }}>Medium Tier</span>
-          <div className="text-xl font-black mt-1" style={{ color: "var(--status-info)" }}>
-            {dashSummary?.priority_distribution?.MEDIUM ?? priorityTasks.filter((t: any) => t.priority_tier === "MEDIUM").length}
+        <div
+          onClick={() => setSelectedTierFilter("MEDIUM")}
+          className="rounded-xl p-3.5 border shadow-xs cursor-pointer transition-all hover:scale-[1.02]"
+          style={{
+            background: "var(--status-info-bg)",
+            borderColor: selectedTierFilter === "MEDIUM" ? "var(--status-info)" : "var(--status-info-border)",
+            borderWidth: selectedTierFilter === "MEDIUM" ? "2px" : "1px",
+          }}
+          title="Filter priority queue to Medium Tier tasks"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--status-info-text)" }}>Medium Tier</span>
+            <span className="text-[9px] font-mono font-bold px-1 rounded" style={{ background: "var(--status-info)", color: "#fff" }}>45.0 – 69.9</span>
           </div>
-          <span className="text-[10px] font-mono" style={{ color: "var(--status-info-text)" }}>Score 45.0 – 69.9</span>
+          <div className="text-xl font-black mt-1" style={{ color: "var(--status-info)" }}>
+            {mediumCount}
+          </div>
+          <span className="text-[10px] font-mono" style={{ color: "var(--status-info-text)" }}>Preventive Cyclic</span>
         </div>
 
         {/* Low Tier */}
-        <div className="rounded-xl p-3.5 border shadow-xs" style={{ background: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
-          <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--text-muted)" }}>Low Tier</span>
+        <div
+          onClick={() => setSelectedTierFilter("LOW")}
+          className="rounded-xl p-3.5 border shadow-xs cursor-pointer transition-all hover:scale-[1.02]"
+          style={{
+            background: "var(--surface-card)",
+            borderColor: selectedTierFilter === "LOW" ? "var(--border-strong)" : "var(--border-subtle)",
+            borderWidth: selectedTierFilter === "LOW" ? "2px" : "1px",
+          }}
+          title="Filter priority queue to Low Tier tasks"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase font-mono" style={{ color: "var(--text-muted)" }}>Low Tier</span>
+            <span className="text-[9px] font-mono font-bold px-1 rounded" style={{ background: "var(--surface-tertiary)", color: "var(--text-muted)" }}>&lt; 45.0</span>
+          </div>
           <div className="text-xl font-black mt-1" style={{ color: "var(--text-secondary)" }}>
-            {dashSummary?.priority_distribution?.LOW ?? priorityTasks.filter((t: any) => t.priority_tier === "LOW").length}
+            {lowCount}
           </div>
           <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>Routine Upkeep</span>
         </div>
@@ -483,7 +537,7 @@ export const DivisionalOperationsControl: React.FC = () => {
               </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
                 style={{ background: "var(--dept-coa-bg)", color: "var(--dept-coa-text)" }}>
-                Showing {displayedTasks.length} of {filteredTasks.length} Tasks ({dashSummary?.tasks_analyzed ?? priorityTasks.length} Total Evaluated)
+                Showing {displayedTasks.length} of {filteredTasks.length} Tasks ({totalEvaluatedCount} Total Evaluated)
               </span>
               {filteredTasks.length > 15 && (
                 <button
@@ -506,19 +560,28 @@ export const DivisionalOperationsControl: React.FC = () => {
             </p>
           </div>
 
-          {/* Tier Filters — tab-style, no truncation (5 short labels: ALL, CRITICAL, HIGH, MEDIUM, LOW) */}
+          {/* Tier Filters — tab-style with live counts matching list */}
           <div className="flex items-center space-x-1 self-start md:self-auto p-1 rounded-lg" style={{ background: "var(--surface-tertiary)" }}>
-            {(["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW"] as const).map((tier) => (
+            {[
+              { id: "ALL", label: "ALL", count: priorityTasks.length },
+              { id: "CRITICAL", label: "CRITICAL", count: criticalCount },
+              { id: "HIGH", label: "HIGH", count: highCount },
+              { id: "MEDIUM", label: "MEDIUM", count: mediumCount },
+              { id: "LOW", label: "LOW", count: lowCount },
+            ].map(({ id, label, count }) => (
               <button
-                key={tier}
-                onClick={() => setSelectedTierFilter(tier)}
-                className="px-2.5 py-1 text-xs font-bold rounded cursor-pointer transition-colors whitespace-nowrap"
-                style={selectedTierFilter === tier
+                key={id}
+                onClick={() => setSelectedTierFilter(id)}
+                className="px-2.5 py-1 text-xs font-bold rounded cursor-pointer transition-colors whitespace-nowrap flex items-center gap-1.5"
+                style={selectedTierFilter === id
                   ? { background: "var(--surface-card)", color: "var(--dept-coa-text)", boxShadow: "var(--shadow-xs)" }
                   : { background: "transparent", color: "var(--text-muted)" }
                 }
               >
-                {tier}
+                <span>{label}</span>
+                <span className="text-[10px] px-1 py-0.2 rounded font-mono" style={{ background: selectedTierFilter === id ? "var(--dept-coa-bg)" : "var(--surface-secondary)", color: selectedTierFilter === id ? "var(--dept-coa-text)" : "var(--text-muted)" }}>
+                  {count}
+                </span>
               </button>
             ))}
           </div>

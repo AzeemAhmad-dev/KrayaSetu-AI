@@ -41,8 +41,8 @@ class MaintenanceBlockOptimizer:
         self,
         tasks: List[Dict[str, Any]],
         train_movements: List[Dict[str, Any]],
-        window_start_str: str = "08:00",
-        window_end_str: str = "20:00",
+        window_start_str: str = "00:00",
+        window_end_str: str = "23:59",
         available_machines: Optional[List[str]] = None,
         candidate_blocks: Optional[List[Dict[str, Any]]] = None,
         allow_bundling: bool = True,
@@ -634,7 +634,7 @@ class MaintenanceBlockOptimizer:
                     reason_code = "WINDOW_CAPACITY_EXCEEDED"
                     reason = f"Deferred to accommodate higher-priority safety work within the {minutes_to_time(horizon_start)}-{minutes_to_time(horizon_end)} window."
                     human_reason = f"Section possession capacity fully utilized by higher-priority safety work during the {minutes_to_time(horizon_start)}-{minutes_to_time(horizon_end)} window."
-                    mitigation = "Schedule in tomorrow's maintenance corridor window (08:00 - 20:00)."
+                    mitigation = "Schedule in tomorrow's maintenance corridor window (00:00 - 23:59)."
 
                 def_corr = task.get("corridor_id") or "BPL-ET"
                 def_sec = task.get("section_id") or "SEC-MAIN"

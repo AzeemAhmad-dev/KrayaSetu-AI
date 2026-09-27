@@ -910,7 +910,7 @@ export const GanttDashboard: React.FC<GanttDashboardProps> = ({
                 Corridor Maintenance & Resource Possession Timeline
               </span>
               <span className="text-[11px] text-[var(--text-muted)]">
-                (08:00 – 20:00 Regular Day / Night Possession Horizon)
+                (00:00 – 23:59 24-Hour Operational Horizon)
               </span>
             </div>
             {/* Canonical Lock-Type Legend */}

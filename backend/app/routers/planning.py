@@ -144,11 +144,12 @@ def get_planning_dashboard_summary(db: Session = Depends(get_db)):
     - Status breakdown (Proposed, Pending Approval, Approved, Selected)
     - 8-second solver configuration parameters
     """
-    tasks_count = db.query(MaintenanceTask).count()
-    crit_count = db.query(MaintenanceTask).filter(MaintenanceTask.priority == "CRITICAL").count()
-    high_count = db.query(MaintenanceTask).filter(MaintenanceTask.priority == "HIGH").count()
-    med_count = db.query(MaintenanceTask).filter(MaintenanceTask.priority == "MEDIUM").count()
-    low_count = db.query(MaintenanceTask).filter(MaintenanceTask.priority == "LOW").count()
+    eval_results = priority_engine.evaluate_all_tasks(db)
+    tasks_count = len(eval_results) if eval_results else db.query(MaintenanceTask).count()
+    crit_count = sum(1 for r in eval_results if r.get("priority_tier") == "CRITICAL")
+    high_count = sum(1 for r in eval_results if r.get("priority_tier") == "HIGH")
+    med_count = sum(1 for r in eval_results if r.get("priority_tier") == "MEDIUM")
+    low_count = sum(1 for r in eval_results if r.get("priority_tier") == "LOW")
 
     blocks = db.query(Block).all()
     planned_count = sum(1 for b in blocks if b.status == "PLANNED")
@@ -158,11 +159,9 @@ def get_planning_dashboard_summary(db: Session = Depends(get_db)):
     selected_count = sum(1 for b in blocks if b.status == "SELECTED")
     rejected_count = sum(1 for b in blocks if b.status == "REJECTED")
 
-    crit_task = db.query(MaintenanceTask).filter(MaintenanceTask.priority == "CRITICAL").first()
-    crit_score = 95.25
-    if crit_task:
-        score_eval = priority_engine.calculate_task_priority(crit_task)
-        crit_score = score_eval.get("total_score", 95.25)
+    top_crit = next((r for r in eval_results if r.get("priority_tier") == "CRITICAL"), None)
+    if not top_crit and eval_results:
+        top_crit = eval_results[0]
 
     fingerprint = compute_dataset_fingerprint(db)
     return {
@@ -177,13 +176,13 @@ def get_planning_dashboard_summary(db: Session = Depends(get_db)):
             "LOW": low_count
         },
         "critical_task": {
-            "id": crit_task.id,
-            "priority": "CRITICAL",
-            "score": crit_score,
-            "section_id": crit_task.section_id,
-            "track_name": crit_task.track_name,
-            "location_km": crit_task.location_km
-        } if crit_task else None,
+            "id": top_crit["task_id"],
+            "priority": top_crit.get("priority_tier", "CRITICAL"),
+            "score": top_crit.get("priority_score", 95.25),
+            "section_id": top_crit.get("section_id"),
+            "track_name": top_crit.get("track_name"),
+            "location_km": top_crit.get("location_km")
+        } if top_crit else None,
         "blocks_summary": {
             "total_blocks": len(blocks),
             "planned": planned_count,

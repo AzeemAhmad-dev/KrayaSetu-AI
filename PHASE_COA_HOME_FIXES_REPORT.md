@@ -175,6 +175,123 @@ dist/assets/index-D-DeRFUN.js   1,347.74 kB │ gzip: 312.65 kB
 
 ---
 
+---
+
+## Issue 5: Priority Tier Dashboard Counts Harmonized with S-R-C-A-O Intelligence
+
+### 1. Root Cause Diagnosis
+- In `frontend/src/pages/DivisionalOperationsControl.tsx`, the KPI summary cards previously rendered:
+  ```tsx
+  {dashSummary?.priority_distribution?.CRITICAL ?? priorityTasks.filter((t: any) => t.priority_tier === "CRITICAL").length}
+  ```
+- Because `dashSummary?.priority_distribution` was defined, it was always prioritized.
+- However, `backend/app/routers/planning.py` (`get_planning_dashboard_summary`) had been computing `priority_distribution` by directly querying the database column `MaintenanceTask.priority` (which held unranked, pre-eval defaults: 5 CRITICAL, 18 HIGH, 28 MEDIUM, 13 LOW).
+- In contrast, the Operational Priority Queue table fetched its data from `/planning/priorities`, which executed `priority_engine.evaluate_all_tasks(db)`. This continuous S-R-C-A-O weighting (0.35·Severity + 0.25·EscalationRisk + 0.20·Criticality + 0.10·Age + 0.10·Opportunity) assigns the dynamic `priority_tier` field (`CRITICAL` for $\ge 90$, `HIGH` for $70-89.9$, `MEDIUM` for $45-69.9$, `LOW` for $< 45$).
+- In addition, the seed generator in `populate_four_block_dataset.py` had generated numeric scores for planned low tasks using the broad `PLANNED` range ($35-75$), causing tasks labeled `LOW` to score above 45.0 and land in `MEDIUM` tier.
+
+### 2. Full-Stack Harmonization Implemented
+1. **Frontend (`frontend/src/pages/DivisionalOperationsControl.tsx`)**:
+   - Derived all priority tier metrics directly from the live `priorityTasks` array:
+     ```tsx
+     const criticalCount = priorityTasks.filter((t: any) => t.priority_tier === "CRITICAL").length;
+     const highCount = priorityTasks.filter((t: any) => t.priority_tier === "HIGH").length;
+     const mediumCount = priorityTasks.filter((t: any) => t.priority_tier === "MEDIUM").length;
+     const lowCount = priorityTasks.filter((t: any) => t.priority_tier === "LOW").length;
+     const totalEvaluatedCount = priorityTasks.length > 0 ? priorityTasks.length : (dashSummary?.tasks_analyzed ?? 0);
+     ```
+   - Bound KPI cards directly to these live derived values with click-to-filter capability and active outline badges.
+   - Enhanced the filter tab buttons (`ALL (64)`, `CRITICAL (5)`, `HIGH (18)`, `MEDIUM (28)`, `LOW (13)`) so every badge, filter button, and rendered table count derives from the exact same single source of truth.
+2. **Backend Router (`backend/app/routers/planning.py`)**:
+   - Updated `get_planning_dashboard_summary()` to evaluate tasks using `priority_engine.evaluate_all_tasks(db)`.
+   - Guaranteed that both `/planning/dashboard-summary` and `/planning/priorities` emit identical priority distribution counts.
+3. **Canonical Generator (`scripts/populate_four_block_dataset.py`)**:
+   - Enhanced `SRCAO_RANGES` with tier-specific bounds (`EMERGENT`/`CRITICAL`: 94–99, `HIGH`: 72–88, `MEDIUM`: 48–68, `LOW`: 20–38).
+   - Passed `priority_tier` into `generate_srcao_factors()`.
+   - Verified that all 64 tasks have 100% mathematical parity:
+     - `DB MaintenanceTask.priority`: `{'CRITICAL': 5, 'HIGH': 18, 'MEDIUM': 28, 'LOW': 13}`
+     - `Evaluated priority_tier`: `{'CRITICAL': 5, 'HIGH': 18, 'MEDIUM': 28, 'LOW': 13}`
+     - Mismatches: **0 out of 64**.
+
+---
+
+## Issue 6: 24-Hour Operational Horizon (Elimination of Hardcoded 08:00–20:00 Window)
+
+### 1. Domain Reality & Problem
+Indian Railways track possessions operate round-the-clock (24/7). Major corridor possessions (especially for TRD 25kV power cutdowns and mechanized P-Way tamping) are predominantly scheduled during nocturnal traffic lulls (00:30–04:30) or late-night freight gaps (21:30–23:45) to protect daytime passenger punctuality. Prototype code had artificially restricted the default intraday scheduling horizon to `08:00`–`20:00`.
+
+### 2. Systematic Codebase Updates
+1. **Time Validation (`backend/app/services/time_validation.py`)**:
+   - Updated `compute_future_planning_horizon()` default parameters:
+     - `requested_start: str = "00:00"` (was `"08:00"`)
+     - `requested_end: str = "23:59"` (was `"20:00"`)
+   - Preserved all safety-horizon buffer logic: past times on the current date automatically roll forward to `current_time + 15m prep buffer` rounded to the nearest 15-minute mark, or roll over to tomorrow if cannot fit before 23:59.
+2. **CP-SAT Optimizer (`backend/app/services/optimizer.py`)**:
+   - Updated `optimize_blocks()` default parameters:
+     - `window_start_str: str = "00:00"` (was `"08:00"`)
+     - `window_end_str: str = "23:59"` (was `"20:00"`)
+   - Updated mitigation copy: `"Schedule in tomorrow's maintenance corridor window (00:00 - 23:59)."`.
+3. **Blocks Router (`backend/app/routers/blocks.py`)**:
+   - Updated `/api/blocks/optimize` defaults for `window_start` / `window_end` to `"00:00"` and `"23:59"`.
+   - Updated deferred task fallback and mitigation copy to 24-hour horizon.
+4. **Explanation Service (`backend/app/services/explanation_service.py`)**:
+   - Updated `WINDOW_CAPACITY_EXCEEDED` mitigation recommendation from `(08:00 - 20:00)` to `(00:00 - 23:59)`.
+5. **Canonical Dataset Generator (`scripts/populate_four_block_dataset.py`)**:
+   - Slotted the 33 planned blocks across 13 round-the-clock Indian Railways possession windows:
+     `00:30`, `02:00`, `03:45`, `05:30`, `07:30`, `09:30`, `11:30`, `13:30`, `15:30`, `17:30`, `19:30`, `21:30`, `22:45`.
+   - Updated Shadow blocks `BLOCK-SHD-001` (`01:30–04:00`), `BLOCK-SHD-005` (`21:30–23:45`), and `BLOCK-SHD-008` (`02:00–04:00`) to nocturnal joint possessions.
+   - 31 of 50 blocks now execute outside the 08:00–20:00 window across the 24-hour operational day.
+6. **Frontend UI Copy (`frontend/src/GanttDashboard.tsx` & `frontend/src/pages/BlockPlannerPage.tsx`)**:
+   - Updated Timeline Planning Horizon label in `GanttDashboard.tsx`:
+     `(00:00 – 23:59 24-Hour Operational Horizon)` (was `(08:00 – 20:00 Regular Day / Night Possession Horizon)`).
+   - Updated `BlockPlannerPage.tsx` optimizer call to pass `"00:00"` and `"23:59"`.
+   - Verified that the Gantt chart timetable spans all 24 hours (`00:00` to `23:00`).
+
+---
+
+## Verification & Artifacts
+
+### 1. Frontend Build Output (`npm.cmd run build`)
+```
+> frontend@0.0.0 build
+> tsc -b && vite build
+
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 2047 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.94 kB │ gzip:   0.52 kB
+dist/assets/logo-CRickKxn.jpg      75.41 kB
+dist/assets/index-B17sBuRG.css    136.23 kB │ gzip:  20.97 kB
+dist/assets/index-DURGavAD.js   1,349.72 kB │ gzip: 313.02 kB
+✓ built in 3.12s
+```
+
+### 2. Backend Test Output (`pytest backend/tests`)
+```
+============================== test session starts ==============================
+collected 89 items
+
+backend/tests/test_canonical_synchronization.py .......                  [  7%]
+backend/tests/test_contracts.py .........                               [ 17%]
+backend/tests/test_cpsat_proposal_lifecycle.py ......................... [ 46%]
+backend/tests/test_datetime_aware_scheduling_and_marey_multiday.py .... [ 50%]
+backend/tests/test_master_fixes.py .................................... [ 91%]
+backend/tests/test_production_baseline_verification.py ........         [100%]
+
+======================== 89 passed, 3 warnings in 60.17s ========================
+```
+
+### 3. Screenshot Inventory (`phase_coa_fixes_screenshots/`)
+1. **`01_priority_badges_and_queue.png`**: Operations Control Home showing all 5 KPI cards harmonized with the Operational Priority Queue (`Tasks Analyzed: 64`, `Critical Tier: 5`, `High Tier: 18`, `Medium Tier: 28`, `Low Tier: 13`), filter tabs matching (`ALL 64`, `CRITICAL 5`, `HIGH 18`, `MEDIUM 28`, `LOW 13`), and queue header displaying `Showing 64 of 64 Tasks (64 Total Evaluated)`.
+2. **`02_tier_filter_critical.png`**: Filtered by `CRITICAL` tier — card outline highlights active filter, and table displays exactly the 5 Critical tasks (`Showing 5 of 5 Tasks (64 Total Evaluated)`).
+3. **`03_tier_filter_low.png`**: Filtered by `LOW` tier — card outline highlights active filter, and table displays exactly the 13 Low upkeep tasks (`Showing 13 of 13 Tasks (64 Total Evaluated)`).
+4. **`04_block_planner_24h_horizon.png`**: Block Planner with banner `CORRIDOR MAINTENANCE & RESOURCE POSSESSION TIMELINE (00:00 – 23:59 24-Hour Operational Horizon)`, Gantt timeline starting from `00:00`, and round-the-clock possession bars.
+5. **`05_marey_diagram_24h_blocks.png`**: Indian Railways 24-Hour Marey diagram showing round-the-clock train paths and maintenance block slots from `MIDNIGHT 1 AM ... 11 PM MIDNIGHT`.
+
+---
+
 ## Conclusion
 
-All four issues have been diagnosed with empirical evidence and fixed with zero regressions. All 89 backend tests pass, the TypeScript frontend build is error-free, and visual proofs confirm full compliance with railway domain constraints.
+All tier badge counts, filter tab numbers, database columns, and S-R-C-A-O evaluated scores are 100% harmonized with zero discrepancies. The 24-hour round-the-clock operational possession window (`00:00`–`23:59`) is fully operational across backend services, CP-SAT solver, canonical dataset generator, and frontend visualizations. All 89 backend tests pass, the TypeScript frontend build is 100% clean, and visual verification proofs have been captured.
+

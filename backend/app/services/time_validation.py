@@ -52,8 +52,8 @@ def minutes_to_time(minutes: int) -> str:
 
 
 def compute_future_planning_horizon(
-    requested_start: str = "08:00",
-    requested_end: str = "20:00",
+    requested_start: str = "00:00",
+    requested_end: str = "23:59",
     requested_date: Optional[str] = None,
     canonical_now: Optional[datetime] = None,
     min_prep_buffer_mins: int = 15,

@@ -885,8 +885,8 @@ def optimize_blocks(req: OptimizeRequest, db: Session = Depends(get_db)):
             for m in movements
         ]
 
-    raw_win_start = req.window_start or req.time_window_start or "08:00"
-    raw_win_end = req.window_end or req.time_window_end or "20:00"
+    raw_win_start = req.window_start or req.time_window_start or "00:00"
+    raw_win_end = req.window_end or req.time_window_end or "23:59"
 
     now = get_canonical_now()
     eff_win_start, eff_win_end, target_date = compute_future_planning_horizon(
@@ -950,7 +950,7 @@ def optimize_blocks(req: OptimizeRequest, db: Session = Depends(get_db)):
                 "station_name": def_stn,
                 "location_km": item.get("location_km"),
                 "track_name": item.get("track_name") or "DOWN_MAIN",
-                "original_time": f"{item.get('allocated_start_time', '08:00')} – {item.get('allocated_end_time', '10:00')}",
+                "original_time": f"{item.get('allocated_start_time', '00:00')} – {item.get('allocated_end_time', '02:00')}",
                 "status": "DEFERRED",
                 "rescheduled_slot": "Deferred — requires rescheduling",
                 "priority_tier": prio,
@@ -958,7 +958,7 @@ def optimize_blocks(req: OptimizeRequest, db: Session = Depends(get_db)):
                 "reason_code": "WINDOW_CAPACITY_EXCEEDED",
                 "reason": "Deferred to accommodate higher-priority safety work within the requested window.",
                 "human_readable_reason": "Section possession capacity fully utilized by higher-priority safety work during the requested window.",
-                "mitigation": "Schedule in tomorrow's maintenance corridor window (08:00 - 20:00)."
+                "mitigation": "Schedule in tomorrow's maintenance corridor window (00:00 - 23:59)."
             })
         optimization_result["metrics"]["tasks_scheduled"] = len(optimization_result["schedule"])
         optimization_result["metrics"]["tasks_deferred"] = len(optimization_result["deferred_tasks"])

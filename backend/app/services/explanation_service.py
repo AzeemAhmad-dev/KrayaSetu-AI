@@ -61,7 +61,7 @@ class ExplanationService:
             "title": "Window Duration / Capacity Limit Exceeded",
             "human_readable": "Section possession capacity fully absorbed by higher-priority safety tasks during the requested window.",
             "operational_impact": "Routine task deferred to protect sectional train throughput.",
-            "recommended_action": "Schedule in tomorrow's maintenance corridor window (08:00 - 20:00)."
+            "recommended_action": "Schedule in tomorrow's maintenance corridor window (00:00 - 23:59)."
         },
         "HIGH_PRIORITY_DEFERRED": {
             "title": "High Priority Task Deferred Due to Congestion",

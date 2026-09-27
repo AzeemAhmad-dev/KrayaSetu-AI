@@ -131,12 +131,16 @@ CORRIDOR_SECTIONS = {
 }
 
 
-# ----- S-R-C-A-O Factor Ranges by Block Type -----
+# ----- S-R-C-A-O Factor Ranges by Block Type & Priority Tier -----
 SRCAO_RANGES = {
-    "EMERGENT": {"sev": (85, 95), "risk": (80, 94), "crit": (82, 95), "age": (70, 92), "opp": (70, 90)},
-    "RULING":   {"sev": (70, 90),  "risk": (65, 85), "crit": (72, 92), "age": (60, 82), "opp": (55, 78)},
-    "PLANNED":  {"sev": (35, 75),  "risk": (30, 70), "crit": (40, 78), "age": (30, 65), "opp": (45, 80)},
-    "SHADOW":   {"sev": (55, 82),  "risk": (50, 80), "crit": (58, 85), "age": (45, 75), "opp": (55, 85)},
+    "EMERGENT":     {"sev": (94, 99), "risk": (91, 98), "crit": (91, 98), "age": (84, 96), "opp": (82, 95)},
+    "CRITICAL":     {"sev": (94, 99), "risk": (91, 98), "crit": (91, 98), "age": (84, 96), "opp": (82, 95)},
+    "HIGH":         {"sev": (72, 88), "risk": (70, 86), "crit": (70, 88), "age": (65, 82), "opp": (60, 80)},
+    "MEDIUM":       {"sev": (48, 68), "risk": (46, 66), "crit": (48, 68), "age": (42, 65), "opp": (45, 68)},
+    "LOW":          {"sev": (20, 38), "risk": (18, 36), "crit": (20, 38), "age": (20, 38), "opp": (22, 38)},
+    "RULING":       {"sev": (72, 88), "risk": (70, 86), "crit": (70, 88), "age": (65, 82), "opp": (60, 80)},
+    "PLANNED":      {"sev": (48, 68), "risk": (46, 66), "crit": (48, 68), "age": (42, 65), "opp": (45, 68)},
+    "SHADOW":       {"sev": (55, 82), "risk": (52, 80), "crit": (56, 84), "age": (48, 75), "opp": (55, 82)},
 }
 
 # Defect-type bias adjustments (added to base random value, then clamped)
@@ -154,17 +158,18 @@ DEFECT_BIAS = {
 }
 
 
-def generate_srcao_factors(rng: random.Random, block_type: str, work_type_id: str) -> dict:
+def generate_srcao_factors(rng: random.Random, block_type: str, work_type_id: str, priority_tier: str = None) -> dict:
     """Generate randomized but realistic S-R-C-A-O numeric scores for a task.
-    Uses bounded ranges per block_type with defect-type bias adjustments."""
-    ranges = SRCAO_RANGES.get(block_type, SRCAO_RANGES["PLANNED"])
+    Uses bounded ranges per priority_tier or block_type with defect-type bias adjustments."""
+    key = priority_tier or block_type
+    ranges = SRCAO_RANGES.get(key, SRCAO_RANGES.get(block_type, SRCAO_RANGES["PLANNED"]))
     bias = DEFECT_BIAS.get(work_type_id, {})
 
-    def gen(key):
-        lo, hi = ranges[key]
+    def gen(k):
+        lo, hi = ranges[k]
         base = rng.uniform(lo, hi)
-        if key in bias:
-            blo, bhi = bias[key]
+        if k in bias:
+            blo, bhi = bias[k]
             base += rng.uniform(blo, bhi)
         return round(max(0.0, min(100.0, base)), 1)
 
@@ -325,7 +330,7 @@ def generate_candidate_dataset(db=None, rng=None, demo_seed=None):
             )
             faults.append(fault)
 
-            srcao = generate_srcao_factors(rng, "RULING", spec["work_type"])
+            srcao = generate_srcao_factors(rng, "RULING", spec["work_type"], priority_tier="HIGH")
             task = MaintenanceTask(
                 id=tid,
                 fault_id=fid,
@@ -522,7 +527,7 @@ def generate_candidate_dataset(db=None, rng=None, demo_seed=None):
             )
             faults.append(fault)
 
-            srcao = generate_srcao_factors(rng, "EMERGENT", spec["work_type"])
+            srcao = generate_srcao_factors(rng, "EMERGENT", spec["work_type"], priority_tier="CRITICAL")
             task = MaintenanceTask(
                 id=tid,
                 fault_id=fid,
@@ -604,8 +609,8 @@ def generate_candidate_dataset(db=None, rng=None, demo_seed=None):
                 "track_name": "DOWN_MAIN",
                 "km": 84.5,
                 "execution_date": rng.choice(future_week_days).strftime("%Y-%m-%d"),
-                "start_time": "11:00",
-                "end_time": "13:30",
+                "start_time": "01:30",
+                "end_time": "04:00",
                 "duration": 150,
                 "power_iso": True,
                 "tasks": [
@@ -680,9 +685,9 @@ def generate_candidate_dataset(db=None, rng=None, demo_seed=None):
                 "track_name": "DOWN_MAIN",
                 "km": 121.0,
                 "execution_date": rng.choice(future_week_days).strftime("%Y-%m-%d"),
-                "start_time": "11:30",
-                "end_time": "14:00",
-                "duration": 150,
+                "start_time": "21:30",
+                "end_time": "23:45",
+                "duration": 135,
                 "power_iso": True,
                 "tasks": [
                     {"dept": "PWAY", "work": "RAIL_FRACTURE_REPAIR", "title": "P.Way Bridge Guard Rail Fastening & Sleeper Renewal", "eq": None, "prio": "HIGH"},
@@ -736,8 +741,8 @@ def generate_candidate_dataset(db=None, rng=None, demo_seed=None):
                 "track_name": "DOWN_MAIN",
                 "km": 74.0,
                 "execution_date": rng.choice(future_week_days).strftime("%Y-%m-%d"),
-                "start_time": "10:00",
-                "end_time": "12:00",
+                "start_time": "02:00",
+                "end_time": "04:00",
                 "duration": 120,
                 "power_iso": True,
                 "tasks": [
@@ -799,7 +804,7 @@ def generate_candidate_dataset(db=None, rng=None, demo_seed=None):
                 )
                 faults.append(fault)
 
-                srcao = generate_srcao_factors(rng, "SHADOW", t_spec["work"])
+                srcao = generate_srcao_factors(rng, "SHADOW", t_spec["work"], priority_tier=t_spec.get("prio", "MEDIUM"))
                 task = MaintenanceTask(
                     id=tid,
                     fault_id=fid,
@@ -925,13 +930,44 @@ def generate_candidate_dataset(db=None, rng=None, demo_seed=None):
                 else:
                     exec_date = rng.choice(future_month_days).strftime("%Y-%m-%d")
 
-                # Slot time (spaced throughout the operating day)
-                slot_hour = 9 + ((pln_idx * 2) % 9)
-                start_str = f"{slot_hour:02d}:00"
+                # Distribute planned blocks across full 24-hour round-the-clock operational windows:
+                # Includes night corridors (00:30-04:30), dawn possessions (05:00-08:00),
+                # daytime inter-peak slots, and late night blocks (21:00-23:30).
+                ROUND_THE_CLOCK_SLOTS = [
+                    (0, 30),   # 00:30 Night maintenance corridor (tamping & deep screening)
+                    (2, 0),    # 02:00 Deep night lull (TRD 25kV catenary overhaul)
+                    (3, 45),   # 03:45 Pre-dawn track packing
+                    (5, 30),   # 05:30 Dawn window (point machine maintenance)
+                    (7, 30),   # 07:30 Early morning inter-peak
+                    (9, 30),   # 09:30 Morning possession
+                    (11, 30),  # 11:30 Midday window
+                    (13, 30),  # 13:30 Afternoon inter-peak
+                    (15, 30),  # 15:30 Post-peak afternoon
+                    (17, 30),  # 17:30 Early evening
+                    (19, 30),  # 19:30 Evening window
+                    (21, 30),  # 21:30 Late evening corridor
+                    (22, 45),  # 22:45 Night freight lull
+                ]
+                slot_h, slot_m = ROUND_THE_CLOCK_SLOTS[(pln_idx - 1) % len(ROUND_THE_CLOCK_SLOTS)]
+                start_str = f"{slot_h:02d}:{slot_m:02d}"
                 duration_val = max(60, tmpl[4] + rng.choice([-15, 0, 15]))
-                end_hour = slot_hour + (duration_val // 60)
-                end_min = duration_val % 60
+                end_total_mins = min(1439, slot_h * 60 + slot_m + duration_val)
+                end_hour = end_total_mins // 60
+                end_min = end_total_mins % 60
                 end_str = f"{end_hour:02d}:{end_min:02d}"
+
+                if exec_date == today_str:
+                    time_val = validate_or_recalculate_future_window(
+                        start_time_str=start_str,
+                        end_time_str=end_str,
+                        execution_date_str=exec_date,
+                        duration_mins=duration_val,
+                        canonical_now=now,
+                    )
+                    start_str = time_val["start_time"]
+                    end_str = time_val["end_time"]
+                    exec_date = time_val["execution_date"]
+                    duration_val = time_val["duration_mins"]
 
                 track = "DOWN_MAIN" if pln_idx % 2 == 1 else "UP_MAIN"
                 # Keep km strictly within the bounds of this specific section
@@ -961,7 +997,7 @@ def generate_candidate_dataset(db=None, rng=None, demo_seed=None):
                 )
                 faults.append(fault)
 
-                srcao = generate_srcao_factors(rng, "PLANNED", tmpl[1])
+                srcao = generate_srcao_factors(rng, "PLANNED", tmpl[1], priority_tier=prio)
                 task = MaintenanceTask(
                     id=tid,
                     fault_id=fid,

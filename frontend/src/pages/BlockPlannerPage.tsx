@@ -521,8 +521,8 @@ export const BlockPlannerPage: React.FC = () => {
     setOptimizing(true);
     try {
       const res = await api.optimizeBlocks({
-        time_window_start: "08:00",
-        time_window_end: "20:00",
+        time_window_start: "00:00",
+        time_window_end: "23:59",
         execution_date: executionDate,
         allow_bundling: true,
       });
@@ -1984,7 +1984,7 @@ export const BlockPlannerPage: React.FC = () => {
                 const kmDisplay = formatDistanceKm(dt.location_km);
                 const origTime = dt.original_time
                   ? formatTimeRangeClean(dt.original_time.split("–")[0]?.trim(), dt.original_time.split("–")[1]?.trim())
-                  : "08:00 – 10:00 | 2h 0m";
+                  : "00:00 – 02:00 | 2h 0m";
 
                 return (
                   <div key={idx} className="pt-3 first:pt-0 space-y-2">
