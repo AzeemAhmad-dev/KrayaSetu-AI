@@ -18,6 +18,7 @@ import {
 import { DepartmentProblem, ProblemWorkflowStatus, FaultObservationData } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../services/api";
+import { Button, EmptyState } from "../ui";
 
 const PROBLEM_WORKFLOW_STEPS: ProblemWorkflowStatus[] = [
   "Issue Logged",
@@ -270,26 +271,27 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
         </div>
 
         <div className="flex items-center space-x-2.5">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={loadProblems}
             disabled={loadingProblems}
             title="Refresh issues from database"
-            className="p-2 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-colors disabled:opacity-50"
+            leftIcon={<RefreshCw className={`w-4 h-4 ${loadingProblems ? "animate-spin text-sky-600" : ""}`} />}
           >
-            <RefreshCw className={`w-4 h-4 ${loadingProblems ? "animate-spin text-sky-600" : ""}`} />
-          </button>
+            <span>Refresh</span>
+          </Button>
           <span className="text-xs font-mono text-slate-500">
             Logged Issues: <strong className="text-slate-900 font-bold">{problems.length}</strong>
           </span>
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => setIsAddModalOpen(true)}
-            className="px-3.5 py-2 bg-[#0b2545] hover:bg-[#134074] text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+            leftIcon={<Plus className="w-4 h-4" />}
           >
-            <Plus className="w-4 h-4" />
             <span>Log Issue</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -303,7 +305,7 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
           <button
             type="button"
             onClick={() => setBackendError(null)}
-            className="text-red-700 hover:text-red-900 text-xs px-2 py-0.5 font-bold"
+            className="text-red-700 hover:text-red-900 text-xs px-2 py-0.5 font-bold cursor-pointer"
           >
             ✕
           </button>
@@ -319,7 +321,7 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
           <button
             type="button"
             onClick={() => setSuccessMessage(null)}
-            className="text-emerald-700 hover:text-emerald-900 text-xs px-2 py-0.5 font-bold"
+            className="text-emerald-700 hover:text-emerald-900 text-xs px-2 py-0.5 font-bold cursor-pointer"
           >
             ✕
           </button>
@@ -338,27 +340,15 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
           </p>
         </div>
       ) : problems.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-          <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-            <AlertTriangle className="w-7 h-7" />
-          </div>
-          <h3 className="text-sm font-bold text-slate-800">
-            No Issues Logged Yet
-          </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-            The issue log for {departmentName} is completely clean. Department users can record an infrastructure problem or defect found during inspection using the button below.
-          </p>
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="px-4 py-2 bg-slate-100 hover:bg-[#0b2545] hover:text-white text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition-colors cursor-pointer inline-flex items-center space-x-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Log Issue</span>
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/20"
+          icon={<CheckCircle2 className="w-8 h-8 text-[var(--status-success)]" />}
+          title="Issue Log Clean — Zero Faults Recorded"
+          description={`The issue log for ${departmentName} is completely clean. No pending track anomalies or equipment defects recorded.`}
+          actionLabel="Log Issue"
+          onAction={() => setIsAddModalOpen(true)}
+          advisoryNote="All divisional assets functioning within statutory parameters"
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {problems.map((prob) => {
@@ -450,9 +440,9 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 font-mono">
                   <span>Reported: {new Date(prob.createdAt).toLocaleDateString()}</span>
-                  <div className="flex items-center space-x-1 font-bold text-[#0b2545]">
+                  <div className="flex items-center space-x-1 font-bold text-[var(--brand-navy)] dark:text-sky-400">
                     <span>View Details</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </div>
@@ -466,11 +456,11 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
       {/* Modal: Log Issue */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <AlertTriangle className="w-5 h-5 text-red-600" />
-                <h3 className="font-bold text-slate-900 text-base">
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">
                   Log Issue / Defect ({departmentName})
                 </h3>
               </div>
@@ -492,7 +482,7 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
               )}
 
               <div>
-                <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                <label className="block text-xs font-bold font-mono text-slate-700 dark:text-slate-300 uppercase mb-1">
                   Issue Summary / Defect Title *
                 </label>
                 <input
@@ -501,19 +491,19 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Broken weld at turnout 102A / Dropped track circuit"
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                  className="w-full text-sm border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-slate-700 dark:text-slate-300 uppercase mb-1">
                     Issue Category *
                   </label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   >
                     {categories.map((cat) => (
                       <option key={cat} value={cat}>
@@ -524,13 +514,13 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-slate-700 dark:text-slate-300 uppercase mb-1">
                     Severity / Urgency
                   </label>
                   <select
                     value={severity}
                     onChange={(e) => setSeverity(e.target.value as any)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   >
                     <option value="LOW">Low (Routine observation)</option>
                     <option value="MEDIUM">Medium (Requires attention)</option>
@@ -542,13 +532,13 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-slate-700 dark:text-slate-300 uppercase mb-1">
                     Corridor Section
                   </label>
                   <select
                     value={locationChoice}
                     onChange={(e) => setLocationChoice(e.target.value)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   >
                     {locationOptions.map((opt) => (
                       <option key={opt} value={opt}>
@@ -559,7 +549,7 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-slate-700 dark:text-slate-300 uppercase mb-1">
                     Precise KM / Point / Pole
                   </label>
                   <input
@@ -567,13 +557,13 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                     value={customLocation}
                     onChange={(e) => setCustomLocation(e.target.value)}
                     placeholder="e.g. KM 18.4 Up Main or Mast 142/12"
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                <label className="block text-xs font-bold font-mono text-slate-700 dark:text-slate-300 uppercase mb-1">
                   Field Observation / Technical Notes *
                 </label>
                 <textarea
@@ -582,34 +572,35 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                   value={observation}
                   onChange={(e) => setObservation(e.target.value)}
                   placeholder="Describe the physical condition observed, measurements (if any), suspected cause, and required block or maintenance action..."
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                  className="w-full text-sm border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                 />
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 flex items-start space-x-2">
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 flex items-start space-x-2">
                 <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <span>
                   This issue will be recorded as a maintenance/block requirement for {departmentName}. It does NOT generate operational train delays or fake simulated traffic impacts.
                 </span>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
-                <button
-                  type="button"
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <Button
+                  variant="secondary"
+                  size="default"
                   disabled={submitting}
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 rounded-lg cursor-pointer disabled:opacity-50"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
+                  size="default"
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-[#0b2545] hover:bg-[#134074] text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  isLoading={submitting}
                 >
-                  {submitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                   <span>{submitting ? "Logging Defect..." : "Save & Log Issue"}</span>
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -672,7 +663,7 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                         key={step}
                         className={`p-2 rounded-lg border text-[11px] flex flex-col items-center justify-center transition-all ${
                           isCurrent
-                            ? "bg-[#0b2545] text-white border-[#0b2545] font-bold shadow-xs"
+                            ? "bg-[var(--brand-navy)] text-white border-[var(--brand-navy-border)] font-bold shadow-xs"
                             : isPassed
                             ? "bg-emerald-50 text-emerald-900 border-emerald-300 font-semibold"
                             : "bg-slate-50 text-slate-400 border-slate-200"
@@ -759,37 +750,38 @@ export const DepartmentProblemSection: React.FC<DepartmentProblemSectionProps> =
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Advance button */}
                   {getNextStatus(selectedProblem.status) && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={() => handleUpdateStatus(selectedProblem.id, getNextStatus(selectedProblem.status)!)}
-                      className="px-4 py-2 rounded-lg bg-[#0b2545] hover:bg-[#134074] text-white text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                      leftIcon={<ArrowRight className="w-4 h-4" />}
                     >
-                      <ArrowRight className="w-4 h-4" />
                       <span>Advance to: {getNextStatus(selectedProblem.status)}</span>
-                    </button>
+                    </Button>
                   )}
 
                   {/* Reschedule Button */}
                   {selectedProblem.status !== "Completed" && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => setShowRescheduleInput(!showRescheduleInput)}
-                      className="px-3 py-2 rounded-lg border border-purple-300 text-purple-900 bg-purple-50 hover:bg-purple-100 text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
+                      leftIcon={<RotateCcw className="w-3.5 h-3.5 text-purple-600" />}
+                      className="border-purple-300 text-purple-900 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" />
                       <span>Reschedule / Postpone</span>
-                    </button>
+                    </Button>
                   )}
 
                   {/* If completed or rescheduled, option to re-open */}
                   {(selectedProblem.status === "Completed" || selectedProblem.status === "Rescheduled") && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => handleUpdateStatus(selectedProblem.id, "Issue Logged")}
-                      className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                     >
                       Re-open Issue
-                    </button>
+                    </Button>
                   )}
                 </div>
 

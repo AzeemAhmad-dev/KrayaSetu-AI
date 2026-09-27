@@ -235,16 +235,25 @@ export const CorridorDetailPage: React.FC = () => {
         {/* Location Dropdown Filter & Active View Metadata (Visible on MAP, INFRASTRUCTURE, INDEX) */}
         {activeTab !== "BLOCK" && (
           <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-            <div className="text-xs font-mono text-slate-500 flex items-center space-x-1.5">
-              <span className="font-bold text-slate-700 uppercase">
-                {activeTab === "MAP"
-                  ? "DETAILED CORRIDOR MAP WORKSPACE"
-                  : activeTab === "INFRASTRUCTURE"
-                  ? "SECTION INFRASTRUCTURE SPECIFICATIONS"
-                  : "INDEX SECTION · ROUTE PROGRESSION"}
-              </span>
-              <span>·</span>
-              <span>{corridor.name} ({formatDistanceKm(corridor.total_distance_km)})</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="text-xs font-mono text-slate-500 flex items-center space-x-1.5">
+                <span className="font-bold text-slate-700 uppercase">
+                  {activeTab === "MAP"
+                    ? "DETAILED CORRIDOR MAP WORKSPACE"
+                    : activeTab === "INFRASTRUCTURE"
+                    ? "SECTION INFRASTRUCTURE SPECIFICATIONS"
+                    : "INDEX SECTION · ROUTE PROGRESSION"}
+                </span>
+                <span>·</span>
+                <span>{corridor.name} ({formatDistanceKm(corridor.total_distance_km)})</span>
+              </div>
+
+              {selectedLocationCode === "ALL" && selectedLocation && (
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[var(--status-info-bg)] border border-[var(--status-info-border)] text-[var(--status-info-text)] text-xs font-mono font-semibold">
+                  <Info className="w-3.5 h-3.5 text-[var(--status-info)] flex-shrink-0" />
+                  <span>Showing: {selectedLocation.name} ({selectedLocation.code}) — default view</span>
+                </div>
+              )}
             </div>
 
             {/* Location Dropdown Filter */}
@@ -280,6 +289,7 @@ export const CorridorDetailPage: React.FC = () => {
               corridor={corridor}
               selectedLocation={selectedLocation}
               onSelectLocation={handleMapSelectLocation}
+              isDefaultSelection={selectedLocationCode === "ALL"}
             />
           </div>
 
@@ -288,7 +298,7 @@ export const CorridorDetailPage: React.FC = () => {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 sm:p-6 space-y-4 font-sans animate-fade-in">
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2.5 rounded-xl bg-[#0b2545] text-white">
+                  <div className="p-2.5 rounded-xl bg-[var(--brand-navy)] text-white">
                     <Building2 className="w-5 h-5" />
                   </div>
                   <div>
@@ -307,6 +317,13 @@ export const CorridorDetailPage: React.FC = () => {
                         · {formatKmBadge(selectedLocation.km)}
                       </span>
                     </div>
+
+                    {selectedLocationCode === "ALL" && (
+                      <div className="mt-1.5 inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[var(--status-info-bg)] border border-[var(--status-info-border)] text-[var(--status-info-text)] text-xs font-mono font-semibold">
+                        <Info className="w-3.5 h-3.5 text-[var(--status-info)] flex-shrink-0" />
+                        <span>Showing: {selectedLocation.name} ({selectedLocation.code}) — default view</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -605,7 +622,7 @@ export const CorridorDetailPage: React.FC = () => {
                     onClick={() => handleMapSelectLocation(loc)}
                     className={`flex flex-col items-center p-2 rounded-xl cursor-pointer transition-all ${
                       selectedLocation?.code === loc.code
-                        ? "bg-[#0b2545] text-white shadow-md scale-105"
+                        ? "bg-[var(--brand-navy)] text-white shadow-md scale-105"
                         : loc.is_major
                         ? "bg-white border-2 border-sky-500 text-slate-900 hover:bg-sky-50"
                         : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"

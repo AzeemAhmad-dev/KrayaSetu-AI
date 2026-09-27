@@ -102,6 +102,19 @@ export const MareyDiagramPage: React.FC = () => {
     }
   }, [blocks, selectedBlock]);
 
+  // Synchronize document.documentElement data-theme & class with active theme
+  useEffect(() => {
+    const isDark = theme === "dark";
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }, [theme]);
+
   // Handlers
   const handleThemeToggle = () => {
     setTheme((prev) => (prev === "vintage" ? "dark" : "vintage"));
@@ -163,8 +176,9 @@ export const MareyDiagramPage: React.FC = () => {
   return (
     <div
       ref={pageContainerRef}
+      data-theme={theme === "dark" ? "dark" : "light"}
       className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
-        theme === "vintage" ? "bg-[#fcfaf2]" : "bg-[#0b1120]"
+        theme === "dark" ? "dark bg-[var(--marey-canvas-bg)] text-[var(--text-primary)]" : "bg-[var(--marey-canvas-bg)] text-[var(--text-primary)]"
       }`}
     >
       {/* 1. ARCHIVAL / MODERN HEADER & CONTROLS */}

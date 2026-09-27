@@ -27,6 +27,7 @@ import { DetailedCorridor } from "../../data/corridorsData";
 import { CorridorBlock, CorridorBlockType, CorridorBlockStatus, CorridorIssue, BlockData } from "../../types";
 import { api } from "../../services/api";
 import { RoleBlockTable } from "../blocks/RoleBlockTable";
+import { Tabs, TabsList, TabsTrigger, Button, EmptyState } from "../ui";
 import { RefreshCw } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { formatDistanceKm, formatKmBadge, formatKmValue } from "../../utils/formatDistance";
@@ -755,126 +756,92 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
       {/* ============================================================== */}
       {/* 2. SUB-NAVIGATION TABS                                         */}
       {/* ============================================================== */}
-      <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center space-x-2 overflow-x-auto">
-          {/* Daily Blocks */}
-          <button
-            type="button"
-            onClick={() => setActiveSection("daily")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "daily"
-                ? "bg-[#0b2545] text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            <span>Daily Blocks</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-              activeSection === "daily" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
-            }`}>
-              {dailyBlocks.length}
-            </span>
-          </button>
+      <div className="bg-white px-4 pt-1 rounded-2xl border border-[var(--border-subtle)] shadow-xs select-none">
+        <Tabs
+          value={activeSection}
+          onValueChange={(val) => setActiveSection(val as any)}
+          variant="underlined"
+        >
+          <TabsList className="w-full">
+            <TabsTrigger
+              value="daily"
+              icon={<Calendar className="w-4 h-4" />}
+              badge={
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                  {dailyBlocks.length}
+                </span>
+              }
+              className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
+            >
+              <span>Daily Blocks</span>
+            </TabsTrigger>
 
-          {/* Weekly Blocks */}
-          <button
-            type="button"
-            onClick={() => setActiveSection("weekly")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "weekly"
-                ? "bg-[#0b2545] text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <CalendarRange className="w-4 h-4" />
-            <span>Weekly Blocks</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-              activeSection === "weekly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
-            }`}>
-              {weeklyBlocks.length}
-            </span>
-          </button>
+            <TabsTrigger
+              value="weekly"
+              icon={<CalendarRange className="w-4 h-4" />}
+              badge={
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                  {weeklyBlocks.length}
+                </span>
+              }
+              className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
+            >
+              <span>Weekly Blocks</span>
+            </TabsTrigger>
 
-          {/* Monthly Blocks */}
-          <button
-            type="button"
-            onClick={() => setActiveSection("monthly")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "monthly"
-                ? "bg-[#0b2545] text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>Monthly Blocks</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-              activeSection === "monthly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
-            }`}>
-              {monthlyBlocks.length}
-            </span>
-          </button>
+            <TabsTrigger
+              value="monthly"
+              icon={<Layers className="w-4 h-4" />}
+              badge={
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                  {monthlyBlocks.length}
+                </span>
+              }
+              className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
+            >
+              <span>Monthly Blocks</span>
+            </TabsTrigger>
 
-          {/* Critical Blocks */}
-          <button
-            type="button"
-            onClick={() => setActiveSection("critical")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "critical"
-                ? "bg-rose-700 text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <Flame className={`w-4 h-4 ${activeSection === "critical" ? "text-white" : "text-rose-600"}`} />
-            <span>Critical Blocks</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-              activeSection === "critical" ? "bg-white/20 text-white" : "bg-white text-rose-700 border border-rose-200"
-            }`}>
-              {criticalBlocks.length}
-            </span>
-          </button>
+            <TabsTrigger
+              value="critical"
+              icon={<Flame className="w-4 h-4 text-[var(--status-danger)]" />}
+              badge={
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] border border-[var(--status-danger-border)]">
+                  {criticalBlocks.length}
+                </span>
+              }
+              className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
+            >
+              <span>Critical Blocks</span>
+            </TabsTrigger>
 
-          {/* Issue Log / Requests */}
-          <button
-            type="button"
-            onClick={() => setActiveSection("issues")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "issues"
-                ? "bg-amber-700 text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <AlertTriangle className={`w-4 h-4 ${activeSection === "issues" ? "text-white" : "text-amber-600"}`} />
-            <span>Issue Log</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-              activeSection === "issues" ? "bg-white/20 text-white" : "bg-white text-amber-800 border border-amber-200"
-            }`}>
-              {issues.length}
-            </span>
-          </button>
+            <TabsTrigger
+              value="issues"
+              icon={<AlertTriangle className="w-4 h-4 text-[var(--status-warning)]" />}
+              badge={
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border border-[var(--status-warning-border)]">
+                  {issues.length}
+                </span>
+              }
+              className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
+            >
+              <span>Issue Log</span>
+            </TabsTrigger>
 
-          {/* Completed Tasks Tab */}
-          <button
-            type="button"
-            onClick={() => setActiveSection("completed")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "completed"
-                ? "bg-emerald-700 text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <CheckCircle2 className={`w-4 h-4 ${activeSection === "completed" ? "text-white" : "text-emerald-600"}`} />
-            <span>Completed Tasks</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-              activeSection === "completed" ? "bg-white/20 text-white" : "bg-white text-emerald-800 border border-emerald-200"
-            }`}>
-              {corridorCompletedTasks.length}
-            </span>
-          </button>
-        </div>
-
-        <div className="text-xs font-mono text-slate-500 hidden sm:block pr-2">
-          Managing {corridor.id} ({corridor.name})
-        </div>
+            <TabsTrigger
+              value="completed"
+              icon={<CheckCircle2 className="w-4 h-4 text-[var(--status-success)]" />}
+              badge={
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--status-success-bg)] text-[var(--status-success-text)] border border-[var(--status-success-border)]">
+                  {corridorCompletedTasks.length}
+                </span>
+              }
+              className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
+            >
+              <span>Completed Tasks</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* ============================================================== */}
@@ -908,15 +875,14 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
           </div>
 
           {dailyBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <Calendar className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">No Daily Blocks Scheduled for Today</h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                There are no planned possession windows scheduled for <strong>{corridor.name} ({corridor.id})</strong> today ({CURRENT_SYSTEM_DATE}). Use the <strong>"Add Daily Block"</strong> button above to plan a maintenance window.
-              </p>
-            </div>
+            <EmptyState
+              className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/25"
+              icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+              title="Full Track Availability — Zero Active Possessions"
+              description={`No daily possessions currently required for ${corridor.name} (${corridor.id}) on ${CURRENT_SYSTEM_DATE} — full track availability. All main tracks and passing loops are cleared for normal traffic.`}
+              actionLabel="Add Daily Block"
+              onAction={() => handleOpenNewBlock("DAILY")}
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {dailyBlocks.map((blk) => renderBlockCard(blk))}
@@ -943,7 +909,7 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
             <button
               type="button"
               onClick={() => handleOpenNewBlock("MONTHLY")}
-              className="px-3.5 py-2 bg-[#0b2545] hover:bg-sky-900 text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+              className="px-3.5 py-2 bg-[var(--brand-navy)] hover:bg-[var(--brand-navy-hover)] text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />
               <span>Add Monthly Block</span>
@@ -951,27 +917,14 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
           </div>
 
           {monthlyBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <CalendarRange className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Monthly Blocks Scheduled
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                The monthly block register for <strong>{corridor.name} ({corridor.id})</strong> is currently clean. Use the <strong>"Add Monthly Block"</strong> button above to schedule a possession window.
-              </p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => handleOpenNewBlock("MONTHLY")}
-                  className="px-4 py-2 bg-slate-100 hover:bg-[#0b2545] hover:text-white text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition-colors cursor-pointer inline-flex items-center space-x-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Create First Monthly Block</span>
-                </button>
-              </div>
-            </div>
+            <EmptyState
+              className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/25"
+              icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+              title="Full Track Availability — Zero Active Possessions"
+              description={`The monthly block register for ${corridor.name} (${corridor.id}) is completely clear — full track availability maintained. No overhaul windows currently booked.`}
+              actionLabel="Add Monthly Block"
+              onAction={() => handleOpenNewBlock("MONTHLY")}
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {monthlyBlocks.map((blk) => renderBlockCard(blk))}
@@ -998,7 +951,7 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
             <button
               type="button"
               onClick={() => handleOpenNewBlock("WEEKLY")}
-              className="px-3.5 py-2 bg-[#0b2545] hover:bg-sky-900 text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+              className="px-3.5 py-2 bg-[var(--brand-navy)] hover:bg-[var(--brand-navy-hover)] text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />
               <span>Add Weekly Block</span>
@@ -1006,27 +959,14 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
           </div>
 
           {weeklyBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <Calendar className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Weekly Blocks Scheduled
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                The weekly block schedule for <strong>{corridor.name} ({corridor.id})</strong> is currently clean. Click <strong>"Add Weekly Block"</strong> above to plan a new departmental possession.
-              </p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => handleOpenNewBlock("WEEKLY")}
-                  className="px-4 py-2 bg-slate-100 hover:bg-[#0b2545] hover:text-white text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition-colors cursor-pointer inline-flex items-center space-x-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Create First Weekly Block</span>
-                </button>
-              </div>
-            </div>
+            <EmptyState
+              className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/25"
+              icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+              title="Full Track Availability — Zero Active Possessions"
+              description={`The 7-day maintenance possession schedule for ${corridor.name} (${corridor.id}) is clean — full track availability across all sections.`}
+              actionLabel="Add Weekly Block"
+              onAction={() => handleOpenNewBlock("WEEKLY")}
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {weeklyBlocks.map((blk) => renderBlockCard(blk))}
@@ -1064,17 +1004,14 @@ export const CorridorBlockManagement: React.FC<CorridorBlockManagementProps> = (
           </div>
 
           {criticalBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 mb-3">
-                <Flame className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Critical Blocks Active
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                There are currently no emergency or critical possessions active on <strong>{corridor.name} ({corridor.id})</strong>. If an urgent defect requires immediate possession, use the <strong>"Create Critical Block"</strong> button above.
-              </p>
-            </div>
+            <EmptyState
+              className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/25"
+              icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+              title="Zero Critical Defects — All Corridors Clear"
+              description={`There are currently zero emergency or safety-critical possessions active on ${corridor.name} (${corridor.id}). No track fracture or OHE breakdown holds.`}
+              actionLabel="Create Critical Block"
+              onAction={() => handleOpenNewBlock("CRITICAL", true)}
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {criticalBlocks.map((blk) => renderBlockCard(blk))}

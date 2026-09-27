@@ -65,15 +65,19 @@ export const DEMO_ACCOUNTS_REGISTRY: Record<string, { user: UserAccount; passwor
       defaultPath: "/operations-control",
       allowedPaths: [
         "/operations-control",
-        "/block-planner",
+        "/baseline-comparison",
         "/marey-diagram",
+        "/block-planner",
+        "/planner",
         "/coordination",
         "/control",
         "/corridors",
+        "/station-master",
         "/maintenance",
         "/scenario-analysis",
+        "/scenarios",
+        "/scenario-lab",
         "/events",
-        "/station-master",
       ],
       badgeColor: "bg-purple-100 text-purple-900 border-purple-300",
       permissions: {
@@ -109,7 +113,7 @@ export const DEMO_ACCOUNTS_REGISTRY: Record<string, { user: UserAccount; passwor
       zone: "West Central Railway (WCR)",
       workspaceName: "Corridor Control",
       defaultPath: "/corridors",
-      allowedPaths: ["/corridors", "/control", "/marey-diagram"],
+      allowedPaths: ["/corridors", "/control", "/marey-diagram", "/baseline-comparison"],
       badgeColor: "bg-blue-100 text-blue-900 border-blue-300",
       permissions: {
         canApproveTrafficBlocks: false,
@@ -432,26 +436,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canAccessPath = (path: string): boolean => {
     if (!user) return false;
-    const clean = path.split("?")[0];
-    // Master accounts and core demonstration paths are universally accessible
-    if (user.username === "COA-001") return true;
-    const universalDemoPaths = [
-      "/operations-control",
-      "/block-planner",
-      "/planner",
-      "/coordination",
-      "/baseline-comparison",
-      "/maintenance",
-      "/scenario-analysis",
-      "/scenarios",
-      "/events",
-      "/control",
-      "/corridors",
-    ];
-    if (universalDemoPaths.some((p) => clean === p || clean.startsWith(`${p}/`))) {
-      return true;
-    }
-    return user.allowedPaths.some((p) => clean === p || clean.startsWith(`${p}/`));
+    const clean = path.split("?")[0].replace(/\/$/, "");
+    return user.allowedPaths.some((p) => {
+      const cleanAllowed = p.replace(/\/$/, "");
+      return clean === cleanAllowed || clean.startsWith(`${cleanAllowed}/`);
+    });
   };
 
   // Backwards compatibility role object

@@ -812,8 +812,8 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                   width={PLATFORM_END_X - PLATFORM_START_X}
                   height={plat.height}
                   rx={4}
-                  fill={isSelected ? "#e0f2fe" : "#ffffff"}
-                  stroke={isSelected ? "#0284c7" : "#94a3b8"}
+                  fill={isSelected ? "var(--status-info-bg)" : "var(--surface-card)"}
+                  stroke={isSelected ? "var(--status-info)" : "var(--border-strong)"}
                   strokeWidth={isSelected ? 2 : 1}
                 />
 
@@ -823,7 +823,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                   y1={plat.topY + 3}
                   x2={PLATFORM_END_X - 4}
                   y2={plat.topY + 3}
-                  stroke="#eab308"
+                  stroke="var(--status-warning)"
                   strokeWidth={1.8}
                   strokeDasharray="5 3"
                 />
@@ -835,7 +835,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                     y1={plat.topY + plat.height - 3}
                     x2={PLATFORM_END_X - 4}
                     y2={plat.topY + plat.height - 3}
-                    stroke="#eab308"
+                    stroke="var(--status-warning)"
                     strokeWidth={1.8}
                     strokeDasharray="5 3"
                   />
@@ -852,7 +852,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                       width={10}
                       height={6}
                       rx={1}
-                      fill="#94a3b8"
+                      fill="var(--border-strong)"
                     />
                   );
                 })}
@@ -861,7 +861,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                 <text
                   x={(PLATFORM_START_X + PLATFORM_END_X) / 2}
                   y={plat.topY + plat.height / 2 + 3.5}
-                  fill={isSelected ? "#0369a1" : "#0f172a"}
+                  fill={isSelected ? "var(--status-info-text)" : "var(--text-primary)"}
                   fontSize="12"
                   fontWeight="700"
                   fontFamily="'Inter', sans-serif"
@@ -880,8 +880,8 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
           {throatTransitions.map((tt) => {
             if (!tt.westCurve && !tt.eastCurve) return null;
             const isSelected = selectedElement?.id === tt.trackId;
-            const railColor = isSelected ? "#0284c7" : "#1e293b";
-            const sleeperColor = "#64748b";
+            const railColor = isSelected ? "var(--status-info)" : "var(--text-primary)";
+            const sleeperColor = "var(--text-muted)";
 
             return (
               <g key={`throat-${tt.trackId}`} className="throat-turnout">
@@ -889,7 +889,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                 {tt.westCurve && (
                   <g>
                     {/* Ballast bed */}
-                    <path d={tt.westCurve.ballastPath} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth={0.8} />
+                    <path d={tt.westCurve.ballastPath} fill="var(--surface-secondary)" stroke="var(--border-medium)" strokeWidth={0.8} />
                     {/* Rotated perpendicular sleepers */}
                     {tt.westCurve.sleepers.map((s, sIdx) => (
                       <line
@@ -923,7 +923,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                 {tt.eastCurve && (
                   <g>
                     {/* Ballast bed */}
-                    <path d={tt.eastCurve.ballastPath} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth={0.8} />
+                    <path d={tt.eastCurve.ballastPath} fill="var(--surface-secondary)" stroke="var(--border-medium)" strokeWidth={0.8} />
                     {/* Rotated perpendicular sleepers */}
                     {tt.eastCurve.sleepers.map((s, sIdx) => (
                       <line
@@ -961,8 +961,8 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
           {/* ==================================================== */}
           {renderedTurnouts.map((turnout) => {
             const isSelected = selectedElement?.id === turnout.id;
-            const railColor = isSelected ? "#0284c7" : "#1e293b";
-            const sleeperColor = "#64748b";
+            const railColor = isSelected ? "var(--status-info)" : "var(--text-primary)";
+            const sleeperColor = "var(--text-muted)";
 
             return (
               <g
@@ -979,7 +979,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                 }}
               >
                 {/* 1. Main Turnout Curve */}
-                <path d={turnout.curve.ballastPath} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth={0.8} />
+                <path d={turnout.curve.ballastPath} fill="var(--surface-secondary)" stroke="var(--border-medium)" strokeWidth={0.8} />
                 {turnout.curve.sleepers.map((s, sIdx) => (
                   <line
                     key={`ts-${sIdx}`}
@@ -1008,7 +1008,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                 {/* 2. Secondary Scissors Curve (if applicable) */}
                 {turnout.scissorsCurve && (
                   <g>
-                    <path d={turnout.scissorsCurve.ballastPath} fill="#f1f5f9" stroke="#cbd5e1" strokeWidth={0.8} />
+                    <path d={turnout.scissorsCurve.ballastPath} fill="var(--surface-secondary)" stroke="var(--border-medium)" strokeWidth={0.8} />
                     {turnout.scissorsCurve.sleepers.map((s, sIdx) => (
                       <line
                         key={`ss-${sIdx}`}
@@ -1041,8 +1041,8 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                   cx={turnout.midX}
                   cy={(turnout.fromY + turnout.toY) / 2}
                   r={isSelected ? 5.5 : 4}
-                  fill={isSelected ? "#0284c7" : "#f59e0b"}
-                  stroke="#ffffff"
+                  fill={isSelected ? "var(--status-info)" : "var(--status-warning)"}
+                  stroke="var(--text-inverse)"
                   strokeWidth={1.5}
                 />
 
@@ -1054,14 +1054,14 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                     width={46}
                     height={16}
                     rx={3}
-                    fill="#f8fafc"
-                    stroke={isSelected ? "#0284c7" : "#94a3b8"}
+                    fill="var(--surface-body)"
+                    stroke={isSelected ? "var(--status-info)" : "var(--border-strong)"}
                     strokeWidth={1}
                   />
                   <text
                     x={23}
                     y={11.5}
-                    fill={isSelected ? "#0369a1" : "#0f172a"}
+                    fill={isSelected ? "var(--status-info-text)" : "var(--text-primary)"}
                     fontSize="8.5"
                     fontWeight="bold"
                     fontFamily="monospace"
@@ -1086,8 +1086,8 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
             const startX = tt?.isThrough ? TRACK_START_X : tt?.straightStartX || PLATFORM_START_X;
             const endX = tt?.isThrough ? TRACK_END_X : tt?.straightEndX || PLATFORM_END_X;
 
-            const railColor = isSelected ? "#0284c7" : "#1e293b";
-            const sleeperColor = "#64748b";
+            const railColor = isSelected ? "var(--status-info)" : "var(--text-primary)";
+            const sleeperColor = "var(--text-muted)";
 
             // Generate horizontal sleepers along the straight segment
             const numSleepers = Math.floor((endX - startX) / SLEEPER_SPACING);
@@ -1108,8 +1108,8 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                   width={endX - startX + 8}
                   height={26}
                   rx={4}
-                  fill="#f1f5f9"
-                  stroke="#cbd5e1"
+                  fill="var(--surface-secondary)"
+                  stroke="var(--border-medium)"
                   strokeWidth={0.8}
                 />
 
@@ -1164,11 +1164,11 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                       height={28}
                       rx={2}
                       fill="url(#bufferStopStripe)"
-                      stroke="#ef4444"
+                      stroke="var(--status-danger)"
                       strokeWidth={1.5}
                     />
-                    <circle cx={6} cy={14} r={3} fill="#ef4444" stroke="#ffffff" strokeWidth={1} />
-                    <text x={18} y={18} fill="#ef4444" fontSize="9" fontWeight="700" fontFamily="'Inter', sans-serif">
+                    <circle cx={6} cy={14} r={3} fill="var(--status-danger)" stroke="var(--text-inverse)" strokeWidth={1} />
+                    <text x={18} y={18} fill="var(--status-danger)" fontSize="9" fontWeight="700" fontFamily="'Inter', sans-serif">
                       BUFFER STOP
                     </text>
                   </g>
@@ -1182,14 +1182,14 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
                     width={195}
                     height={26}
                     rx={5}
-                    fill={isSelected ? "#e0f2fe" : "#ffffff"}
-                    stroke={isSelected ? "#0284c7" : "#cbd5e1"}
+                    fill={isSelected ? "var(--status-info-bg)" : "var(--surface-card)"}
+                    stroke={isSelected ? "var(--status-info)" : "var(--border-medium)"}
                     strokeWidth={isSelected ? 1.5 : 1}
                   />
                   <text
                     x={10}
                     y={17}
-                    fill={isSelected ? "#0369a1" : "#0f172a"}
+                    fill={isSelected ? "var(--status-info-text)" : "var(--text-primary)"}
                     fontSize="11.5"
                     fontWeight="600"
                     fontFamily="'Inter', sans-serif"
@@ -1201,7 +1201,7 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
 
                 {/* 6. LEVEL 5 Physical Engineering Specs (Right Margin) */}
                 <g transform={`translate(${TRACK_END_X + 18}, ${y + 4})`}>
-                  <text fill="#64748b" fontSize="11" fontWeight="500" fontFamily="'Inter', sans-serif">
+                  <text fill="var(--text-muted)" fontSize="11" fontWeight="500" fontFamily="'Inter', sans-serif">
                     <tspan className="tech-mono font-bold text-slate-700">{Math.min(track.speedLimitKmph || 60, 60)} km/h</tspan> · <tspan className="tech-mono">{track.lengthMeters}m CSR</tspan> · {track.electrified ? "25kV AC" : "Non-Elec"}
                   </text>
                 </g>
@@ -1218,28 +1218,28 @@ export const StationSchematicCanvas: React.FC<StationSchematicCanvasProps> = ({
       <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-slate-700">
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center space-x-2">
-            <span className="w-5 h-1 bg-[#1e293b] rounded-full inline-block" />
+            <span className="w-5 h-1 bg-[var(--text-primary)] rounded-full inline-block" />
             <span className="text-xs text-slate-700 font-bold">Dual Steel Rails & Sleepers</span>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="w-3.5 h-2 rounded-xs bg-white border border-[#94a3b8]" />
+            <span className="w-3.5 h-2 rounded-xs bg-white border border-[var(--border-strong)]" />
             <span className="text-xs text-slate-700 font-bold">Concrete Platform & Tactile Band</span>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--status-warning)]" />
             <span className="text-xs text-slate-700 font-bold">Turnout / Point Machine</span>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-xs bg-red-600" />
+            <span className="w-2.5 h-2.5 rounded-xs bg-[var(--status-danger)]" />
             <span className="text-xs text-slate-700 font-bold">Buffer Stop (Siding)</span>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#0284c7]" />
-            <span className="text-xs text-[#0369a1] font-bold">Selected Asset (Specs in Drawer)</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--status-info)]" />
+            <span className="text-xs text-[var(--status-info-text)] font-bold">Selected Asset (Specs in Drawer)</span>
           </div>
         </div>
 

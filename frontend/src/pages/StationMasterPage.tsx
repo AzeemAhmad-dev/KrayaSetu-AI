@@ -6,6 +6,7 @@ import { StationDetailsDrawer } from "../components/station/StationDetailsDrawer
 import { StationSelectionModal } from "../components/station/StationSelectionModal";
 import { StationControlTab } from "../components/station/StationControlTab";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
+import { Tabs, TabsList, TabsTrigger, Button } from "../components/ui";
 import {
   Building2,
   ArrowRightLeft,
@@ -17,7 +18,9 @@ import {
   ShieldCheck,
   Compass,
   Sliders,
-  ShieldAlert
+  ShieldAlert,
+  Sun,
+  Moon
 } from "lucide-react";
 
 const STATION_CODE_ALIAS: Record<string, string> = {
@@ -85,54 +88,102 @@ export const StationMasterPage: React.FC = () => {
     navigate(`/station-master/${newStationCode.toUpperCase()}${suffix}`);
   };
 
+  // Theme state synchronized with document.documentElement
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlTheme = urlParams.get("theme");
+      if (urlTheme === "dark" || urlTheme === "light") return urlTheme;
+      const saved = localStorage.getItem("app-theme");
+      if (saved === "dark" || saved === "light") return saved;
+      if (document.documentElement.getAttribute("data-theme") === "dark") return "dark";
+    }
+    return "light";
+  });
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", theme);
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }, [theme]);
+
+  const handleThemeToggle = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("app-theme", nextTheme);
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", nextTheme);
+      if (nextTheme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  };
+
   const platforms = infrastructure.tracks.filter((t) => t.platformNumber);
   const otherTracks = infrastructure.tracks.filter((t) => !t.platformNumber);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 font-sans">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 font-sans min-h-screen bg-[var(--surface-body)] text-[var(--text-primary)] transition-colors" data-theme={theme}>
       {/* ============================================================== */}
       {/* 1. COMMAND HEADER & TYPOGRAPHY HIERARCHY                        */}
       {/* ============================================================== */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      <div className="bg-[var(--surface-card)] p-5 sm:p-6 rounded-2xl border border-[var(--border-subtle)] shadow-xs space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             {/* LEVEL 1: STATION MASTER */}
             <div className="flex items-center space-x-2">
-              <span className="text-sm sm:text-base font-bold tracking-wider text-sky-800 uppercase">
+              <span className="text-sm sm:text-base font-bold tracking-wider text-[var(--brand-navy)] dark:text-sky-400 uppercase">
                 STATION MASTER
               </span>
-              <span className="text-slate-300">|</span>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              <span className="text-[var(--text-muted)]">|</span>
+              <span className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">
                 Indian Railways · Bhopal Division
               </span>
             </div>
 
             {/* LEVEL 2: RANI KAMLAPATI (RKMP) */}
             <div className="flex flex-wrap items-baseline gap-3 pt-1">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 font-sans">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[var(--text-primary)] font-sans">
                 {infrastructure.name.toUpperCase()} <span className="font-mono">({infrastructure.code})</span>
               </h1>
               {infrastructure.hindiName && (
-                <span className="text-lg sm:text-xl font-bold text-slate-500 font-sans">
+                <span className="text-lg sm:text-xl font-bold text-[var(--text-muted)] font-sans">
                   · {infrastructure.hindiName}
                 </span>
               )}
-              <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-sky-100 text-sky-900 border border-sky-300 shadow-xs">
+              <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-300 border border-sky-300 dark:border-sky-800 shadow-xs">
                 {infrastructure.category.split(" ")[0]}
               </span>
             </div>
           </div>
 
-          {/* Action: Station Selection Switcher */}
+          {/* Action: Station Selection Switcher & Theme Toggle */}
           <div className="flex items-center space-x-3">
-            <button
-              type="button"
-              onClick={() => setIsStationModalOpen(true)}
-              className="px-4 py-2 bg-[#0b2545] hover:bg-sky-900 text-white text-xs font-semibold rounded-xl border border-[#0b2545] shadow-sm flex items-center space-x-2 transition-all cursor-pointer"
+            <Button
+              variant="secondary"
+              size="default"
+              onClick={handleThemeToggle}
+              leftIcon={theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
+              className="border-[var(--border-subtle)] text-[var(--text-secondary)] font-semibold"
             >
-              <ArrowRightLeft className="w-4 h-4 text-sky-300" />
+              <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+            </Button>
+            <Button
+              variant="primary"
+              size="default"
+              onClick={() => setIsStationModalOpen(true)}
+              leftIcon={<ArrowRightLeft className="w-4 h-4 text-sky-300" />}
+              className="cursor-pointer"
+            >
               <span>Switch Station</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -161,52 +212,40 @@ export const StationMasterPage: React.FC = () => {
       {/* ============================================================== */}
       {/* 2. STATION MASTER WORKSPACE TABS                                */}
       {/* ============================================================== */}
-      <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center space-x-2">
-          {/* Main Station Layout & Infrastructure Tab */}
-          <button
-            type="button"
-            onClick={() => handleTabChange("infrastructure")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer ${
-              activeTab === "infrastructure"
-                ? "bg-[#0b2545] text-white shadow-xs"
-                : "bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-            }`}
-          >
-            <Compass className="w-4 h-4" />
-            <span>Station Layout & Infrastructure</span>
-            <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-bold ${
-              activeTab === "infrastructure" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-            }`}>
-              Main
-            </span>
-          </button>
+      <div className="bg-white px-4 pt-1 rounded-2xl border border-[var(--border-subtle)] shadow-xs select-none">
+        <Tabs
+          value={activeTab}
+          onValueChange={(val) => handleTabChange(val as "infrastructure" | "block")}
+          variant="underlined"
+        >
+          <TabsList className="w-full">
+            <TabsTrigger
+              value="infrastructure"
+              icon={<Compass className="w-4 h-4" />}
+              badge={
+                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                  Main
+                </span>
+              }
+              className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
+            >
+              <span>Station Layout & Infrastructure</span>
+            </TabsTrigger>
 
-          {/* New Separate Top-Level Block Tab */}
-          <button
-            type="button"
-            onClick={() => handleTabChange("block")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer ${
-              activeTab === "block"
-                ? "bg-[#0b2545] text-white shadow-xs"
-                : "bg-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4" />
-            <span>Block</span>
-            <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-bold ${
-              activeTab === "block" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-            }`}>
-              Workspace
-            </span>
-          </button>
-        </div>
-
-        <div className="text-xs font-mono text-slate-500 hidden sm:block pr-2">
-          {activeTab === "infrastructure"
-            ? "Interactive Track Schematic & Asset Inventory"
-            : "Weekly/Monthly Blocks & Issue / Block Requests"}
-        </div>
+            <TabsTrigger
+              value="block"
+              icon={<ShieldAlert className="w-4 h-4" />}
+              badge={
+                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                  Workspace
+                </span>
+              }
+              className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
+            >
+              <span>Block Workspace</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* ============================================================== */}

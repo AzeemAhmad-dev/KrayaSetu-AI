@@ -21,6 +21,7 @@ import { StationInfrastructureData, TrackDefinition } from "../../data/stationIn
 import { api } from "../../services/api";
 import { BlockData, StationBlock, StationIssueBlockRequest } from "../../types";
 import { RoleBlockTable } from "../blocks/RoleBlockTable";
+import { Tabs, TabsList, TabsTrigger, Button, EmptyState } from "../ui";
 import { RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -328,22 +329,22 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* ============================================================== */}
       {/* 1. STATION CONTROL NAVIGATION HEADER                            */}
       {/* ============================================================== */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+      <div className="bg-[var(--surface-card)] p-4 sm:p-5 rounded-2xl border border-[var(--border-subtle)] shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3.5">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-[#0b2545] text-white flex-shrink-0">
+            <div className="p-2.5 rounded-xl bg-[var(--brand-navy)] text-white flex-shrink-0">
               <Wrench className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 uppercase">
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-[var(--text-primary)] uppercase">
                   Block Workspace
                 </h2>
-                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-sky-100 text-sky-900 border border-sky-300">
+                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-300 border border-sky-300 dark:border-sky-800">
                   {stationName} ({stationCode})
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 Station Master block management, assigned possessory schedules, and station infrastructure defect requisition
               </p>
             </div>
@@ -351,78 +352,69 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
         </div>
 
         {/* Navigation Sub-Tabs: Weekly Blocks, Monthly Blocks, Issue / Block Request */}
-        <div className="flex items-center space-x-2 overflow-x-auto pt-0.5">
-          <button
-            type="button"
-            onClick={() => setActiveSection("weekly")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "weekly"
-                ? "bg-[#0b2545] text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
+        <div className="pt-0.5 select-none">
+          <Tabs
+            value={activeSection}
+            onValueChange={(val) => setActiveSection(val as any)}
+            variant="pills"
+            className="w-full min-w-0"
           >
-            <Calendar className="w-4 h-4" />
-            <span>Weekly Blocks</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ml-1 font-bold ${
-              activeSection === "weekly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
-            }`}>
-              {allWeeklyBlocks.length}
-            </span>
-          </button>
+            <div className="w-full min-w-0 overflow-x-auto">
+              <TabsList className="bg-transparent border-0 p-0 space-x-2 overflow-visible min-w-max">
+                <TabsTrigger
+                  value="weekly"
+                  icon={<Calendar className="w-4 h-4" />}
+                  badge={
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                      {allWeeklyBlocks.length}
+                    </span>
+                  }
+                  className="px-3.5 py-2 text-xs sm:text-sm font-bold tracking-wide"
+                >
+                  <span>Weekly Blocks</span>
+                </TabsTrigger>
 
-          <button
-            type="button"
-            onClick={() => setActiveSection("monthly")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "monthly"
-                ? "bg-[#0b2545] text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <CalendarRange className="w-4 h-4" />
-            <span>Monthly Blocks</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ml-1 font-bold ${
-              activeSection === "monthly" ? "bg-white/20 text-white" : "bg-white text-slate-700 border border-slate-200"
-            }`}>
-              {allMonthlyBlocks.length}
-            </span>
-          </button>
+                <TabsTrigger
+                  value="monthly"
+                  icon={<CalendarRange className="w-4 h-4" />}
+                  badge={
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                      {allMonthlyBlocks.length}
+                    </span>
+                  }
+                  className="px-3.5 py-2 text-xs sm:text-sm font-bold tracking-wide"
+                >
+                  <span>Monthly Blocks</span>
+                </TabsTrigger>
 
-          <button
-            type="button"
-            onClick={() => setActiveSection("requests")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "requests"
-                ? "bg-amber-700 text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <AlertOctagon className={`w-4 h-4 ${activeSection === "requests" ? "text-white" : "text-amber-600"}`} />
-            <span>Issue / Block Request</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ml-1 font-bold ${
-              activeSection === "requests" ? "bg-white/20 text-white" : "bg-white text-amber-800 border border-amber-200"
-            }`}>
-              {issueRequests.length}
-            </span>
-          </button>
+                <TabsTrigger
+                  value="requests"
+                  icon={<AlertOctagon className="w-4 h-4 text-[var(--status-warning)]" />}
+                  badge={
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border border-[var(--status-warning-border)]">
+                      {issueRequests.length}
+                    </span>
+                  }
+                  className="px-3.5 py-2 text-xs sm:text-sm font-bold tracking-wide"
+                >
+                  <span>Issue / Block Request</span>
+                </TabsTrigger>
 
-          <button
-            type="button"
-            onClick={() => setActiveSection("completed")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeSection === "completed"
-                ? "bg-emerald-700 text-white shadow-xs"
-                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-            }`}
-          >
-            <CheckCircle2 className={`w-4 h-4 ${activeSection === "completed" ? "text-white" : "text-emerald-600"}`} />
-            <span>Completed Tasks</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ml-1 font-bold ${
-              activeSection === "completed" ? "bg-white/20 text-white" : "bg-white text-emerald-800 border border-emerald-200"
-            }`}>
-              {stationCompletedTasks.length}
-            </span>
-          </button>
+                <TabsTrigger
+                  value="completed"
+                  icon={<CheckCircle2 className="w-4 h-4 text-[var(--status-success)]" />}
+                  badge={
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--status-success-bg)] text-[var(--status-success-text)] border border-[var(--status-success-border)]">
+                      {stationCompletedTasks.length}
+                    </span>
+                  }
+                  className="px-3.5 py-2 text-xs sm:text-sm font-bold tracking-wide"
+                >
+                  <span>Completed Tasks</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </Tabs>
         </div>
       </div>
 
@@ -431,26 +423,26 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* ============================================================== */}
       {activeSection === "weekly" && (
         <div className="space-y-4">
-          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-[var(--surface-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-subtle)] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[var(--text-primary)]">
             <div className="flex items-center space-x-3">
-              <div className="p-2.5 rounded-lg bg-slate-100 text-slate-700">
+              <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
                 <Calendar className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base font-bold text-[var(--text-primary)]">
                   Weekly Maintenance Blocks — {stationName} ({stationCode})
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Scheduled 7-day maintenance possession windows assigned to this station yard and connecting sections
                 </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
-              <span className="text-xs font-mono text-slate-500">
-                Scheduled Blocks: <strong className="text-slate-900 font-bold">{allWeeklyBlocks.length}</strong>
+              <span className="text-xs font-mono text-[var(--text-muted)]">
+                Scheduled Blocks: <strong className="text-[var(--text-primary)] font-bold">{allWeeklyBlocks.length}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-600 text-[11px] font-mono font-bold">
+              <span className="px-2.5 py-1 rounded bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-[11px] font-mono font-bold">
                 VIEW ONLY
               </span>
             </div>
@@ -458,43 +450,34 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
 
           {/* Empty state */}
           {allWeeklyBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <Calendar className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Weekly Blocks Scheduled
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                There are currently no weekly maintenance blocks scheduled for <strong>{stationName} ({stationCode})</strong>. Weekly maintenance possessions granted by Divisional Operations will appear here for yard and line coordination.
-              </p>
-              <div className="mt-4">
-                <span className="inline-block text-[11px] font-mono text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                  Station Master view-only register · Scheduled centrally by Division
-                </span>
-              </div>
-            </div>
+            <EmptyState
+              className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/25"
+              icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+              title="Full Track Availability — Zero Active Possessions"
+              description={`No weekly maintenance possessions currently assigned to ${stationName} (${stationCode}) — full track availability. All yard lines and passenger platform berths are operational for regular train movements.`}
+              advisoryNote="Station Master view-only register · Synchronized centrally with Bhopal Division"
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {allWeeklyBlocks.map((blk) => (
                 <div
                   key={blk.id}
                   onClick={() => setSelectedBlock(blk)}
-                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs hover:border-slate-400 cursor-pointer space-y-3"
+                  className="bg-[var(--surface-card)] rounded-xl border border-[var(--border-subtle)] p-4 shadow-xs hover:border-[var(--border-bold)] cursor-pointer space-y-3 transition-colors text-[var(--text-primary)]"
                 >
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="font-bold text-slate-600">{blk.id}</span>
-                    <span className="px-2 py-0.5 rounded font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                    <span className="font-bold text-[var(--text-muted)]">{blk.id}</span>
+                    <span className="px-2 py-0.5 rounded font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                       {blk.status}
                     </span>
                   </div>
-                  <h4 className="font-bold text-slate-900 text-sm">{blk.title}</h4>
-                  <div className="text-xs text-slate-600 font-mono">
-                    Line: <strong className="text-slate-900">{blk.lineOrPlatform}</strong> · {blk.durationMinutes} mins
+                  <h4 className="font-bold text-[var(--text-primary)] text-sm">{blk.title}</h4>
+                  <div className="text-xs text-[var(--text-secondary)] font-mono">
+                    Line: <strong className="text-[var(--text-primary)]">{blk.lineOrPlatform}</strong> · {blk.durationMinutes} mins
                   </div>
-                  <div className="text-xs text-slate-500 font-mono pt-2 border-t border-slate-100 flex justify-between">
+                  <div className="text-xs text-[var(--text-muted)] font-mono pt-2 border-t border-[var(--border-subtle)] flex justify-between">
                     <span>{blk.scheduledDate}</span>
-                    <span className="font-bold text-[#0b2545]">Inspect</span>
+                    <span className="font-bold text-[var(--brand-navy)] dark:text-sky-400">Inspect</span>
                   </div>
                 </div>
               ))}
@@ -508,26 +491,26 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* ============================================================== */}
       {activeSection === "monthly" && (
         <div className="space-y-4">
-          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-[var(--surface-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-subtle)] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[var(--text-primary)]">
             <div className="flex items-center space-x-3">
-              <div className="p-2.5 rounded-lg bg-slate-100 text-slate-700">
+              <div className="p-2.5 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
                 <CalendarRange className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base font-bold text-[var(--text-primary)]">
                   Monthly Possessory Blocks — {stationName} ({stationCode})
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Scheduled monthly possession windows assigned by Divisional Operations and Chief of Block Officer
                 </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
-              <span className="text-xs font-mono text-slate-500">
-                Scheduled Blocks: <strong className="text-slate-900 font-bold">{allMonthlyBlocks.length}</strong>
+              <span className="text-xs font-mono text-[var(--text-muted)]">
+                Scheduled Blocks: <strong className="text-[var(--text-primary)] font-bold">{allMonthlyBlocks.length}</strong>
               </span>
-              <span className="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-600 text-[11px] font-mono font-bold">
+              <span className="px-2.5 py-1 rounded bg-[var(--surface-secondary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-[11px] font-mono font-bold">
                 VIEW ONLY
               </span>
             </div>
@@ -535,43 +518,34 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
 
           {/* Empty state */}
           {allMonthlyBlocks.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <CalendarRange className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Monthly Blocks Scheduled
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                There are currently no monthly blocks assigned or received for <strong>{stationName} ({stationCode})</strong>. Scheduled monthly possessory blocks granted by Divisional Operations will appear here for station line supervision.
-              </p>
-              <div className="mt-4">
-                <span className="inline-block text-[11px] font-mono text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                  Station Master view-only register · Scheduled centrally by Division
-                </span>
-              </div>
-            </div>
+            <EmptyState
+              className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/25"
+              icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+              title="Full Track Availability — Zero Active Possessions"
+              description={`The monthly possessory schedule for ${stationName} (${stationCode}) is clear — full track availability maintained. No periodic overhaul windows currently booked.`}
+              advisoryNote="Station Master view-only register · Scheduled centrally by Divisional Operations"
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {allMonthlyBlocks.map((blk) => (
                 <div
                   key={blk.id}
                   onClick={() => setSelectedBlock(blk)}
-                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs hover:border-slate-400 cursor-pointer space-y-3"
+                  className="bg-[var(--surface-card)] rounded-xl border border-[var(--border-subtle)] p-4 shadow-xs hover:border-[var(--border-bold)] cursor-pointer space-y-3 transition-colors text-[var(--text-primary)]"
                 >
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="font-bold text-slate-600">{blk.id}</span>
-                    <span className="px-2 py-0.5 rounded font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                    <span className="font-bold text-[var(--text-muted)]">{blk.id}</span>
+                    <span className="px-2 py-0.5 rounded font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                       {blk.status}
                     </span>
                   </div>
-                  <h4 className="font-bold text-slate-900 text-sm">{blk.title}</h4>
-                  <div className="text-xs text-slate-600 font-mono">
-                    Line: <strong className="text-slate-900">{blk.lineOrPlatform}</strong> · {blk.durationMinutes} mins
+                  <h4 className="font-bold text-[var(--text-primary)] text-sm">{blk.title}</h4>
+                  <div className="text-xs text-[var(--text-secondary)] font-mono">
+                    Line: <strong className="text-[var(--text-primary)]">{blk.lineOrPlatform}</strong> · {blk.durationMinutes} mins
                   </div>
-                  <div className="text-xs text-slate-500 font-mono pt-2 border-t border-slate-100 flex justify-between">
+                  <div className="text-xs text-[var(--text-muted)] font-mono pt-2 border-t border-[var(--border-subtle)] flex justify-between">
                     <span>{blk.scheduledDate}</span>
-                    <span className="font-bold text-[#0b2545]">Inspect</span>
+                    <span className="font-bold text-[var(--brand-navy)] dark:text-sky-400">Inspect</span>
                   </div>
                 </div>
               ))}
@@ -585,43 +559,42 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* ============================================================== */}
       {activeSection === "requests" && (
         <div className="space-y-4">
-          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-[var(--surface-card)] p-4 sm:p-5 rounded-xl border border-[var(--border-subtle)] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[var(--text-primary)]">
             <div className="flex items-center space-x-3">
-              <div className="p-2.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+              <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
                 <AlertOctagon className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base font-bold text-[var(--text-primary)]">
                   Station Infrastructure Issues & Block Requests — {stationName} ({stationCode})
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Report station yard or platform defects and requisition a formal traffic/power block from Divisional Operations (persisted to database)
                 </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-2.5">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => loadStationFaults()}
                 disabled={loadingRequests}
-                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold border border-slate-300 flex items-center space-x-1 cursor-pointer transition-colors"
-                title="Refresh from database"
+                leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${loadingRequests ? "animate-spin" : ""}`} />}
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingRequests ? "animate-spin" : ""}`} />
                 <span className="hidden sm:inline">Refresh</span>
-              </button>
-              <span className="text-xs font-mono text-slate-500">
-                Submitted Requests: <strong className="text-slate-900 font-bold">{issueRequests.length}</strong>
+              </Button>
+              <span className="text-xs font-mono text-[var(--text-muted)]">
+                Submitted Requests: <strong className="text-[var(--text-primary)] font-bold">{issueRequests.length}</strong>
               </span>
-              <button
-                type="button"
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => setIsFormModalOpen(true)}
-                className="px-4 py-2 bg-[#0b2545] hover:bg-sky-900 text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+                leftIcon={<Plus className="w-4 h-4" />}
               >
-                <Plus className="w-4 h-4" />
-                <span>Submit Issue / Block Request</span>
-              </button>
+                Submit Issue / Block Request
+              </Button>
             </div>
           </div>
 
@@ -660,76 +633,63 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
 
           {/* Empty state (Strictly Empty by default) */}
           {issueRequests.length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-              <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-                <AlertOctagon className="w-7 h-7 text-amber-500" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">
-                No Issues or Block Requests Submitted
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                The issue and block request register for <strong>{stationName} ({stationCode})</strong> is currently clean. If an infrastructure defect or track abnormality is observed, click the button below to log the issue and requisition a block.
-              </p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsFormModalOpen(true)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-[#0b2545] hover:text-white text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition-colors cursor-pointer inline-flex items-center space-x-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Submit Issue / Block Request</span>
-                </button>
-              </div>
-            </div>
+            <EmptyState
+              icon={<AlertOctagon className="w-8 h-8 text-amber-500" />}
+              title="No Issues or Block Requests Submitted"
+              description={`The issue and block request register for ${stationName} (${stationCode}) is currently clean. If an infrastructure defect or track abnormality is observed, click the button below to log the issue and requisition a block.`}
+              actionLabel="Submit Issue / Block Request"
+              onAction={() => setIsFormModalOpen(true)}
+              className="py-12"
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {issueRequests.map((req) => {
-                let urgencyBadge = "bg-slate-100 text-slate-800 border-slate-300";
-                if (req.urgency === "SAFETY_HAZARD") urgencyBadge = "bg-red-100 text-red-900 border-red-300";
-                if (req.urgency === "URGENT") urgencyBadge = "bg-orange-100 text-orange-900 border-orange-300";
-                if (req.urgency === "PRIORITY") urgencyBadge = "bg-amber-100 text-amber-900 border-amber-300";
+                let urgencyBadge = "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-subtle)]";
+                if (req.urgency === "SAFETY_HAZARD") urgencyBadge = "bg-red-100 dark:bg-red-950/60 text-red-900 dark:text-red-300 border-red-300 dark:border-red-800";
+                if (req.urgency === "URGENT") urgencyBadge = "bg-orange-100 dark:bg-orange-950/60 text-orange-900 dark:text-orange-300 border-orange-300 dark:border-orange-800";
+                if (req.urgency === "PRIORITY") urgencyBadge = "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-800";
 
                 return (
                   <div
                     key={req.id}
                     onClick={() => setSelectedRequest(req)}
-                    className="bg-white rounded-xl border border-slate-200 hover:border-slate-400 p-4 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-3 flex flex-col justify-between"
+                    className="bg-[var(--surface-card)] rounded-xl border border-[var(--border-subtle)] hover:border-[var(--border-bold)] p-4 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-3 flex flex-col justify-between"
                   >
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-1 text-[11px] font-mono">
-                        <span className="font-bold text-slate-500">{req.id}</span>
+                        <span className="font-bold text-[var(--text-muted)]">{req.id}</span>
                         <div className="flex items-center space-x-1.5">
                           <span className={`px-2 py-0.5 rounded font-bold border ${urgencyBadge}`}>
                             {req.urgency.replace("_", " ")}
                           </span>
-                          <span className="px-2 py-0.5 rounded font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                          <span className="px-2 py-0.5 rounded font-bold bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                             {req.status}
                           </span>
                         </div>
                       </div>
 
-                      <h4 className="font-bold text-slate-900 text-sm leading-snug">
+                      <h4 className="font-bold text-[var(--text-primary)] text-sm leading-snug">
                         {req.title}
                       </h4>
 
-                      <div className="flex items-center space-x-1.5 text-xs text-slate-600">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <div className="flex items-center space-x-1.5 text-xs text-[var(--text-secondary)]">
+                        <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
                         <span className="truncate">{req.affectedLineOrAsset}</span>
                       </div>
 
                       <div className="flex flex-wrap gap-1.5 pt-1">
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-mono font-bold">
+                        <span className="px-2 py-0.5 bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)] rounded text-[10px] font-mono font-bold">
                           {req.department}
                         </span>
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded text-[10px] font-mono">
+                        <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded text-[10px] font-mono">
                           {req.blockTypeRequired.replace("_", " ")} ({req.requestedDurationMinutes}m)
                         </span>
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
+                    <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-muted)] font-mono">
                       <span>{new Date(req.createdAt).toLocaleDateString()}</span>
-                      <div className="flex items-center space-x-1 font-bold text-[#0b2545]">
+                      <div className="flex items-center space-x-1 font-bold text-[var(--brand-navy)] dark:text-sky-400">
                         <span>View Details</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </div>
@@ -747,32 +707,33 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* ============================================================== */}
       {activeSection === "completed" && (
         <div className="space-y-4">
-          <div className="bg-white p-4 sm:p-5 rounded-xl border border-emerald-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-[var(--surface-card)] p-4 sm:p-5 rounded-xl border border-emerald-200/50 dark:border-emerald-800/40 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[var(--text-primary)]">
             <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center space-x-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <span>Station Vicinity Completed Tasks — {stationName} ({stationCode})</span>
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 Tasks completed by departmental squads (P.Way, S&T, TRD) in this station jurisdiction. Notice: Overall operational track possession blocks remain active until all coordinated work finishes.
               </p>
             </div>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={loadStationCompletedTasks}
               disabled={loadingCompletedTasks}
-              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold rounded-lg shadow-2xs flex items-center space-x-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+              leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${loadingCompletedTasks ? "animate-spin" : ""}`} />}
+              className="self-start sm:self-auto"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loadingCompletedTasks ? "animate-spin" : ""}`} />
               <span>Refresh Completed</span>
-            </button>
+            </Button>
           </div>
 
           {stationCompletedTasks.length > 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="bg-[var(--surface-card)] rounded-xl border border-[var(--border-subtle)] shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 font-mono text-[11px] text-slate-600 uppercase">
+                  <thead className="bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] font-mono text-[11px] text-[var(--text-muted)] uppercase">
                     <tr>
                       <th className="p-3 pl-4">Task ID</th>
                       <th className="p-3">Block ID</th>
@@ -785,43 +746,43 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                       <th className="p-3 pr-4">Verification Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-sans">
+                  <tbody className="divide-y divide-[var(--border-subtle)] font-sans">
                     {stationCompletedTasks.map((tsk) => (
-                      <tr key={tsk.id} className="hover:bg-slate-50/80">
-                        <td className="p-3 pl-4 font-mono font-bold text-slate-900">
+                      <tr key={tsk.id} className="hover:bg-[var(--surface-secondary)]/50 transition-colors">
+                        <td className="p-3 pl-4 font-mono font-bold text-[var(--text-primary)]">
                           {tsk.task_id || tsk.id}
                         </td>
-                        <td className="p-3 font-mono font-bold text-indigo-700">
+                        <td className="p-3 font-mono font-bold text-indigo-700 dark:text-indigo-400">
                           {tsk.block_id || "Unlinked"}
                         </td>
                         <td className="p-3">
                           <span
                             className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] border ${
                               tsk.department_id === "PWAY"
-                                ? "bg-blue-50 text-blue-900 border-blue-200"
+                                ? "bg-blue-50 dark:bg-blue-950/60 text-blue-900 dark:text-blue-300 border-blue-200 dark:border-blue-800"
                                 : tsk.department_id === "SNT"
-                                ? "bg-purple-50 text-purple-900 border-purple-200"
-                                : "bg-amber-50 text-amber-900 border-amber-200"
+                                ? "bg-purple-50 dark:bg-purple-950/60 text-purple-900 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                                : "bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-200 dark:border-amber-800"
                             }`}
                           >
                             {tsk.department_id}
                           </span>
                         </td>
-                        <td className="p-3 text-slate-800 text-[11px] font-medium max-w-[200px] truncate" title={tsk.description || tsk.title}>
+                        <td className="p-3 text-[var(--text-primary)] text-[11px] font-medium max-w-[200px] truncate" title={tsk.description || tsk.title}>
                           {tsk.description || tsk.title || tsk.work_type_id}
                         </td>
-                        <td className="p-3 font-mono text-slate-700">
+                        <td className="p-3 font-mono text-[var(--text-secondary)]">
                           <div>Track {tsk.track_name}</div>
-                          <div className="font-bold text-slate-900">{formatDistanceKm(tsk.location_km)}</div>
+                          <div className="font-bold text-[var(--text-primary)]">{formatDistanceKm(tsk.location_km)}</div>
                         </td>
-                        <td className="p-3 text-slate-700 font-medium text-[11px]">
+                        <td className="p-3 text-[var(--text-secondary)] font-medium text-[11px]">
                           {tsk.completed_by || tsk.assigned_crew || "Field Squad"}
                         </td>
-                        <td className="p-3 font-mono text-slate-700 text-[11px]">
+                        <td className="p-3 font-mono text-[var(--text-secondary)] text-[11px]">
                           {tsk.completed_at ? new Date(tsk.completed_at).toLocaleString() : "Recently Completed"}
                         </td>
                         <td className="p-3 font-mono">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                             {tsk.block_status || "ACTIVE"}
                           </span>
                         </td>
@@ -829,8 +790,8 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
                               tsk.verification_status === "VERIFIED"
-                                ? "bg-emerald-100 text-emerald-900 border-emerald-300"
-                                : "bg-amber-100 text-amber-900 border-amber-300"
+                                ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+                                : "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-800"
                             }`}
                           >
                             {tsk.verification_status || "VERIFIED"}
@@ -843,9 +804,12 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
               </div>
             </div>
           ) : (
-            <div className="p-8 text-center text-slate-400 text-xs font-mono bg-white rounded-xl border border-slate-200">
-              No completed departmental tasks recorded in the vicinity of {stationName} ({stationCode}) yet.
-            </div>
+            <EmptyState
+              icon={<CheckCircle2 className="w-8 h-8 text-emerald-500" />}
+              title="No Completed Departmental Tasks"
+              description={`No completed departmental tasks recorded in the vicinity of ${stationName} (${stationCode}) yet.`}
+              className="py-8"
+            />
           )}
         </div>
       )}
@@ -855,18 +819,18 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* ============================================================== */}
       {isFormModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="bg-[var(--surface-card)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden text-[var(--text-primary)]">
+            <div className="p-4 sm:p-5 bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <AlertOctagon className="w-5 h-5 text-amber-600" />
-                <h3 className="font-bold text-slate-900 text-base">
+                <AlertOctagon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <h3 className="font-bold text-[var(--text-primary)] text-base">
                   Submit Issue & Block Request — {stationName} ({stationCode})
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsFormModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -874,15 +838,15 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
 
             <form onSubmit={handleSubmitRequest} className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs rounded-lg flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600 dark:text-red-400" />
                   <span>{formError}</span>
                 </div>
               )}
 
               {/* 1. Issue Title */}
               <div>
-                <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                   Issue Summary / Defect Title *
                 </label>
                 <input
@@ -891,20 +855,20 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   placeholder="e.g. Sluggish throw on Crossover Point 102A / Rail surface defect"
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                  className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                 />
               </div>
 
               {/* 2. Affected Line or Asset */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                     Station Line / Platform *
                   </label>
                   <select
                     value={formAffectedAsset}
                     onChange={(e) => setFormAffectedAsset(e.target.value)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   >
                     <option value="">-- Select Line/Platform --</option>
                     {trackOptions.map((opt: string) => (
@@ -916,7 +880,7 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                     Or Specific Turnout / Asset
                   </label>
                   <input
@@ -924,7 +888,7 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                     value={customAsset}
                     onChange={(e) => setCustomAsset(e.target.value)}
                     placeholder="e.g. Turnout 101B or Mast 142/8"
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   />
                 </div>
               </div>
@@ -932,13 +896,13 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
               {/* 3. Department & Urgency */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                     Concerned Department *
                   </label>
                   <select
                     value={formDepartment}
                     onChange={(e) => setFormDepartment(e.target.value as any)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   >
                     <option value="PWAY">Track / Permanent Way (P.Way)</option>
                     <option value="SNT">Signal & Telecommunications (S&T)</option>
@@ -948,13 +912,13 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                     Urgency / Priority
                   </label>
                   <select
                     value={formUrgency}
                     onChange={(e) => setFormUrgency(e.target.value as any)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   >
                     <option value="ROUTINE">Routine Inspection</option>
                     <option value="PRIORITY">Priority Attention</option>
@@ -967,13 +931,13 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
               {/* 4. Block Type & Duration */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                     Block Type Requisitioned *
                   </label>
                   <select
                     value={formBlockType}
                     onChange={(e) => setFormBlockType(e.target.value as any)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                    className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                   >
                     <option value="TRAFFIC_BLOCK">Traffic Block (Line Possessed)</option>
                     <option value="POWER_BLOCK">Power Block (OHE De-energized)</option>
@@ -983,7 +947,7 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                  <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                     Requested Duration (Minutes) *
                   </label>
                   <input
@@ -993,14 +957,14 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                     step={15}
                     value={formDuration}
                     onChange={(e) => setFormDuration(parseInt(e.target.value) || 60)}
-                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none font-mono"
+                    className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none font-mono"
                   />
                 </div>
               </div>
 
               {/* 5. Preferred Window */}
               <div>
-                <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                   Preferred Time Window / Date
                 </label>
                 <input
@@ -1008,13 +972,13 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                   value={formWindow}
                   onChange={(e) => setFormWindow(e.target.value)}
                   placeholder="e.g. Earliest available corridor window / Night shift 01:30 - 03:00"
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                  className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                 />
               </div>
 
               {/* 6. Description */}
               <div>
-                <label className="block text-xs font-bold font-mono text-slate-700 uppercase mb-1">
+                <label className="block text-xs font-bold font-mono text-[var(--text-secondary)] uppercase mb-1">
                   Issue Description & Block Justification *
                 </label>
                 <textarea
@@ -1023,33 +987,32 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="Detail the physical or electrical defect observed, station operational impact, train movements managed, and why possession is necessary..."
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0b2545] focus:outline-none"
+                  className="w-full text-sm border border-[var(--border-subtle)] rounded-lg px-3 py-2 bg-[var(--surface-card)] text-[var(--text-primary)] focus:ring-2 focus:ring-[var(--brand-navy)] focus:outline-none"
                 />
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 flex items-start space-x-2">
-                <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="p-3 bg-amber-50/70 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-300 flex items-start space-x-2">
+                <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                 <span>
                   This requisition is submitted into the station's formal register for Divisional Operations review. It does not generate fake train delays or simulated train movements.
                 </span>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-200">
-                <button
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-[var(--border-subtle)]">
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => setIsFormModalOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 rounded-lg cursor-pointer"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
                   type="submit"
-                  disabled={submittingRequest}
-                  className="px-5 py-2 bg-[#0b2545] hover:bg-[#134074] disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-xs cursor-pointer flex items-center space-x-1.5"
+                  isLoading={submittingRequest}
                 >
-                  {submittingRequest && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{submittingRequest ? "Submitting..." : "Submit Issue & Block Requisition"}</span>
-                </button>
+                  {submittingRequest ? "Submitting..." : "Submit Issue & Block Requisition"}
+                </Button>
               </div>
             </form>
           </div>
@@ -1061,21 +1024,21 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* ============================================================== */}
       {selectedRequest && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="bg-[var(--surface-card)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden flex flex-col max-h-[90vh] text-[var(--text-primary)]">
+            <div className="p-4 sm:p-5 bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
-                <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-slate-200 text-slate-800">
+                <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                   {selectedRequest.id}
                 </span>
-                <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-amber-100 text-amber-900 border border-amber-300">
+                <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
                   {selectedRequest.department}
                 </span>
-                <h3 className="font-bold text-slate-900 text-base">Issue & Block Request Details</h3>
+                <h3 className="font-bold text-[var(--text-primary)] text-base">Issue & Block Request Details</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedRequest(null)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1083,48 +1046,48 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
 
             <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs">
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold block">
                   Reported Issue
                 </span>
-                <h2 className="text-base font-black text-slate-900 mt-1">{selectedRequest.title}</h2>
+                <h2 className="text-base font-black text-[var(--text-primary)] mt-1">{selectedRequest.title}</h2>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-[var(--surface-secondary)] p-3.5 rounded-xl border border-[var(--border-subtle)]">
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-mono">Affected Line</span>
-                  <span className="font-bold text-slate-900 mt-0.5 block">{selectedRequest.affectedLineOrAsset}</span>
+                  <span className="text-[var(--text-muted)] block text-[10px] uppercase font-mono">Affected Line</span>
+                  <span className="font-bold text-[var(--text-primary)] mt-0.5 block">{selectedRequest.affectedLineOrAsset}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-mono">Block Type</span>
-                  <span className="font-bold text-slate-900 mt-0.5 block">{selectedRequest.blockTypeRequired.replace("_", " ")}</span>
+                  <span className="text-[var(--text-muted)] block text-[10px] uppercase font-mono">Block Type</span>
+                  <span className="font-bold text-[var(--text-primary)] mt-0.5 block">{selectedRequest.blockTypeRequired.replace("_", " ")}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-mono">Duration</span>
-                  <span className="font-bold text-slate-900 mt-0.5 block font-mono">{selectedRequest.requestedDurationMinutes} Mins</span>
+                  <span className="text-[var(--text-muted)] block text-[10px] uppercase font-mono">Duration</span>
+                  <span className="font-bold text-[var(--text-primary)] mt-0.5 block font-mono">{selectedRequest.requestedDurationMinutes} Mins</span>
                 </div>
               </div>
 
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold block mb-1">
                   Requested Time Window
                 </span>
-                <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 font-mono text-slate-800">
+                <div className="p-2.5 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-subtle)] font-mono text-[var(--text-primary)]">
                   {selectedRequest.requestedWindow}
                 </div>
               </div>
 
               <div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] font-bold block mb-1">
                   Defect Description & Justification
                 </span>
-                <p className="p-3 bg-white rounded-lg border border-slate-200 leading-relaxed text-slate-800">
+                <p className="p-3 bg-[var(--surface-card)] rounded-lg border border-[var(--border-subtle)] leading-relaxed text-[var(--text-secondary)]">
                   {selectedRequest.description}
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 text-slate-500 font-mono pt-2 border-t border-slate-100">
-                <span>Submitted by: <strong className="text-slate-800">{selectedRequest.loggedBy}</strong></span>
-                <span>Date: <strong className="text-slate-800">{new Date(selectedRequest.createdAt).toLocaleString()}</strong></span>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[var(--text-muted)] font-mono pt-2 border-t border-[var(--border-subtle)]">
+                <span>Submitted by: <strong className="text-[var(--text-primary)]">{selectedRequest.loggedBy}</strong></span>
+                <span>Date: <strong className="text-[var(--text-primary)]">{new Date(selectedRequest.createdAt).toLocaleString()}</strong></span>
               </div>
             </div>
           </div>
@@ -1136,41 +1099,41 @@ export const StationControlTab: React.FC<StationControlTabProps> = ({
       {/* ============================================================== */}
       {selectedBlock && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
-            <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="bg-[var(--surface-card)] w-full max-w-md rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden flex flex-col text-[var(--text-primary)]">
+            <div className="p-4 sm:p-5 bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-slate-200 text-slate-800">
+                <span className="px-2 py-0.5 text-xs font-mono font-bold rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                   {selectedBlock.id}
                 </span>
-                <h3 className="font-bold text-slate-900 text-base">Block Details</h3>
+                <h3 className="font-bold text-[var(--text-primary)] text-base">Block Details</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedBlock(null)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-5 space-y-3 text-xs">
-              <h4 className="font-bold text-slate-900 text-sm">{selectedBlock.title}</h4>
-              <div className="space-y-1.5 font-mono text-slate-700">
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Line:</span>
-                  <span className="font-bold">{selectedBlock.lineOrPlatform}</span>
+              <h4 className="font-bold text-[var(--text-primary)] text-sm">{selectedBlock.title}</h4>
+              <div className="space-y-1.5 font-mono text-[var(--text-secondary)]">
+                <div className="flex justify-between py-1 border-b border-[var(--border-subtle)]">
+                  <span className="text-[var(--text-muted)]">Line:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{selectedBlock.lineOrPlatform}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Department:</span>
-                  <span className="font-bold">{selectedBlock.department}</span>
+                <div className="flex justify-between py-1 border-b border-[var(--border-subtle)]">
+                  <span className="text-[var(--text-muted)]">Department:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{selectedBlock.department}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Duration:</span>
-                  <span className="font-bold">{selectedBlock.durationMinutes} Minutes</span>
+                <div className="flex justify-between py-1 border-b border-[var(--border-subtle)]">
+                  <span className="text-[var(--text-muted)]">Duration:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{selectedBlock.durationMinutes} Minutes</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-slate-500">Scheduled:</span>
-                  <span className="font-bold">{selectedBlock.scheduledDate}</span>
+                  <span className="text-[var(--text-muted)]">Scheduled:</span>
+                  <span className="font-bold text-[var(--text-primary)]">{selectedBlock.scheduledDate}</span>
                 </div>
               </div>
             </div>

@@ -20,16 +20,18 @@ import { DivisionalOperationsControl } from "./pages/DivisionalOperationsControl
 import { TrainPilotWorkspacePage } from "./pages/TrainPilotWorkspacePage";
 import { MareyDiagramPage } from "./pages/MareyDiagramPage";
 import { BaselineComparisonPage } from "./pages/BaselineComparisonPage";
+import { ComponentGalleryPage } from "./pages/dev/ComponentGalleryPage";
+import { UnauthorizedWorkspace } from "./components/common/UnauthorizedWorkspace";
 
 const ProtectedRoute: React.FC<{ path: string; children: React.ReactNode }> = ({ path, children }) => {
-  const { isAuthenticated, canAccessPath, currentRole } = useAuth();
+  const { isAuthenticated, canAccessPath } = useAuth();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
   if (!canAccessPath(path)) {
-    return <Navigate to={currentRole.defaultPath} replace />;
+    return <UnauthorizedWorkspace attemptedPath={path} />;
   }
 
   return <>{children}</>;
@@ -50,7 +52,7 @@ const AppContent: React.FC = () => {
   const isLoginPage = location.pathname === "/login";
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-[var(--surface-body)] text-[var(--text-primary)] flex flex-col font-sans">
       {!isLoginPage && <Navbar />}
       <div className="flex flex-1">
         {!isLoginPage && isAuthenticated && <Sidebar />}
@@ -264,6 +266,9 @@ const AppContent: React.FC = () => {
                 </ProtectedRoute>
               }
             />
+
+            {/* Developer Component Gallery (Phase 1 isolated library verification) */}
+            <Route path="/dev/component-gallery" element={<ComponentGalleryPage />} />
 
             {/* Catch-all fallback */}
             <Route path="*" element={<RootRedirect />} />

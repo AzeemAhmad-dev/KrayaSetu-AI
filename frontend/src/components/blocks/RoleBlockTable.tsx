@@ -14,9 +14,11 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
-  Train
+  Train,
+  ShieldCheck
 } from "lucide-react";
 import { formatDistanceKm } from "../../utils/formatDistance";
+import { Button, EmptyState } from "../ui";
 
 interface RoleBlockTableProps {
   blocks: BlockData[];
@@ -57,45 +59,45 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
     switch (status) {
       case "PROPOSED":
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
             PROPOSED
           </span>
         );
       case "PENDING_APPROVAL":
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-900 border border-amber-300">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border border-[var(--status-warning-border)]">
             PENDING APPROVAL
           </span>
         );
       case "APPROVED":
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--status-success-bg)] text-[var(--status-success-text)] border border-[var(--status-success-border)]">
             APPROVED
           </span>
         );
       case "SELECTED":
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-50 text-sky-800 border border-sky-300 flex items-center space-x-1">
-            <CheckCircle2 className="w-3 h-3 text-sky-600 inline" />
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--status-success-bg)] text-[var(--status-success-text)] border border-[var(--status-success-border)] flex items-center space-x-1">
+            <CheckCircle2 className="w-3 h-3 text-[var(--status-success)] inline" />
             <span>SELECTED PLAN</span>
           </span>
         );
       case "REJECTED":
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-50 text-red-800 border border-red-200">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] border border-[var(--status-danger-border)]">
             REJECTED
           </span>
         );
       case "RE_PLAN":
       case "DEFERRED":
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-800 border border-purple-200">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
             RE-PLANNING
           </span>
         );
       default:
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
             {status}
           </span>
         );
@@ -106,27 +108,27 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
     const p = (prio || "MEDIUM").toUpperCase();
     if (p === "CRITICAL") {
       return (
-        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black bg-red-600 text-white animate-pulse">
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-black bg-[var(--status-danger)] text-white animate-pulse">
           CRITICAL
         </span>
       );
     }
     if (p === "HIGH") {
       return (
-        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300">
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] border border-[var(--status-warning-border)]">
           HIGH
         </span>
       );
     }
     if (p === "MEDIUM") {
       return (
-        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 text-blue-800 border border-blue-200">
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
           MEDIUM
         </span>
       );
     }
     return (
-      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700">
+      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--surface-secondary)] text-[var(--text-muted)] border border-[var(--border-subtle)]">
         LOW
       </span>
     );
@@ -138,7 +140,7 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
       case "RULING":
         return (
           <span
-            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-100 text-indigo-900 border border-indigo-300 inline-flex items-center space-x-1"
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--lock-ruling-bg)] text-[var(--lock-ruling-text)] border border-[var(--lock-ruling-border)] inline-flex items-center space-x-1"
             title="Ruling Block: Long-term Annual Maintenance Programme 2026"
           >
             <span>🏛️</span>
@@ -148,7 +150,7 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
       case "EMERGENT":
         return (
           <span
-            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-100 text-rose-900 border border-rose-300 inline-flex items-center space-x-1"
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--lock-emergent-bg)] text-[var(--lock-emergent-text)] border border-[var(--lock-emergent-border)] inline-flex items-center space-x-1"
             title="Emergent Block: P1 Critical Safety Intervention"
           >
             <span>🚨</span>
@@ -158,7 +160,7 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
       case "SHADOW":
         return (
           <span
-            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center space-x-1"
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--lock-shadow-bg)] text-[var(--lock-shadow-text)] border border-[var(--lock-shadow-border)] inline-flex items-center space-x-1"
             title="Shadow Block: Opportunistic multi-department possession"
           >
             <span>👥</span>
@@ -168,7 +170,7 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
       default:
         return (
           <span
-            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 inline-flex items-center space-x-1"
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[var(--lock-planned-bg)] text-[var(--lock-planned-text)] border border-[var(--lock-planned-border)] inline-flex items-center space-x-1"
             title="Planned Block: Divisional Maintenance Programme"
           >
             <span>📋</span>
@@ -179,29 +181,32 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+    <div className="bg-[var(--surface-card)] rounded-xl border border-[var(--border-subtle)] shadow-xs overflow-hidden">
       {(title || subtitle) && (
-        <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div className="p-3.5 bg-[var(--surface-secondary)]/60 border-b border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2">
           <div>
             {title && (
-              <h3 className="font-bold text-slate-900 text-xs sm:text-sm uppercase tracking-wider font-mono flex items-center space-x-2">
-                <Layers className="w-4 h-4 text-[#0b2545]" />
+              <h3 className="font-bold text-[var(--text-primary)] text-xs sm:text-sm uppercase tracking-wider font-mono flex items-center space-x-2">
+                <Layers className="w-4 h-4 text-[var(--brand-navy)] dark:text-sky-400" />
                 <span>{title}</span>
-                <span className="text-slate-500 font-normal">({blocks.length})</span>
+                <span className="text-[var(--text-muted)] font-normal">({blocks.length})</span>
               </h3>
             )}
-            {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
+            {subtitle && <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
           </div>
           <ProvenanceBadge type="REAL_PUBLIC" size="sm" />
         </div>
       )}
 
       {blocks.length === 0 ? (
-        <div className="p-8 text-center space-y-2">
-          <div className="text-xs text-slate-500 font-mono">{emptyMessage}</div>
-          <div className="text-[11px] text-slate-400">
-            Blocks created or cleared in the central planning workflow will appear here in real time.
-          </div>
+        <div className="p-4">
+          <EmptyState
+            className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/20"
+            icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+            title="All Tracks Available — No Active Blocks"
+            description={emptyMessage}
+            advisoryNote="Divisional line-clear maintained · Single Source of Truth verified across central planning"
+          />
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -314,20 +319,21 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
                       {/* Actions & Reasoning */}
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end space-x-1.5">
-                          <button
-                            type="button"
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => setReasoningBlockId(b.id)}
-                            className="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold flex items-center space-x-1 cursor-pointer transition-colors shadow-2xs"
+                            leftIcon={<Sparkles className="w-3 h-3 text-indigo-500" />}
+                            className="text-[11px] h-7 px-2"
                             title="View AI Decision Rationale & Impact Analysis"
                           >
-                            <Sparkles className="w-3 h-3 text-indigo-600" />
                             <span>Reasoning</span>
-                          </button>
+                          </Button>
 
                           <button
                             type="button"
                             onClick={() => toggleExpand(b.id)}
-                            className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs cursor-pointer transition-colors"
+                            className="p-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] text-xs cursor-pointer transition-colors border border-[var(--border-subtle)]"
                             title="Toggle expanded details"
                           >
                             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -336,38 +342,41 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
                           {showActions && (
                             <>
                               {b.status === "PROPOSED" && onSubmit && (
-                                <button
-                                  type="button"
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
                                   onClick={() => onSubmit(b.id)}
-                                  disabled={actioningBlockId === b.id}
-                                  className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[10px] font-bold inline-flex items-center space-x-1 cursor-pointer"
+                                  isLoading={actioningBlockId === b.id}
+                                  leftIcon={<Send className="w-2.5 h-2.5" />}
+                                  className="text-[10px] h-7 px-2"
                                 >
-                                  <Send className="w-2.5 h-2.5" />
-                                  <span>{actioningBlockId === b.id ? "Submitting..." : "Submit"}</span>
-                                </button>
+                                  <span>Submit</span>
+                                </Button>
                               )}
 
                               {b.status === "PENDING_APPROVAL" && (
                                 <>
                                   {onReject && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
                                       onClick={() => onReject(b.id)}
                                       disabled={actioningBlockId === b.id}
-                                      className="px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 text-[10px] font-bold cursor-pointer"
+                                      className="text-[10px] h-7 px-2"
                                     >
                                       Reject
-                                    </button>
+                                    </Button>
                                   )}
                                   {onApprove && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="success"
+                                      size="sm"
                                       onClick={() => onApprove(b.id)}
-                                      disabled={actioningBlockId === b.id}
-                                      className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold cursor-pointer"
+                                      isLoading={actioningBlockId === b.id}
+                                      className="text-[10px] h-7 px-2"
                                     >
-                                      {actioningBlockId === b.id ? "Approving..." : "Approve"}
-                                    </button>
+                                      Approve
+                                    </Button>
                                   )}
                                 </>
                               )}
@@ -375,24 +384,26 @@ export const RoleBlockTable: React.FC<RoleBlockTableProps> = ({
                               {b.status === "APPROVED" && (
                                 <>
                                   {onReplan && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
                                       onClick={() => onReplan(b.id)}
                                       disabled={actioningBlockId === b.id}
-                                      className="px-2 py-1 rounded border border-purple-300 text-purple-800 hover:bg-purple-50 disabled:opacity-50 text-[10px] font-bold cursor-pointer"
+                                      className="text-[10px] h-7 px-2"
                                     >
                                       Re-plan
-                                    </button>
+                                    </Button>
                                   )}
                                   {onSelect && (
-                                    <button
-                                      type="button"
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
                                       onClick={() => onSelect(b.id)}
-                                      disabled={actioningBlockId === b.id}
-                                      className="px-2.5 py-1 rounded bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-[10px] font-bold cursor-pointer"
+                                      isLoading={actioningBlockId === b.id}
+                                      className="text-[10px] h-7 px-2"
                                     >
-                                      {actioningBlockId === b.id ? "Selecting..." : "Select Plan"}
-                                    </button>
+                                      Select Plan
+                                    </Button>
                                   )}
                                 </>
                               )}

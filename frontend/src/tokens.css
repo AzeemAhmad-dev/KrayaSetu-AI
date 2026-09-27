@@ -1,0 +1,443 @@
+/**
+ * KRAYASETU AI — CENTRALIZED DESIGN TOKEN FOUNDATION (PHASE 0)
+ * 
+ * Source: UI_INVENTORY_REPORT.md Section 5 (Design System & Styling Audit)
+ * Target Framework: Tailwind CSS v4 & Modern CSS Custom Properties
+ * 
+ * Rules:
+ * 1. Single source of truth for all semantic colors, typography, spacing, and layout metrics.
+ * 2. Parallel variable sets on identical token names for Light and Dark themes.
+ * 3. Formalized tokens for Lock Types (Ruling, Planned, Emergent, Shadow) and Departments (COA, P.Way, TRD, S&T).
+ * 4. Phase 0 is strictly non-breaking and invisible — components will consume these tokens in Phase 1+.
+ */
+
+:root {
+  /* ==========================================================================
+     1. COLOR PALETTE: BRAND NAVY FAMILY (§5.1)
+     ========================================================================== */
+  --brand-navy: #0b2545;
+  --brand-navy-border: #134074;
+  --brand-navy-hover: #13315c;
+  --brand-canvas-blue: #1d4e89;
+
+  /* ==========================================================================
+     2. COLOR PALETTE: SURFACES & BACKGROUNDS (§5.1)
+     ========================================================================== */
+  --surface-body: #f8fafc;        /* Slate-50: Main viewport canvas */
+  --surface-card: #ffffff;        /* Pure white: Content cards and tables */
+  --surface-secondary: #f1f5f9;   /* Slate-100: Table headers, inputs, pills */
+  --surface-tertiary: #e2e8f0;    /* Slate-200: Dividers, secondary hovers */
+  --surface-overlay: rgba(15, 23, 42, 0.70); /* Slate-900 / 70% modal backdrop */
+
+  /* ==========================================================================
+     3. COLOR PALETTE: TEXT & FOREGROUND CONTENT (§5.1)
+     ========================================================================== */
+  --text-primary: #0f172a;        /* Slate-900: High-emphasis titles, values */
+  --text-secondary: #334155;      /* Slate-700: Body copy, active labels */
+  --text-muted: #64748b;          /* Slate-500: Subtitles, metadata, timestamps */
+  --text-disabled: #94a3b8;       /* Slate-400: Disabled elements */
+  --text-inverse: #ffffff;        /* Crisp white text for dark/navy surfaces */
+
+  /* ==========================================================================
+     4. COLOR PALETTE: BORDERS & SEPARATORS (§5.1)
+     ========================================================================== */
+  --border-subtle: #e2e8f0;       /* Slate-200: Standard card borders */
+  --border-medium: #cbd5e1;       /* Slate-300: Active inputs, table grids */
+  --border-strong: #94a3b8;       /* Slate-400: Focus rings, selected boundaries */
+
+  /* ==========================================================================
+     5. COLOR PALETTE: SEMANTIC & OPERATIONAL STATUS (§5.1)
+     ========================================================================== */
+  /* Success: Approved blocks, downtime saved, on-time status */
+  --status-success: #059669;
+  --status-success-bg: #ecfdf5;
+  --status-success-border: #a7f3d0;
+  --status-success-text: #065f46;
+
+  /* Warning: Safety advisories, pending review, cautionary alerts */
+  --status-warning: #d97706;
+  --status-warning-bg: #fffbeb;
+  --status-warning-border: #fde68a;
+  --status-warning-text: #78350f;
+
+  /* Danger / Error: Traffic conflicts, rail defects, overrides */
+  --status-danger: #dc2626;
+  --status-danger-bg: #fef2f2;
+  --status-danger-border: #fecaca;
+  --status-danger-text: #7f1d1d;
+
+  /* Info / Accent: Provenance badges, corridor navigation, system sync */
+  --status-info: #0284c7;
+  --status-info-bg: #f0f9ff;
+  --status-info-border: #bae6fd;
+  --status-info-text: #075985;
+
+  /* ==========================================================================
+     6. FORMALIZED TOKEN CATEGORY 1: FOUR LOCK-TYPE COLORS (§B.1)
+     Sourced from: MareyCanvas.tsx (lines 256-270), RoleBlockTable.tsx (lines 135-175),
+                   MareyHeader.tsx (lines 400-418), BlockPlannerPage.tsx (lines 1046-1055)
+     ========================================================================== */
+  /* Ruling: Long-term statutory annual maintenance programme */
+  --lock-ruling: #9333ea;
+  --lock-ruling-bg: #f3e8ff;
+  --lock-ruling-fill: rgba(147, 51, 234, 0.18);
+  --lock-ruling-border: #d8b4fe;
+  --lock-ruling-text: #581c87;
+
+  /* Planned: Standard divisional timetable possession */
+  --lock-planned: #2563eb;
+  --lock-planned-bg: #eff6ff;
+  --lock-planned-fill: rgba(59, 130, 246, 0.16);
+  --lock-planned-border: #bfdbfe;
+  --lock-planned-text: #1e40af;
+
+  /* Emergent: P1 critical safety intervention / emergency repair */
+  --lock-emergent: #dc2626;
+  --lock-emergent-bg: #fef2f2;
+  --lock-emergent-fill: rgba(239, 68, 68, 0.22);
+  --lock-emergent-border: #fecaca;
+  --lock-emergent-text: #991b1b;
+
+  /* Shadow: Opportunistic multi-department co-located possession */
+  --lock-shadow: #4f46e5;
+  --lock-shadow-bg: #e0e7ff;
+  --lock-shadow-fill: rgba(79, 70, 229, 0.20);
+  --lock-shadow-border: #c7d2fe;
+  --lock-shadow-text: #312e81;
+
+  /* ==========================================================================
+     7. FORMALIZED TOKEN CATEGORY 2: FOUR DEPARTMENT COLORS (§B.2)
+     Sourced from: AuthContext.tsx (lines 78, 174, 230, 258), Sidebar.tsx,
+                   BaselineComparisonPage.tsx (lines 280-325), CoordinationPage.tsx
+     ========================================================================== */
+  /* COA: Chief of Block Operations / Divisional Executive / Master Control */
+  --dept-coa: #7e22ce;
+  --dept-coa-bg: #f3e8ff;
+  --dept-coa-border: #d8b4fe;
+  --dept-coa-text: #581c87;
+
+  /* P.Way: Civil Engineering / Permanent Way / Track Structure */
+  --dept-pway: #ea580c;
+  --dept-pway-bg: #ffedd5;
+  --dept-pway-border: #fdba74;
+  --dept-pway-text: #7c2d12;
+
+  /* TRD: Electrical / Traction Distribution / 25kV OHE Overhead */
+  --dept-trd: #d97706;
+  --dept-trd-bg: #fef3c7;
+  --dept-trd-border: #fcd34d;
+  --dept-trd-text: #78350f;
+
+  /* S&T: Signal & Telecommunication / Electronic Interlocking */
+  --dept-snt: #0891b2;
+  --dept-snt-bg: #cffafe;
+  --dept-snt-border: #67e8f9;
+  --dept-snt-text: #164e63;
+
+  /* ==========================================================================
+     8. MAREY CANVAS RE-DERIVATION TOKENS (§C.2)
+     Sourced from: MareyCanvas.tsx (lines 114-132), MareyHeader.tsx (lines 370-397)
+     ========================================================================== */
+  --marey-canvas-bg: #fcfaf2;
+  --marey-header-bg: #f4eee1;
+  --marey-canvas-border: #cbd5e1;
+  --marey-grid-major: rgba(30, 41, 59, 0.40);
+  --marey-grid-minor: rgba(148, 163, 184, 0.25);
+  --marey-grid-time: rgba(148, 163, 184, 0.22);
+  --marey-text-station: #1e293b;
+  --marey-text-station-major: #0f172a;
+  --marey-text-km: #64748b;
+  --marey-text-hour: #475569;
+  --marey-scrubber: #ef4444;
+
+  /* Train Category Trajectory Lines */
+  --train-prestige: #b91c1c;        /* Vande Bharat / Shatabdi (130 km/h) */
+  --train-superfast: #1d4ed8;       /* Superfast / Express (110 km/h) */
+  --train-mail: #0f766e;            /* Mail / Express (100 km/h) */
+  --train-passenger: #b45309;       /* Passenger / MEMU (75 km/h) */
+  --train-freight: #334155;         /* Freight / Container (65 km/h) */
+
+  /* ==========================================================================
+     9. TYPOGRAPHY SCALE & FONT SYSTEM (§5.2)
+     ========================================================================== */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* 5-Step Weight Hierarchy */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+
+  /* Preserved 12px Minimum UI Floor as a Formal Token (Not Hardcoded Override) */
+  --text-floor: 0.75rem;            /* 12px minimum comfortable UI size */
+  --text-floor-leading: 1.05rem;    /* 16.8px line height */
+
+  /* Font Size Hierarchy */
+  --text-xs: 0.75rem;               /* 12px */
+  --text-sm: 0.875rem;              /* 14px */
+  --text-base: 1rem;                /* 16px */
+  --text-lg: 1.125rem;              /* 18px */
+  --text-xl: 1.25rem;               /* 20px */
+  --text-2xl: 1.5rem;               /* 24px */
+  --text-3xl: 1.875rem;             /* 30px */
+  --text-4xl: 2.25rem;              /* 36px */
+
+  /* ==========================================================================
+     10. SPACING, LAYOUT & CONTAINER SCALE (§5.3)
+     ========================================================================== */
+  /* Container Widths */
+  --container-sm: 28rem;            /* 448px: max-w-md login form */
+  --container-md: 42rem;            /* 672px: max-w-2xl modals and dialogs */
+  --container-lg: 64rem;            /* 1024px: max-w-5xl general containers */
+  --container-xl: 80rem;            /* 1280px: max-w-7xl standard dashboards */
+  --container-2xl: 100rem;          /* 1600px: max-w-[1600px] topographic workspaces */
+
+  /* Common Padding Patterns */
+  --padding-viewport-sm: 1rem;      /* 16px: p-4 */
+  --padding-viewport-md: 1.5rem;    /* 24px: p-6 */
+  --padding-viewport-lg: 2rem;      /* 32px: p-8 */
+  --padding-card-sm: 1rem;          /* 16px: p-4 */
+  --padding-card-md: 1.25rem;       /* 20px: p-5 */
+  --padding-card-lg: 1.5rem;        /* 24px: p-6 */
+  --padding-table-cell: 0.625rem 0.75rem; /* 10px 12px: p-2.5 sm:p-3 */
+
+  /* Border Radiuses */
+  --radius-xs: 0.25rem;             /* 4px */
+  --radius-sm: 0.375rem;            /* 6px */
+  --radius-md: 0.5rem;              /* 8px */
+  --radius-lg: 0.75rem;             /* 12px: rounded-xl standard card */
+  --radius-xl: 1rem;                /* 16px: rounded-2xl large card */
+  --radius-2xl: 1.5rem;             /* 24px: rounded-3xl hero containers */
+  --radius-full: 9999px;            /* rounded-full pills, status badges */
+
+  /* Elevation & Shadow Styles */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* ==========================================================================
+   DARK THEME: PARALLEL VARIABLE SET (EXACT SAME TOKEN NAMES) (§C.1)
+   Activated via .dark or [data-theme="dark"] on <html> or container
+   ========================================================================== */
+.dark,
+[data-theme="dark"] {
+  /* Brand Navy Family */
+  --brand-navy: #1e293b;
+  --brand-navy-border: #334155;
+  --brand-navy-hover: #334155;
+  --brand-canvas-blue: #0369a1;
+
+  /* Surfaces & Backgrounds */
+  --surface-body: #090d16;
+  --surface-card: #111827;
+  --surface-secondary: #1e293b;
+  --surface-tertiary: #334155;
+  --surface-overlay: rgba(0, 0, 0, 0.85);
+
+  /* Text & Foreground Content */
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-disabled: #64748b;
+  --text-inverse: #f8fafc;
+
+  /* Borders & Separators */
+  --border-subtle: #1e293b;
+  --border-medium: #334155;
+  --border-strong: #475569;
+
+  /* Semantic & Operational Status */
+  --status-success: #10b981;
+  --status-success-bg: #064e3b;
+  --status-success-border: #047857;
+  --status-success-text: #a7f3d0;
+
+  --status-warning: #f59e0b;
+  --status-warning-bg: #451a03;
+  --status-warning-border: #b45309;
+  --status-warning-text: #fde68a;
+
+  --status-danger: #ef4444;
+  --status-danger-bg: #450a0a;
+  --status-danger-border: #b91c1c;
+  --status-danger-text: #fecaca;
+
+  --status-info: #38bdf8;
+  --status-info-bg: #082f49;
+  --status-info-border: #0369a1;
+  --status-info-text: #bae6fd;
+
+  /* Lock Types (Dark Theme Equivalents) */
+  --lock-ruling: #c084fc;
+  --lock-ruling-bg: #3b0764;
+  --lock-ruling-fill: rgba(147, 51, 234, 0.25);
+  --lock-ruling-border: #7e22ce;
+  --lock-ruling-text: #e9d5ff;
+
+  --lock-planned: #60a5fa;
+  --lock-planned-bg: #1e3a8a;
+  --lock-planned-fill: rgba(59, 130, 246, 0.22);
+  --lock-planned-border: #1d4ed8;
+  --lock-planned-text: #dbeafe;
+
+  --lock-emergent: #fb7185;
+  --lock-emergent-bg: #450a0a;
+  --lock-emergent-fill: rgba(239, 68, 68, 0.28);
+  --lock-emergent-border: #b91c1c;
+  --lock-emergent-text: #fee2e2;
+
+  --lock-shadow: #818cf8;
+  --lock-shadow-bg: #312e81;
+  --lock-shadow-fill: rgba(79, 70, 229, 0.25);
+  --lock-shadow-border: #4338ca;
+  --lock-shadow-text: #e0e7ff;
+
+  /* Department Colors (Dark Theme Equivalents) */
+  --dept-coa: #a855f7;
+  --dept-coa-bg: #3b0764;
+  --dept-coa-border: #7e22ce;
+  --dept-coa-text: #f3e8ff;
+
+  --dept-pway: #f97316;
+  --dept-pway-bg: #431407;
+  --dept-pway-border: #c2410c;
+  --dept-pway-text: #ffedd5;
+
+  --dept-trd: #f59e0b;
+  --dept-trd-bg: #451a03;
+  --dept-trd-border: #b45309;
+  --dept-trd-text: #fef3c7;
+
+  --dept-snt: #06b6d4;
+  --dept-snt-bg: #083344;
+  --dept-snt-border: #0e7490;
+  --dept-snt-text: #cffafe;
+
+  /* Marey Canvas Re-Derivation (Dark Dispatcher Charcoal) */
+  --marey-canvas-bg: #090d16;
+  --marey-header-bg: #070b14;
+  --marey-canvas-border: #1e293b;
+  --marey-grid-major: rgba(148, 163, 184, 0.45);
+  --marey-grid-minor: rgba(71, 85, 105, 0.25);
+  --marey-grid-time: rgba(71, 85, 105, 0.22);
+  --marey-text-station: #cbd5e1;
+  --marey-text-station-major: #f8fafc;
+  --marey-text-km: #94a3b8;
+  --marey-text-hour: #94a3b8;
+  --marey-scrubber: #f87171;
+
+  --train-prestige: #ef4444;
+  --train-superfast: #3b82f6;
+  --train-mail: #14b8a6;
+  --train-passenger: #f59e0b;
+  --train-freight: #94a3b8;
+}
+
+/* ==========================================================================
+   TAILWIND CSS V4 THEME MAPPINGS
+   Exposes all centralized tokens to Tailwind's utility class generator
+   ========================================================================== */
+@theme {
+  /* Brand Navy */
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-navy-border: var(--brand-navy-border);
+  --color-brand-navy-hover: var(--brand-navy-hover);
+  --color-brand-canvas-blue: var(--brand-canvas-blue);
+
+  /* Surfaces */
+  --color-surface-body: var(--surface-body);
+  --color-surface-card: var(--surface-card);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-tertiary: var(--surface-tertiary);
+  --color-surface-overlay: var(--surface-overlay);
+
+  /* Text & Foreground Content */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-inverse: var(--text-inverse);
+
+  /* Borders */
+  --color-border-subtle: var(--border-subtle);
+  --color-border-medium: var(--border-medium);
+  --color-border-strong: var(--border-strong);
+
+  /* Status Colors */
+  --color-status-success: var(--status-success);
+  --color-status-success-bg: var(--status-success-bg);
+  --color-status-success-border: var(--status-success-border);
+  --color-status-success-text: var(--status-success-text);
+
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-bg: var(--status-warning-bg);
+  --color-status-warning-border: var(--status-warning-border);
+  --color-status-warning-text: var(--status-warning-text);
+
+  --color-status-danger: var(--status-danger);
+  --color-status-danger-bg: var(--status-danger-bg);
+  --color-status-danger-border: var(--status-danger-border);
+  --color-status-danger-text: var(--status-danger-text);
+
+  --color-status-info: var(--status-info);
+  --color-status-info-bg: var(--status-info-bg);
+  --color-status-info-border: var(--status-info-border);
+  --color-status-info-text: var(--status-info-text);
+
+  /* Formalized Lock Types */
+  --color-lock-ruling: var(--lock-ruling);
+  --color-lock-ruling-bg: var(--lock-ruling-bg);
+  --color-lock-ruling-border: var(--lock-ruling-border);
+  --color-lock-ruling-text: var(--lock-ruling-text);
+
+  --color-lock-planned: var(--lock-planned);
+  --color-lock-planned-bg: var(--lock-planned-bg);
+  --color-lock-planned-border: var(--lock-planned-border);
+  --color-lock-planned-text: var(--lock-planned-text);
+
+  --color-lock-emergent: var(--lock-emergent);
+  --color-lock-emergent-bg: var(--lock-emergent-bg);
+  --color-lock-emergent-border: var(--lock-emergent-border);
+  --color-lock-emergent-text: var(--lock-emergent-text);
+
+  --color-lock-shadow: var(--lock-shadow);
+  --color-lock-shadow-bg: var(--lock-shadow-bg);
+  --color-lock-shadow-border: var(--lock-shadow-border);
+  --color-lock-shadow-text: var(--lock-shadow-text);
+
+  /* Formalized Department Colors */
+  --color-dept-coa: var(--dept-coa);
+  --color-dept-coa-bg: var(--dept-coa-bg);
+  --color-dept-coa-border: var(--dept-coa-border);
+  --color-dept-coa-text: var(--dept-coa-text);
+
+  --color-dept-pway: var(--dept-pway);
+  --color-dept-pway-bg: var(--dept-pway-bg);
+  --color-dept-pway-border: var(--dept-pway-border);
+  --color-dept-pway-text: var(--dept-pway-text);
+
+  --color-dept-trd: var(--dept-trd);
+  --color-dept-trd-bg: var(--dept-trd-bg);
+  --color-dept-trd-border: var(--dept-trd-border);
+  --color-dept-trd-text: var(--dept-trd-text);
+
+  --color-dept-snt: var(--dept-snt);
+  --color-dept-snt-bg: var(--dept-snt-bg);
+  --color-dept-snt-border: var(--dept-snt-border);
+  --color-dept-snt-text: var(--dept-snt-text);
+
+  /* Marey Canvas Colors */
+  --color-marey-canvas-bg: var(--marey-canvas-bg);
+  --color-marey-header-bg: var(--marey-header-bg);
+  --color-marey-canvas-border: var(--marey-canvas-border);
+  --color-train-prestige: var(--train-prestige);
+  --color-train-superfast: var(--train-superfast);
+  --color-train-mail: var(--train-mail);
+  --color-train-passenger: var(--train-passenger);
+  --color-train-freight: var(--train-freight);
+}

@@ -9,6 +9,7 @@ import { VisualJunctionHubs, VERIFIED_JUNCTION_HUBS } from "../components/networ
 import { NetworkSectionsView } from "../components/network/NetworkSectionsView";
 import { CoaBlockManagement } from "../components/network/CoaBlockManagement";
 import { ProvenanceBadge } from "../components/common/ProvenanceBadge";
+import { Tabs, TabsList, TabsTrigger, Button, EmptyState } from "../components/ui";
 import {
   Layers,
   Building2,
@@ -110,7 +111,7 @@ export const ControlDashboard: React.FC = () => {
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-[#0b2545] text-white flex-shrink-0">
+            <div className="p-2.5 rounded-xl bg-[var(--brand-navy)] text-white flex-shrink-0">
               <Layers className="w-6 h-6" />
             </div>
             <div>
@@ -159,42 +160,35 @@ export const ControlDashboard: React.FC = () => {
       </div>
 
       {/* 2. ASSIGNED WORKSPACE TOP-LEVEL NAVIGATION TABS */}
-      <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-1.5 select-none">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = currentTab === tab.key;
-
-          return (
-            <button
-              key={`coa-tab-${tab.key}`}
-              type="button"
-              onClick={() => handleTabChange(tab.key)}
-              className={`flex-1 min-w-[150px] sm:min-w-[180px] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold uppercase tracking-wider transition-all flex items-center justify-center sm:justify-start space-x-2 cursor-pointer ${
-                isActive
-                  ? "bg-[#0b2545] text-white shadow-sm"
-                  : "bg-slate-50/80 text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/80"
-              }`}
-            >
-              <Icon
-                className={`w-4 h-4 flex-shrink-0 ${
-                  isActive ? "text-sky-300" : "text-slate-500"
-                }`}
-              />
-              <span className="truncate">{tab.label}</span>
-              {tab.badge && (
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ml-auto ${
-                    isActive
-                      ? "bg-white/20 text-white"
-                      : "bg-slate-200 text-slate-700"
-                  }`}
+      <div className="bg-white px-4 pt-1 rounded-2xl border border-[var(--border-subtle)] shadow-xs select-none">
+        <Tabs
+          value={currentTab}
+          onValueChange={(val) => handleTabChange(val as CoaWorkspaceTab)}
+          variant="underlined"
+        >
+          <TabsList className="w-full">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger
+                  key={`coa-tab-${tab.key}`}
+                  value={tab.key}
+                  icon={<Icon className="w-4 h-4" />}
+                  badge={
+                    tab.badge ? (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                        {tab.badge}
+                      </span>
+                    ) : undefined
+                  }
+                  className="py-3 px-3 text-xs sm:text-sm font-bold tracking-wide"
                 >
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                  <span>{tab.label}</span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* 3. TAB CONTENT */}
@@ -207,7 +201,7 @@ export const ControlDashboard: React.FC = () => {
           <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div className="flex items-center space-x-3">
-                <div className="p-2.5 rounded-xl bg-[#0b2545] text-white">
+                <div className="p-2.5 rounded-xl bg-[var(--brand-navy)] text-white">
                   <Calendar className="w-5 h-5" />
                 </div>
                 <div>
@@ -221,21 +215,23 @@ export const ControlDashboard: React.FC = () => {
               </div>
 
               <div className="flex items-center space-x-2">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={loadNetworkBlocks}
-                  className="px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 flex items-center space-x-1.5 transition-colors cursor-pointer"
+                  leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${loadingBlocks ? "animate-spin" : ""}`} />}
+                  className="cursor-pointer text-xs"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingBlocks ? "animate-spin" : ""}`} />
-                  <span>Refresh</span>
-                </button>
-                <button
-                  type="button"
+                  Refresh
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => handleTabChange("block")}
-                  className="px-3 py-1.5 text-xs font-bold text-white bg-[#0b2545] hover:bg-sky-900 rounded-lg shadow-xs transition-colors cursor-pointer"
+                  className="cursor-pointer text-xs"
                 >
                   Open Full Block Management →
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -274,15 +270,14 @@ export const ControlDashboard: React.FC = () => {
                 showDepartmentColumn={true}
               />
             ) : (
-              <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <div className="w-10 h-10 mx-auto rounded-full bg-slate-200/80 flex items-center justify-center text-slate-500">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-800">No Possessory Blocks Currently Active</h4>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Possessions generated and approved in the Block Planner will appear here across all 5 corridors as the single operational source of truth.
-                </p>
-              </div>
+              <EmptyState
+                className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/25"
+                icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+                title="Full Track Availability — Zero Active Possessions"
+                description="No possessions currently required — full track availability across all 5 corridors in Bhopal Division. All running lines and yard berths are clear for regular traffic."
+                actionLabel="Refresh Possessions"
+                onAction={loadNetworkBlocks}
+              />
             )}
           </div>
 
@@ -320,7 +315,7 @@ export const ControlDashboard: React.FC = () => {
 
                     <Link
                       to={`/corridors/${c.id}`}
-                      className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-[#0b2545] hover:text-white rounded border border-slate-300 font-semibold transition-colors"
+                      className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-[var(--brand-navy)] hover:text-white rounded border border-slate-300 font-semibold transition-colors"
                     >
                       View
                     </Link>
@@ -428,7 +423,7 @@ export const ControlDashboard: React.FC = () => {
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-black bg-[#0b2545] text-white">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-black bg-[var(--brand-navy)] text-white">
                       {c.id}
                     </span>
                     <span className="text-xs font-mono font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
@@ -468,7 +463,7 @@ export const ControlDashboard: React.FC = () => {
                 <div className="pt-3 border-t border-slate-100 flex items-center space-x-2">
                   <Link
                     to={`/corridors/${c.id}`}
-                    className="w-full py-2 px-3 bg-[#0b2545] hover:bg-sky-900 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+                    className="w-full py-2 px-3 bg-[var(--brand-navy)] hover:bg-[var(--brand-navy-hover)] text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
                   >
                     <span>Open Corridor Workspace</span>
                     <ArrowRight className="w-3.5 h-3.5" />

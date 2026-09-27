@@ -67,7 +67,7 @@ export const CorridorsPage: React.FC = () => {
               {/* Corridor ID & Track Type Badge */}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
-                  <span className="font-mono text-xs font-black px-2.5 py-1 rounded-lg bg-[#0b2545] text-white">
+                  <span className="font-mono text-xs font-black px-2.5 py-1 rounded-lg bg-[var(--brand-navy)] text-white">
                     {c.id}
                   </span>
                   <span className="text-xs text-slate-500 font-mono font-bold">{c.code}</span>
@@ -87,14 +87,14 @@ export const CorridorsPage: React.FC = () => {
                 {c.description}
               </p>
 
-              {/* Station Progression Chips */}
+              {/* Station Progression Chips — Standardized height container for B.1 */}
               <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
                 <div className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono flex items-center justify-between">
                   <span>Major Interchanges:</span>
                   <span className="text-slate-600 font-bold">{c.locations.length} Locations</span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono min-h-[56px] content-start">
                   {c.locations
                     .filter((l) => l.is_major)
                     .map((stn, sIdx, arr) => (
@@ -119,7 +119,7 @@ export const CorridorsPage: React.FC = () => {
 
               <Link
                 to={`/corridors/${c.id}`}
-                className="inline-flex items-center text-xs sm:text-sm font-bold text-sky-600 hover:text-sky-800 space-x-1 group-hover:translate-x-0.5 transition-transform"
+                className="inline-flex items-center text-xs sm:text-sm font-bold text-sky-700 hover:text-[var(--brand-navy)] space-x-1 group-hover:translate-x-0.5 transition-transform"
               >
                 <span>Enter Workspace</span>
                 <ArrowRight className="w-4 h-4 ml-0.5" />

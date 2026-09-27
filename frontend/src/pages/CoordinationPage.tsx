@@ -13,23 +13,190 @@ import {
   ShieldCheck,
   AlertTriangle,
   FileCheck,
-  Send,
   Sparkles,
   Search,
   Building2,
   CheckCircle2,
   Layers,
-  Calendar,
   X,
   RefreshCw,
   GitMerge,
+  Sun,
+  Moon,
+  Shield,
 } from "lucide-react";
+import { Button } from "../components/ui/Button";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/Tabs";
+import { EmptyState } from "../components/ui/EmptyState";
 import { BlockReasoningModal } from "../components/blocks/BlockReasoningModal";
-import { formatDistanceKm, formatKmBadge, formatKmValue } from "../utils/formatDistance";
+import { formatDistanceKm, formatKmBadge } from "../utils/formatDistance";
+
+// ============================================================================
+// TOKEN-MAPPED HELPERS FOR LOCK TYPES & DEPARTMENTS (PHASE 0 & PHASE 6)
+// Zero hardcoded hex: all styles evaluated via canonical CSS variables
+// ============================================================================
+
+const getLockTypeBadgeStyle = (lockType?: string) => {
+  const l = (lockType || "PLANNED").toUpperCase();
+  if (l.includes("RULING")) {
+    return {
+      bg: "var(--lock-ruling-bg)",
+      text: "var(--lock-ruling-text)",
+      border: "var(--lock-ruling-border)",
+      color: "var(--lock-ruling)",
+      label: "🏛️ RULING",
+    };
+  }
+  if (l.includes("EMERGENT")) {
+    return {
+      bg: "var(--lock-emergent-bg)",
+      text: "var(--lock-emergent-text)",
+      border: "var(--lock-emergent-border)",
+      color: "var(--lock-emergent)",
+      label: "🚨 EMERGENT",
+    };
+  }
+  if (l.includes("SHADOW")) {
+    return {
+      bg: "var(--lock-shadow-bg)",
+      text: "var(--lock-shadow-text)",
+      border: "var(--lock-shadow-border)",
+      color: "var(--lock-shadow)",
+      label: "👥 SHADOW",
+    };
+  }
+  return {
+    bg: "var(--lock-planned-bg)",
+    text: "var(--lock-planned-text)",
+    border: "var(--lock-planned-border)",
+    color: "var(--lock-planned)",
+    label: "📋 PLANNED",
+  };
+};
+
+const getDepartmentBadgeStyle = (dept?: string) => {
+  const d = (dept || "").toUpperCase();
+  if (d.includes("PWAY") || d.includes("CIVIL")) {
+    return {
+      bg: "var(--dept-pway-bg)",
+      text: "var(--dept-pway-text)",
+      border: "var(--dept-pway-border)",
+      dot: "var(--dept-pway)",
+      label: "P.Way (Civil)",
+    };
+  }
+  if (d.includes("SNT") || d.includes("SIGNAL")) {
+    return {
+      bg: "var(--dept-snt-bg)",
+      text: "var(--dept-snt-text)",
+      border: "var(--dept-snt-border)",
+      dot: "var(--dept-snt)",
+      label: "S&T (Signaling)",
+    };
+  }
+  if (d.includes("TRD") || d.includes("OHE") || d.includes("ELEC") || d.includes("TRACTION")) {
+    return {
+      bg: "var(--dept-trd-bg)",
+      text: "var(--dept-trd-text)",
+      border: "var(--dept-trd-border)",
+      dot: "var(--dept-trd)",
+      label: "TRD (25kV OHE)",
+    };
+  }
+  return {
+    bg: "var(--dept-coa-bg)",
+    text: "var(--dept-coa-text)",
+    border: "var(--dept-coa-border)",
+    dot: "var(--dept-coa)",
+    label: dept || "COA / Operating",
+  };
+};
+
+const getConflictBadgeStyle = (status?: string) => {
+  const s = (status || "").toUpperCase();
+  if (s === "CONFLICT") {
+    return {
+      bg: "var(--status-danger-bg)",
+      text: "var(--status-danger-text)",
+      border: "var(--status-danger-border)",
+    };
+  }
+  if (s.includes("POTENTIAL")) {
+    return {
+      bg: "var(--status-warning-bg)",
+      text: "var(--status-warning-text)",
+      border: "var(--status-warning-border)",
+    };
+  }
+  return {
+    bg: "var(--status-success-bg)",
+    text: "var(--status-success-text)",
+    border: "var(--status-success-border)",
+  };
+};
+
+const getPriorityBadgeStyle = (priority?: string) => {
+  const p = (priority || "").toUpperCase();
+  if (p === "CRITICAL") {
+    return {
+      bg: "var(--status-danger-bg)",
+      text: "var(--status-danger-text)",
+      border: "var(--status-danger-border)",
+    };
+  }
+  if (p === "HIGH" || p === "MEDIUM") {
+    return {
+      bg: "var(--status-warning-bg)",
+      text: "var(--status-warning-text)",
+      border: "var(--status-warning-border)",
+    };
+  }
+  return {
+    bg: "var(--surface-secondary)",
+    text: "var(--text-secondary)",
+    border: "var(--border-subtle)",
+  };
+};
 
 export const CoordinationPage: React.FC = () => {
   const { currentRole, hasPermission } = useRole();
   const invalidateCanonicalData = useInvalidateCanonicalData();
+
+  // Active theme management with synchronized document.documentElement attribution
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlTheme = urlParams.get("theme");
+      if (urlTheme === "dark" || urlTheme === "light") return urlTheme;
+      const saved = localStorage.getItem("app-theme") || localStorage.getItem("coordination-theme");
+      if (saved === "dark" || saved === "light") return saved;
+      if (document.documentElement.getAttribute("data-theme") === "dark") return "dark";
+    }
+    return "light";
+  });
+
+  const handleThemeToggle = () => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      if (typeof window !== "undefined") {
+        localStorage.setItem("app-theme", next);
+        localStorage.setItem("coordination-theme", next);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", theme);
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  }, [theme]);
+
   const [blocks, setBlocks] = useState<BlockData[]>([]);
   const [completedTasks, setCompletedTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +208,7 @@ export const CoordinationPage: React.FC = () => {
   const [reasoningBlockId, setReasoningBlockId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const [regenerating, setRegenerating] = useState<boolean>(false);
-  const [datasetFingerprint, setDatasetFingerprint] = useState<string>("CANONICAL");
+  const [, setDatasetFingerprint] = useState<string>("CANONICAL");
 
   const canApprove = hasPermission("canApproveTrafficBlocks");
 
@@ -86,7 +253,7 @@ export const CoordinationPage: React.FC = () => {
   const loadBlocks = async () => {
     try {
       const res = await api.getBlocks();
-      // Joint Coordination Desk: only display blocks that have been submitted
+      // Joint Coordination Desk: display blocks that have been submitted
       // (PENDING_APPROVAL or later). Raw PROPOSED blocks remain in Block Planner only.
       const submitted = res.filter((b: any) => b.status !== "PROPOSED");
       setBlocks(submitted);
@@ -141,7 +308,7 @@ export const CoordinationPage: React.FC = () => {
         );
         setFeedback({
           type: "success",
-          message: `Block ${blockId} sanctioned successfully by Chief of Block Officer (COBO). Marked as SANCTIONED and moved to Approved Blocks.`,
+          message: `Block ${blockId} sanctioned successfully by Chief of Block Officer (COBO). Moved to Approved Blocks.`,
         });
       } else if (action === "REJECT") {
         await api.rejectBlockDirect(blockId, {
@@ -240,23 +407,14 @@ export const CoordinationPage: React.FC = () => {
 
   /**
    * Search matching against backend block data and ALL bundled child tasks.
-   * Searching by child task ID (e.g. TASK-SHD-01-3) or department (S&T)
-   * preserves the complete parent Shadow Block with all associated department tasks.
    */
   const matchBlock = (b: BlockData, q: string): boolean => {
     if (!q || !q.trim()) return true;
     const lower = q.toLowerCase().trim();
 
-    // 1. Match Block ID
     if (b.id.toLowerCase().includes(lower)) return true;
-
-    // 2. Match Block Type (SHADOW, PLANNED, EMERGENT, RULING)
     if (b.block_type?.toLowerCase().includes(lower)) return true;
-
-    // 3. Match Primary Task ID
     if (b.task_id?.toLowerCase().includes(lower)) return true;
-
-    // 4. Match Corridor & Section
     if (b.corridor_id?.toLowerCase().includes(lower)) return true;
     if (b.section_id?.toLowerCase().includes(lower)) return true;
     if (b.section_name?.toLowerCase().includes(lower)) return true;
@@ -265,18 +423,15 @@ export const CoordinationPage: React.FC = () => {
     if (b.to_station_code?.toLowerCase().includes(lower)) return true;
     if (b.station_codes?.some((s) => s.toLowerCase().includes(lower))) return true;
 
-    // 5. Match Location KM (exact or partial string)
     if (b.location_km != null) {
       if (b.location_km.toString().includes(lower)) return true;
       if (formatDistanceKm(b.location_km).toLowerCase().includes(lower)) return true;
     }
 
-    // 6. Match Department strings
     if (b.department_id?.toLowerCase().includes(lower)) return true;
     if (b.departments?.some((d) => d.toLowerCase().includes(lower))) return true;
     if (b.participating_departments?.toLowerCase().includes(lower)) return true;
 
-    // 7. Match Status & Machine & Planner
     if (b.status?.toLowerCase().includes(lower)) return true;
     if (b.approval_status?.toLowerCase().includes(lower)) return true;
     if (b.conflict_status?.toLowerCase().includes(lower)) return true;
@@ -284,7 +439,6 @@ export const CoordinationPage: React.FC = () => {
     if (b.assigned_machine?.toLowerCase().includes(lower)) return true;
     if (b.proposed_by?.toLowerCase().includes(lower)) return true;
 
-    // 8. Match in bundled tasks (Task ID, Fault ID, Department, Work Type, Title)
     if (b.tasks && b.tasks.length > 0) {
       const taskMatch = b.tasks.some((t: any) => {
         if (t.id?.toLowerCase().includes(lower)) return true;
@@ -299,19 +453,22 @@ export const CoordinationPage: React.FC = () => {
       if (taskMatch) return true;
     }
 
-    // 9. Match in bundled_tasks string IDs
     if (b.bundled_tasks?.some((bt: string) => bt.toLowerCase().includes(lower))) return true;
 
     return false;
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500 font-mono">Loading Operational Coordination...</div>;
+    return (
+      <div className="p-8 text-center text-[var(--text-muted)] font-mono min-h-screen bg-[var(--surface-body)] flex items-center justify-center">
+        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+        <span>Loading Operational Coordination...</span>
+      </div>
+    );
   }
 
   // Filter by selected tab
   const tabFilteredBlocks = blocks.filter((b) => {
-    // If a search query is active, include any block matching that query across any child task or metadata
     if (searchQuery.trim() && matchBlock(b, searchQuery)) return true;
     if (selectedDept === "ALL" || selectedDept === "COMPLETED") return true;
     if (selectedDept === "MULTI") return b.is_multi_department || b.block_type === "SHADOW" || (b.tasks && b.tasks.length > 1);
@@ -366,7 +523,7 @@ export const CoordinationPage: React.FC = () => {
 
   /**
    * Sub-component to render the Unified Shadow Block / Multi-Department task breakdown.
-   * Displays ALL associated department tasks under the block with independent statuses.
+   * Sourced directly with --lock-shadow and --dept-* tokens. Zero hardcoded hex.
    */
   const renderMultiDepartmentTasks = (b: BlockData) => {
     const isShadow = b.block_type === "SHADOW" || b.is_multi_department || (b.tasks && b.tasks.length > 1);
@@ -375,70 +532,92 @@ export const CoordinationPage: React.FC = () => {
     const taskList = b.tasks && b.tasks.length > 0 ? b.tasks : [];
 
     return (
-      <div className="mt-3 p-3 bg-gradient-to-r from-indigo-50/70 via-slate-50 to-indigo-50/50 border border-indigo-200 rounded-xl space-y-2.5">
+      <div
+        className="mt-3 p-3 rounded-xl border space-y-2.5 transition-colors"
+        style={{
+          backgroundColor: "var(--lock-shadow-bg)",
+          borderColor: "var(--lock-shadow-border)",
+        }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-2">
-            <div className="p-1 rounded bg-indigo-600 text-white">
+            <div
+              className="p-1 rounded text-white"
+              style={{ backgroundColor: "var(--lock-shadow)" }}
+            >
               <Users className="w-3.5 h-3.5" />
             </div>
             <div>
-              <span className="font-bold text-xs text-indigo-950 font-mono uppercase tracking-wide">
+              <span
+                className="font-bold text-xs font-mono uppercase tracking-wide"
+                style={{ color: "var(--lock-shadow-text)" }}
+              >
                 {b.block_type === "SHADOW"
                   ? "Unified Shadow Block Possession"
                   : "Multi-Department Joint Possession Window"}
               </span>
-              <span className="text-[10px] text-indigo-700/80 block font-mono">
+              <span
+                className="text-[10px] block font-mono opacity-80"
+                style={{ color: "var(--lock-shadow-text)" }}
+              >
                 1 Consolidated Possession · All Departments Visible Together (Zero Traffic Splitting)
               </span>
             </div>
           </div>
-          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-900 border border-indigo-300">
+          <span
+            className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border"
+            style={{
+              backgroundColor: "var(--surface-card)",
+              color: "var(--lock-shadow-text)",
+              borderColor: "var(--lock-shadow-border)",
+            }}
+          >
             {taskList.length} Coordinated Department Tasks
           </span>
         </div>
 
         {/* Department Tasks Breakdown */}
-        <div className="divide-y divide-slate-200 border border-slate-200/90 rounded-lg overflow-hidden bg-white shadow-2xs">
+        <div className="divide-y divide-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-lg overflow-hidden bg-[var(--surface-card)] shadow-2xs">
           {taskList.length > 0 ? (
             taskList.map((task: any, tidx: number) => {
               const isDone = task.status === "COMPLETED";
               const isRunning = task.status === "IN_PROGRESS" || task.status === "WORK_STARTED";
-              const deptColors: Record<string, { bg: string; text: string; border: string; label: string; dot: string }> = {
-                PWAY: { bg: "bg-blue-50", text: "text-blue-900", border: "border-blue-200", label: "P.Way (Civil)", dot: "bg-blue-600" },
-                SNT: { bg: "bg-purple-50", text: "text-purple-900", border: "border-purple-200", label: "S&T (Signaling)", dot: "bg-purple-600" },
-                TRD: { bg: "bg-amber-50", text: "text-amber-900", border: "border-amber-200", label: "TRD (25kV OHE)", dot: "bg-amber-600" },
-              };
-              const deptStyle = deptColors[task.department_id] || {
-                bg: "bg-slate-50",
-                text: "text-slate-800",
-                border: "border-slate-200",
-                label: task.department_id || "Dept",
-                dot: "bg-slate-600",
-              };
+              const deptStyle = getDepartmentBadgeStyle(task.department_id);
 
               return (
-                <div key={task.id || tidx} className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-slate-50/75 transition-colors">
+                <div
+                  key={task.id || tidx}
+                  className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-[var(--surface-secondary)]/50 transition-colors"
+                >
                   <div className="flex items-start space-x-2.5 min-w-0">
                     <span
-                      className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] border flex-shrink-0 mt-0.5 flex items-center space-x-1 ${deptStyle.bg} ${deptStyle.text} ${deptStyle.border}`}
+                      className="px-2 py-0.5 rounded font-mono font-bold text-[10px] border flex-shrink-0 mt-0.5 flex items-center space-x-1"
+                      style={{
+                        backgroundColor: deptStyle.bg,
+                        color: deptStyle.text,
+                        borderColor: deptStyle.border,
+                      }}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${deptStyle.dot}`}></span>
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: deptStyle.dot }}
+                      ></span>
                       <span>{deptStyle.label}</span>
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5 font-mono">
-                        <strong className="text-slate-900 font-bold">{task.id}</strong>
+                        <strong className="text-[var(--text-primary)] font-bold">{task.id}</strong>
                         {task.fault_id && (
-                          <span className="text-[10px] text-slate-500">· Ref: {task.fault_id}</span>
+                          <span className="text-[10px] text-[var(--text-muted)]">· Ref: {task.fault_id}</span>
                         )}
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-semibold border border-slate-200">
+                        <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold border bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-subtle)]">
                           {formatKmBadge(task.location_km ?? b.location_km)}
                         </span>
-                        <span className="text-[10px] text-slate-500">
+                        <span className="text-[10px] text-[var(--text-muted)]">
                           ({formatDistanceKm(task.location_km ?? b.location_km)})
                         </span>
                       </div>
-                      <div className="text-slate-700 font-medium text-[11px] mt-0.5 truncate">
+                      <div className="text-[var(--text-secondary)] font-medium text-[11px] mt-0.5 truncate">
                         {task.title || task.work_type_id}
                       </div>
                     </div>
@@ -447,40 +626,56 @@ export const CoordinationPage: React.FC = () => {
                   {/* Independent Department Status */}
                   <div className="flex items-center space-x-2 self-end sm:self-center flex-shrink-0">
                     {isDone ? (
-                      <span className="px-2.5 py-1 rounded font-mono font-bold text-[10px] bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center space-x-1">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      <span
+                        className="px-2.5 py-1 rounded font-mono font-bold text-[10px] border flex items-center space-x-1"
+                        style={{
+                          backgroundColor: "var(--status-success-bg)",
+                          color: "var(--status-success-text)",
+                          borderColor: "var(--status-success-border)",
+                        }}
+                      >
+                        <CheckCircle className="w-3.5 h-3.5 text-[var(--status-success)]" />
                         <span>
-                          COMPLETED {task.completed_at ? `(${new Date(task.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ""}
+                          COMPLETED {task.completed_at ? `(${new Date(task.completed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` : ""}
                         </span>
                       </span>
                     ) : isRunning ? (
-                      <span className="px-2.5 py-1 rounded font-mono font-bold text-[10px] bg-amber-100 text-amber-900 border border-amber-300 flex items-center space-x-1">
-                        <Clock className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                      <span
+                        className="px-2.5 py-1 rounded font-mono font-bold text-[10px] border flex items-center space-x-1"
+                        style={{
+                          backgroundColor: "var(--status-warning-bg)",
+                          color: "var(--status-warning-text)",
+                          borderColor: "var(--status-warning-border)",
+                        }}
+                      >
+                        <Clock className="w-3.5 h-3.5 text-[var(--status-warning)] animate-spin" />
                         <span>IN PROGRESS</span>
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-slate-100 text-slate-700 border border-slate-300">
+                      <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] border bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-subtle)]">
                         {task.status || "NOT STARTED / PENDING"}
                       </span>
                     )}
 
                     {!isDone && (
-                      <button
+                      <Button
                         type="button"
+                        size="sm"
+                        variant="secondary"
                         onClick={() => handleCompleteIndividualTask(task.id, deptStyle.label)}
-                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-900 text-white font-bold text-[10px] cursor-pointer shadow-2xs transition-colors flex items-center space-x-1"
+                        className="h-6 px-2 text-[10px] font-bold"
+                        leftIcon={<CheckCircle2 className="w-3 h-3 text-[var(--status-success)]" />}
                         title="Mark this department's task as finished (parent block remains active)"
                       >
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span>Finish Task</span>
-                      </button>
+                        Finish Task
+                      </Button>
                     )}
                   </div>
                 </div>
               );
             })
           ) : (
-            <div className="p-3 text-xs text-slate-500 font-mono">
+            <div className="p-3 text-xs text-[var(--text-muted)] font-mono">
               Primary Task: {b.task_id} ({b.department_id || "PWAY"})
             </div>
           )}
@@ -490,61 +685,200 @@ export const CoordinationPage: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
+    <div
+      data-theme={theme}
+      className={`min-h-screen p-4 sm:p-6 max-w-7xl mx-auto space-y-5 transition-colors duration-150 ${
+        theme === "dark"
+          ? "dark bg-[var(--surface-body)] text-[var(--text-primary)]"
+          : "bg-[var(--surface-body)] text-[var(--text-primary)]"
+      }`}
+    >
+      {/* 1. TOP HEADER & WORKSPACE METADATA */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center space-x-2">
-            <Building2 className="w-6 h-6 text-slate-800" />
+          <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-tight flex items-center space-x-2">
+            <Building2 className="w-6 h-6 text-[var(--text-primary)]" />
             <span>Multi-Department Coordination & Block Approvals</span>
           </h1>
-          <p className="text-xs text-slate-500 font-mono mt-0.5">
-            Active Desk: <span className="font-bold text-slate-800">{currentRole.name}</span> · Operating · Station Master · P.Way · S&T · TRD Joint Desk
+          <p className="text-xs text-[var(--text-muted)] font-mono mt-0.5">
+            Active Desk: <strong className="text-[var(--text-primary)]">{currentRole.name}</strong> · Operating · Station Master · P.Way · S&T · TRD Joint Desk
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ProvenanceBadge type="REAL_PUBLIC" />
-          <Link
-            to="/baseline-comparison"
-            className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-lg border border-emerald-500/80 shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer"
-            title="View Independent Baseline vs Co-located Optimizer Comparison"
+
+          {/* Theme Toggle Button */}
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={handleThemeToggle}
+            leftIcon={
+              theme === "dark" ? (
+                <Sun className="w-3.5 h-3.5 text-[var(--status-warning)]" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+              )
+            }
+            className="text-xs font-bold"
+            title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
           >
-            <GitMerge className="w-3.5 h-3.5 text-emerald-200" />
-            <span>Baseline Comparison (-24.9%)</span>
-          </Link>
-          <button
+            {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          </Button>
+
+          <Button
+            asChild
+            size="sm"
+            variant="secondary"
+            className="text-xs font-bold"
+            leftIcon={<GitMerge className="w-3.5 h-3.5 text-[var(--status-success)]" />}
+          >
+            <Link
+              to="/baseline-comparison"
+              title="View Independent Baseline vs Co-located Optimizer Comparison"
+            >
+              Baseline Comparison (-24.9%)
+            </Link>
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
             onClick={handleRegenerateCanonical}
             disabled={regenerating}
-            className={`px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg border border-indigo-500 shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer ${
-              regenerating ? "opacity-60 cursor-not-allowed" : ""
-            }`}
+            isLoading={regenerating}
+            leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} />}
+            className="text-xs font-bold border-purple-300 dark:border-purple-800 text-purple-900 dark:text-purple-200"
             title="Generate a new validated 50-block planning scenario"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? "animate-spin text-white" : ""}`} />
-            <span>{regenerating ? "Validating & Promoting..." : "Regenerate 50 Blocks"}</span>
-          </button>
+            {regenerating ? "Validating & Promoting..." : "Regenerate 50 Blocks"}
+          </Button>
         </div>
       </div>
 
-      {/* Inline Feedback Banner */}
+      {/* 2. CANONICAL VISUAL LEGEND BAR (Zero hardcoded hex: tokens.css variables) */}
+      <div className="bg-[var(--surface-card)] border border-[var(--border-subtle)] p-2.5 rounded-[var(--radius-lg)] flex flex-wrap items-center justify-between text-xs gap-3 shadow-2xs font-mono">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+          <span className="font-bold text-[var(--text-muted)] uppercase text-[10px] tracking-wider">
+            Canonical Lock Types:
+          </span>
+          <div className="flex items-center space-x-1">
+            <span
+              className="w-2.5 h-2.5 rounded inline-block border"
+              style={{ backgroundColor: "var(--lock-ruling-fill)", borderColor: "var(--lock-ruling)" }}
+            ></span>
+            <span className="font-bold" style={{ color: "var(--lock-ruling)" }}>
+              🏛️ Ruling
+            </span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span
+              className="w-2.5 h-2.5 rounded inline-block border"
+              style={{ backgroundColor: "var(--lock-planned-fill)", borderColor: "var(--lock-planned)" }}
+            ></span>
+            <span className="font-bold" style={{ color: "var(--lock-planned)" }}>
+              📋 Planned
+            </span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span
+              className="w-2.5 h-2.5 rounded inline-block border"
+              style={{ backgroundColor: "var(--lock-emergent-fill)", borderColor: "var(--lock-emergent)" }}
+            ></span>
+            <span className="font-bold" style={{ color: "var(--lock-emergent)" }}>
+              🚨 Emergent
+            </span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span
+              className="w-2.5 h-2.5 rounded inline-block border"
+              style={{ backgroundColor: "var(--lock-shadow-fill)", borderColor: "var(--lock-shadow)" }}
+            ></span>
+            <span className="font-bold" style={{ color: "var(--lock-shadow)" }}>
+              👥 Shadow (Consolidated)
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+          <span className="font-bold text-[var(--text-muted)] uppercase text-[10px] tracking-wider">
+            Departments:
+          </span>
+          <div className="flex items-center space-x-1">
+            <span
+              className="w-2.5 h-2.5 rounded-full inline-block"
+              style={{ backgroundColor: "var(--dept-pway)" }}
+            ></span>
+            <span className="font-bold" style={{ color: "var(--dept-pway)" }}>
+              P.Way
+            </span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span
+              className="w-2.5 h-2.5 rounded-full inline-block"
+              style={{ backgroundColor: "var(--dept-snt)" }}
+            ></span>
+            <span className="font-bold" style={{ color: "var(--dept-snt)" }}>
+              S&T
+            </span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span
+              className="w-2.5 h-2.5 rounded-full inline-block"
+              style={{ backgroundColor: "var(--dept-trd)" }}
+            ></span>
+            <span className="font-bold" style={{ color: "var(--dept-trd)" }}>
+              TRD (OHE)
+            </span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span
+              className="w-2.5 h-2.5 rounded-full inline-block"
+              style={{ backgroundColor: "var(--dept-coa)" }}
+            ></span>
+            <span className="font-bold" style={{ color: "var(--dept-coa)" }}>
+              COA (Ops)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. INLINE FEEDBACK BANNER */}
       {feedback && (
         <div
-          className={`p-3 rounded-lg flex items-center justify-between text-xs font-medium border shadow-xs transition-all ${
-            feedback.type === "success"
-              ? "bg-emerald-50 text-emerald-900 border-emerald-300"
-              : feedback.type === "error"
-              ? "bg-red-50 text-red-900 border-red-300"
-              : "bg-blue-50 text-blue-900 border-blue-300"
-          }`}
+          className="p-3 rounded-lg flex items-center justify-between text-xs font-medium border shadow-xs transition-all"
+          style={{
+            backgroundColor:
+              feedback.type === "success"
+                ? "var(--status-success-bg)"
+                : feedback.type === "error"
+                ? "var(--status-danger-bg)"
+                : "var(--status-info-bg)",
+            color:
+              feedback.type === "success"
+                ? "var(--status-success-text)"
+                : feedback.type === "error"
+                ? "var(--status-danger-text)"
+                : "var(--status-info-text)",
+            borderColor:
+              feedback.type === "success"
+                ? "var(--status-success-border)"
+                : feedback.type === "error"
+                ? "var(--status-danger-border)"
+                : "var(--status-info-border)",
+          }}
         >
           <div className="flex items-center space-x-2">
-            {feedback.type === "success" && <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
-            {feedback.type === "error" && <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />}
-            {feedback.type === "info" && <Clock className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+            {feedback.type === "success" && <CheckCircle className="w-4 h-4 text-[var(--status-success)] flex-shrink-0" />}
+            {feedback.type === "error" && <AlertTriangle className="w-4 h-4 text-[var(--status-danger)] flex-shrink-0" />}
+            {feedback.type === "info" && <Clock className="w-4 h-4 text-[var(--status-info)] flex-shrink-0" />}
             <span className="font-semibold">{feedback.message}</span>
           </div>
           <button
+            type="button"
             onClick={() => setFeedback(null)}
-            className="text-slate-400 hover:text-slate-700 cursor-pointer font-bold px-1.5 py-0.5"
+            className="cursor-pointer font-bold px-1.5 py-0.5 opacity-70 hover:opacity-100"
             title="Dismiss"
           >
             ✕
@@ -552,144 +886,203 @@ export const CoordinationPage: React.FC = () => {
         </div>
       )}
 
-      {/* Department Filter Tabs */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto">
-        <span className="text-xs font-semibold text-slate-500 mr-2 flex-shrink-0">Filter Workspace:</span>
-        {[
-          { id: "ALL", label: "All Departments", count: blocks.length },
-          {
-            id: "PWAY",
-            label: "P.Way (Civil)",
-            count: blocks.filter(
-              (b) =>
-                (b.departments ? b.departments.includes("PWAY") : (b.department_id || "PWAY") === "PWAY") ||
-                (b.tasks && b.tasks.some((t: any) => t.department_id === "PWAY"))
-            ).length,
-          },
-          {
-            id: "SNT",
-            label: "S&T (Signaling)",
-            count: blocks.filter(
-              (b) =>
-                (b.departments ? b.departments.includes("SNT") : b.department_id === "SNT") ||
-                (b.tasks && b.tasks.some((t: any) => t.department_id === "SNT"))
-            ).length,
-          },
-          {
-            id: "TRD",
-            label: "TRD (Traction / OHE)",
-            count: blocks.filter(
-              (b) =>
-                (b.departments ? b.departments.includes("TRD") : b.department_id === "TRD") ||
-                Boolean(b.power_isolation_required || b.trd_coordination_required) ||
-                (b.tasks && b.tasks.some((t: any) => t.department_id === "TRD"))
-            ).length,
-          },
-          {
-            id: "MULTI",
-            label: "Multi-Department / Shadow",
-            count: blocks.filter((b) => b.is_multi_department || b.block_type === "SHADOW" || (b.tasks && b.tasks.length > 1)).length,
-          },
-          {
-            id: "COMPLETED",
-            label: "Completed Tasks",
-            count: completedTasks.length,
-          },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setSelectedDept(tab.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer flex-shrink-0 ${
-              selectedDept === tab.id
-                ? "bg-slate-900 text-white shadow-xs"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-            }`}
-          >
-            <span>{tab.label}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                selectedDept === tab.id ? "bg-slate-800 text-slate-200" : "bg-slate-200 text-slate-600"
-              }`}
-            >
-              {tab.count}
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* 4. DEPARTMENT FILTER TABS (Phase 1 Tabs Primitive) */}
+      <Tabs value={selectedDept} onValueChange={setSelectedDept} variant="pills" className="w-full min-w-0">
+        <div className="flex items-center space-x-3 border-b border-[var(--border-subtle)] pb-2 w-full min-w-0">
+          <span className="text-xs font-semibold text-[var(--text-muted)] shrink-0 select-none">
+            Filter Workspace:
+          </span>
+          <div className="flex-1 min-w-0 overflow-x-auto">
+            <TabsList className="bg-transparent border-0 p-0 space-x-1 overflow-visible min-w-max">
+              <TabsTrigger
+                value="ALL"
+                className="px-2.5 py-1 text-xs sm:text-xs sm:px-2.5 sm:py-1 font-semibold"
+                badge={
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+                    {blocks.length}
+                  </span>
+                }
+              >
+                All Departments
+              </TabsTrigger>
+              <TabsTrigger
+                value="PWAY"
+                className="px-2.5 py-1 text-xs sm:text-xs sm:px-2.5 sm:py-1 font-semibold"
+                badge={
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+                    {
+                      blocks.filter(
+                        (b) =>
+                          (b.departments ? b.departments.includes("PWAY") : (b.department_id || "PWAY") === "PWAY") ||
+                          (b.tasks && b.tasks.some((t: any) => t.department_id === "PWAY"))
+                      ).length
+                    }
+                  </span>
+                }
+              >
+                P.Way (Civil)
+              </TabsTrigger>
+              <TabsTrigger
+                value="SNT"
+                className="px-2.5 py-1 text-xs sm:text-xs sm:px-2.5 sm:py-1 font-semibold"
+                badge={
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+                    {
+                      blocks.filter(
+                        (b) =>
+                          (b.departments ? b.departments.includes("SNT") : b.department_id === "SNT") ||
+                          (b.tasks && b.tasks.some((t: any) => t.department_id === "SNT"))
+                      ).length
+                    }
+                  </span>
+                }
+              >
+                S&T (Signaling)
+              </TabsTrigger>
+              <TabsTrigger
+                value="TRD"
+                className="px-2.5 py-1 text-xs sm:text-xs sm:px-2.5 sm:py-1 font-semibold"
+                badge={
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+                    {
+                      blocks.filter(
+                        (b) =>
+                          (b.departments ? b.departments.includes("TRD") : b.department_id === "TRD") ||
+                          Boolean(b.power_isolation_required || b.trd_coordination_required) ||
+                          (b.tasks && b.tasks.some((t: any) => t.department_id === "TRD"))
+                      ).length
+                    }
+                  </span>
+                }
+              >
+                TRD (Traction / OHE)
+              </TabsTrigger>
+              <TabsTrigger
+                value="MULTI"
+                className="px-2.5 py-1 text-xs sm:text-xs sm:px-2.5 sm:py-1 font-semibold"
+                badge={
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+                    {
+                      blocks.filter(
+                        (b) => b.is_multi_department || b.block_type === "SHADOW" || (b.tasks && b.tasks.length > 1)
+                      ).length
+                    }
+                  </span>
+                }
+              >
+                Multi-Dept / Shadow
+              </TabsTrigger>
+              <TabsTrigger
+                value="COMPLETED"
+                className="px-2.5 py-1 text-xs sm:text-xs sm:px-2.5 sm:py-1 font-semibold"
+                badge={
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+                    {completedTasks.length}
+                  </span>
+                }
+              >
+                Completed Tasks
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
+      </Tabs>
 
-      {/* COBO Multi-Department Search Control */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+      {/* 5. COBO SEARCH & CONSISTENT COUNT STATUS CONTROL */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[var(--surface-card)] p-3 rounded-xl border border-[var(--border-subtle)] shadow-2xs">
         <div className="relative flex-1 flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search by Block ID, Task ID (e.g. TASK-SHD-01-3), Fault ID, Corridor (BPL-ET), Station, Department..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50/50"
+              className="w-full pl-9 pr-8 py-2 text-xs border border-[var(--border-subtle)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand-navy)] bg-[var(--surface-secondary)] text-[var(--text-primary)]"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-bold p-1 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs font-bold p-1 cursor-pointer"
                 title="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-          <button
+          <Button
             type="button"
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-colors shadow-2xs cursor-pointer shrink-0"
+            size="sm"
+            variant="primary"
+            className="text-xs font-semibold shrink-0"
             title="Execute Search across all departments and child tasks"
           >
-            <Search className="w-3.5 h-3.5" />
+            <Search className="w-3.5 h-3.5 mr-1" />
             <span>Search</span>
-          </button>
+          </Button>
         </div>
-        <div className="flex items-center space-x-2 text-xs text-slate-600 font-mono">
+        <div className="flex items-center space-x-2 text-xs text-[var(--text-secondary)] font-mono">
           {searchQuery ? (
-            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-lg font-bold">
+            <span
+              className="px-2.5 py-1 rounded-lg font-bold border"
+              style={{
+                backgroundColor: "var(--status-info-bg)",
+                color: "var(--status-info-text)",
+                borderColor: "var(--status-info-border)",
+              }}
+            >
               Found {selectedDept === "COMPLETED" ? filteredCompletedTasks.length : filteredBlocks.length} matches (All coordinated tasks included)
             </span>
           ) : (
-            <span className="text-[11px] text-slate-400">
-              {selectedDept === "COMPLETED" ? `${completedTasks.length} Completed Tasks Recorded` : `${blocks.length} Total Registered Blocks`}
+            <span className="text-[11px] text-[var(--text-muted)]">
+              {selectedDept === "COMPLETED"
+                ? `${completedTasks.length} Completed Tasks Recorded`
+                : `Showing ${filteredBlocks.length} blocks (${pendingBlocks.length} pending · ${approvedBlocks.length} sanctioned · ${selectedBlocks.length} selected · ${historicalBlocks.length} historical)`}
             </span>
           )}
         </div>
       </div>
 
-      {/* View: Dedicated "Completed Tasks" Ledger */}
+      {/* 6. VIEW: DEDICATED COMPLETED TASKS LEDGER */}
       {selectedDept === "COMPLETED" ? (
-        <div className="bg-white rounded-xl border border-emerald-300 shadow-xs overflow-hidden">
-          <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200 flex flex-wrap items-center justify-between gap-2">
+        <div className="bg-[var(--surface-card)] rounded-xl border border-[var(--status-success-border)] shadow-xs overflow-hidden">
+          <div
+            className="p-3.5 border-b flex flex-wrap items-center justify-between gap-2"
+            style={{
+              backgroundColor: "var(--status-success-bg)",
+              borderColor: "var(--status-success-border)",
+              color: "var(--status-success-text)",
+            }}
+          >
             <div>
-              <span className="font-bold text-emerald-950 text-xs tracking-wide flex items-center space-x-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span className="font-bold text-xs tracking-wide flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-[var(--status-success)]" />
                 <span>DEPARTMENT COMPLETED TASKS LEDGER ({filteredCompletedTasks.length})</span>
               </span>
-              <p className="text-[11px] text-emerald-800 mt-0.5">
+              <p className="text-[11px] opacity-90 mt-0.5">
                 Individual department task completion recorded with timestamp. 
-                <strong className="text-emerald-950 ml-1">Important:</strong> The parent block remains in active operational schedule until all participating squads conclude work.
+                <strong className="ml-1">Important:</strong> The parent block remains in active operational schedule until all participating squads conclude work.
               </p>
             </div>
-            <button
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
               onClick={loadCompletedTasks}
               disabled={loadingCompleted}
-              className="px-2.5 py-1 text-[11px] bg-white border border-emerald-300 text-emerald-800 rounded-lg hover:bg-emerald-100 transition-colors flex items-center space-x-1 cursor-pointer font-medium"
+              isLoading={loadingCompleted}
+              className="h-7 text-[11px] font-medium"
+              leftIcon={<RefreshCw className={`w-3 h-3 ${loadingCompleted ? "animate-spin" : ""}`} />}
             >
-              <RefreshCw className={`w-3 h-3 ${loadingCompleted ? "animate-spin" : ""}`} />
-              <span>Refresh</span>
-            </button>
+              Refresh
+            </Button>
           </div>
 
           {filteredCompletedTasks.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-emerald-50/50 border-b border-emerald-100 font-mono uppercase text-[11px] text-slate-600">
+                <thead className="bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] font-mono uppercase text-[11px] text-[var(--text-muted)]">
                   <tr>
                     <th className="p-3 pl-4">Task ID</th>
                     <th className="p-3">Block ID</th>
@@ -702,407 +1095,633 @@ export const CoordinationPage: React.FC = () => {
                     <th className="p-3 pr-4">Verification Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredCompletedTasks.map((t) => (
-                    <tr key={t.id} className="hover:bg-emerald-50/20 transition-colors">
-                      <td className="p-3 pl-4 font-mono font-bold text-slate-900">
-                        {t.task_id || t.id}
-                      </td>
-                      <td className="p-3 font-mono font-bold text-indigo-700">
-                        {t.block_id || "Unlinked"}
-                      </td>
-                      <td className="p-3 font-mono">
-                        <span
-                          className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                            t.department_id === "PWAY"
-                              ? "bg-blue-100 text-blue-900 border border-blue-200"
-                              : t.department_id === "SNT"
-                              ? "bg-purple-100 text-purple-900 border border-purple-200"
-                              : "bg-amber-100 text-amber-900 border border-amber-200"
-                          }`}
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {filteredCompletedTasks.map((t) => {
+                    const deptStyle = getDepartmentBadgeStyle(t.department_id);
+                    return (
+                      <tr key={t.id} className="hover:bg-[var(--surface-secondary)]/50 transition-colors">
+                        <td className="p-3 pl-4 font-mono font-bold text-[var(--text-primary)]">
+                          {t.task_id || t.id}
+                        </td>
+                        <td
+                          className="p-3 font-mono font-bold"
+                          style={{ color: "var(--lock-shadow)" }}
                         >
-                          {t.department_id}
-                        </span>
-                      </td>
-                      <td className="p-3 text-slate-800 text-[11px] font-medium max-w-[200px] truncate" title={t.description || t.title}>
-                        {t.description || t.title}
-                      </td>
-                      <td className="p-3 font-mono text-slate-700">
-                        <div>{t.corridor_id} · Track {t.track_name}</div>
-                        <div className="text-slate-500 font-bold">{formatDistanceKm(t.location_km)}</div>
-                      </td>
-                      <td className="p-3 text-slate-700 font-medium text-[11px]">
-                        {t.completed_by || t.assigned_crew || "Field Squad"}
-                      </td>
-                      <td className="p-3 font-mono text-slate-900 text-[11px]">
-                        {t.completed_at ? new Date(t.completed_at).toLocaleString() : "Recently Completed"}
-                      </td>
-                      <td className="p-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                            t.block_status === "APPROVED"
-                              ? "bg-emerald-100 text-emerald-900 border-emerald-300"
-                              : t.block_status === "SELECTED"
-                              ? "bg-sky-100 text-sky-900 border-sky-300"
-                              : "bg-slate-100 text-slate-700 border-slate-200"
-                          }`}
-                        >
-                          {t.block_status}
-                        </span>
-                      </td>
-                      <td className="p-3 pr-4">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                            t.verification_status === "VERIFIED"
-                              ? "bg-emerald-100 text-emerald-900 border-emerald-300"
-                              : "bg-amber-100 text-amber-900 border-amber-300"
-                          }`}
-                        >
-                          {t.verification_status || "VERIFIED"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                          {t.block_id || "Unlinked"}
+                        </td>
+                        <td className="p-3 font-mono">
+                          <span
+                            className="px-2 py-0.5 rounded font-bold text-[10px] border"
+                            style={{
+                              backgroundColor: deptStyle.bg,
+                              color: deptStyle.text,
+                              borderColor: deptStyle.border,
+                            }}
+                          >
+                            {t.department_id}
+                          </span>
+                        </td>
+                        <td className="p-3 text-[var(--text-secondary)] text-[11px] font-medium max-w-[200px] truncate" title={t.description || t.title}>
+                          {t.description || t.title}
+                        </td>
+                        <td className="p-3 font-mono text-[var(--text-secondary)]">
+                          <div>{t.corridor_id} · Track {t.track_name}</div>
+                          <div className="text-[var(--text-muted)] font-bold">{formatDistanceKm(t.location_km)}</div>
+                        </td>
+                        <td className="p-3 text-[var(--text-secondary)] font-medium text-[11px]">
+                          {t.completed_by || t.assigned_crew || "Field Squad"}
+                        </td>
+                        <td className="p-3 font-mono text-[var(--text-primary)] text-[11px]">
+                          {t.completed_at ? new Date(t.completed_at).toLocaleString() : "Recently Completed"}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                            style={{
+                              backgroundColor:
+                                t.block_status === "APPROVED"
+                                  ? "var(--status-success-bg)"
+                                  : t.block_status === "SELECTED"
+                                  ? "var(--status-info-bg)"
+                                  : "var(--surface-secondary)",
+                              color:
+                                t.block_status === "APPROVED"
+                                  ? "var(--status-success-text)"
+                                  : t.block_status === "SELECTED"
+                                  ? "var(--status-info-text)"
+                                  : "var(--text-secondary)",
+                              borderColor:
+                                t.block_status === "APPROVED"
+                                  ? "var(--status-success-border)"
+                                  : t.block_status === "SELECTED"
+                                  ? "var(--status-info-border)"
+                                  : "var(--border-subtle)",
+                            }}
+                          >
+                            {t.block_status}
+                          </span>
+                        </td>
+                        <td className="p-3 pr-4">
+                          <span
+                            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                            style={{
+                              backgroundColor:
+                                t.verification_status === "VERIFIED"
+                                  ? "var(--status-success-bg)"
+                                  : "var(--status-warning-bg)",
+                              color:
+                                t.verification_status === "VERIFIED"
+                                  ? "var(--status-success-text)"
+                                  : "var(--status-warning-text)",
+                              borderColor:
+                                t.verification_status === "VERIFIED"
+                                  ? "var(--status-success-border)"
+                                  : "var(--status-warning-border)",
+                            }}
+                          >
+                            {t.verification_status || "VERIFIED"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="p-8 text-center text-slate-400 text-xs font-mono">
-              No completed departmental tasks found matching current filters.
+            <div className="p-6">
+              <EmptyState
+                icon={<Layers className="w-8 h-8 text-[var(--text-muted)]" />}
+                title="No Completed Departmental Tasks"
+                description="No individual departmental maintenance tasks match current search criteria or date filters."
+                actionLabel={searchQuery ? "Clear Search" : undefined}
+                onAction={searchQuery ? () => setSearchQuery("") : undefined}
+              />
             </div>
           )}
         </div>
       ) : (
         <>
-          {/* Pending Blocks for Approval */}
-          <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
-            <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <span className="font-bold text-slate-800 text-xs tracking-wide">
-                PENDING BLOCK REQUESTS REQUIRING DIVISIONAL CLEARANCE ({pendingBlocks.length})
-              </span>
+          {/* 7. PENDING BLOCKS FOR APPROVAL */}
+          <div className="bg-[var(--surface-card)] rounded-xl border border-[var(--border-subtle)] shadow-xs overflow-hidden">
+            <div className="p-3 bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-[var(--status-info)]" />
+                <span className="font-bold text-[var(--text-primary)] text-xs tracking-wide">
+                  PENDING BLOCK REQUESTS REQUIRING DIVISIONAL CLEARANCE ({pendingBlocks.length})
+                </span>
+              </div>
               <ProvenanceBadge type="DERIVED" size="sm" />
             </div>
 
             {pendingBlocks.length > 0 ? (
-              <div className="divide-y divide-slate-100">
-                {pendingBlocks.map((b) => (
-                  <div key={b.id} className="p-4 hover:bg-slate-50/50 transition-colors">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold font-mono text-slate-900 text-sm">{b.id}</span>
-                          <span
-                            className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded ${
-                              b.conflict_status === "CONFLICT"
-                                ? "bg-red-100 text-red-800"
-                                : b.conflict_status === "POTENTIAL CONFLICT"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-emerald-100 text-emerald-800"
-                            }`}
-                          >
-                            {b.conflict_status}
-                          </span>
-                          {b.block_type && (
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200 uppercase">
-                              {b.block_type} BLOCK
-                            </span>
-                          )}
-                          {b.status && (
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">
-                              {b.status}
-                            </span>
-                          )}
-                          {b.task_priority && (
+              <div className="divide-y divide-[var(--border-subtle)]">
+                {pendingBlocks.map((b) => {
+                  const lockStyle = getLockTypeBadgeStyle(b.block_type);
+                  const conflictStyle = getConflictBadgeStyle(b.conflict_status);
+                  const priorityStyle = getPriorityBadgeStyle(b.task_priority);
+                  const deptStyle = getDepartmentBadgeStyle(b.participating_departments || b.department_id);
+
+                  return (
+                    <div key={b.id} className="p-4 hover:bg-[var(--surface-secondary)]/40 transition-colors">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold font-mono text-[var(--text-primary)] text-sm">{b.id}</span>
                             <span
-                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                                b.task_priority === "CRITICAL" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"
-                              }`}
+                              className="text-[10px] font-bold font-mono px-2 py-0.5 rounded border"
+                              style={{
+                                backgroundColor: conflictStyle.bg,
+                                color: conflictStyle.text,
+                                borderColor: conflictStyle.border,
+                              }}
                             >
-                              {b.task_priority}
+                              {b.conflict_status}
                             </span>
-                          )}
-                          <span className="text-xs text-slate-400 font-mono">Proposed by {b.proposed_by}</span>
+                            {b.block_type && (
+                              <span
+                                className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase"
+                                style={{
+                                  backgroundColor: lockStyle.bg,
+                                  color: lockStyle.text,
+                                  borderColor: lockStyle.border,
+                                }}
+                              >
+                                {lockStyle.label}
+                              </span>
+                            )}
+                            {b.status && (
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                                {b.status}
+                              </span>
+                            )}
+                            {b.task_priority && (
+                              <span
+                                className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border"
+                                style={{
+                                  backgroundColor: priorityStyle.bg,
+                                  color: priorityStyle.text,
+                                  borderColor: priorityStyle.border,
+                                }}
+                              >
+                                {b.task_priority}
+                              </span>
+                            )}
+                            <span className="text-xs text-[var(--text-muted)] font-mono">Proposed by {b.proposed_by}</span>
+                          </div>
+
+                          <div className="text-xs text-[var(--text-primary)] mt-1.5 font-semibold">
+                            Corridor: {b.corridor_id} · Track: {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time} ({b.duration_mins} mins)
+                          </div>
+
+                          <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                            {b.conflict_summary}
+                          </p>
+
+                          <div className="mt-2 text-[11px] text-[var(--text-muted)] flex flex-wrap items-center gap-3 font-mono">
+                            <span>
+                              Dept:{" "}
+                              <strong
+                                className="font-bold px-1.5 py-0.2 rounded border"
+                                style={{
+                                  backgroundColor: deptStyle.bg,
+                                  color: deptStyle.text,
+                                  borderColor: deptStyle.border,
+                                }}
+                              >
+                                {deptStyle.label}
+                              </strong>
+                            </span>
+                            {b.is_multi_department && (
+                              <span
+                                className="px-1.5 py-0.2 rounded text-[10px] font-bold border"
+                                style={{
+                                  backgroundColor: "var(--lock-shadow-bg)",
+                                  color: "var(--lock-shadow-text)",
+                                  borderColor: "var(--lock-shadow-border)",
+                                }}
+                              >
+                                Multi-Department Block
+                              </span>
+                            )}
+                            {(b.departments && b.departments.includes("TRD")) || b.department_id === "TRD" ? (
+                              <span
+                                className="px-1.5 py-0.2 rounded text-[10px] font-bold border"
+                                style={{
+                                  backgroundColor: "var(--dept-trd-bg)",
+                                  color: "var(--dept-trd-text)",
+                                  borderColor: "var(--dept-trd-border)",
+                                }}
+                              >
+                                TRD MAINTENANCE WORK
+                              </span>
+                            ) : b.power_isolation_required || b.trd_coordination_required ? (
+                              <span
+                                className="px-1.5 py-0.2 rounded text-[10px] font-bold border"
+                                style={{
+                                  backgroundColor: "var(--status-warning-bg)",
+                                  color: "var(--status-warning-text)",
+                                  borderColor: "var(--status-warning-border)",
+                                }}
+                              >
+                                ⚡ POWER ISOLATION ONLY
+                              </span>
+                            ) : null}
+                            <span>·</span>
+                            <span>Protection: {b.protection_type}</span>
+                            <span>·</span>
+                            <span>Power Isolation: {b.power_isolation_required ? "YES (TRD 25kV)" : "NO"}</span>
+                            <span>·</span>
+                            <span>Machine: {b.assigned_machine || "Manual Squad"}</span>
+                          </div>
+
+                          {/* Coordinated Tasks Breakdown */}
+                          {renderMultiDepartmentTasks(b)}
                         </div>
 
-                        <div className="text-xs text-slate-700 mt-1.5 font-semibold">
-                          Corridor: {b.corridor_id} · Track: {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time} ({b.duration_mins} mins)
-                        </div>
+                        {/* Actions & Remarks */}
+                        <div className="flex flex-col items-end space-y-2 flex-shrink-0 min-w-[280px]">
+                          <input
+                            type="text"
+                            placeholder={`${currentRole.name} remarks...`}
+                            value={activeNotes[b.id] || ""}
+                            onChange={(e) => setActiveNotes({ ...activeNotes, [b.id]: e.target.value })}
+                            className="w-full text-xs p-1.5 border border-[var(--border-subtle)] rounded bg-[var(--surface-secondary)] text-[var(--text-primary)]"
+                          />
 
-                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                          {b.conflict_summary}
-                        </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => setReasoningBlockId(b.id)}
+                              leftIcon={<Sparkles className="w-3.5 h-3.5 text-indigo-500" />}
+                              title="View Explainable Decision Support & Train Impact"
+                            >
+                              Reasoning
+                            </Button>
 
-                        <div className="mt-2 text-[11px] text-slate-500 flex flex-wrap items-center gap-3 font-mono">
-                          <span>
-                            Dept: <strong className="text-slate-800">{b.participating_departments || b.department_id || "PWAY"}</strong>
-                          </span>
-                          {b.is_multi_department && (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
-                              Multi-Department Block
-                            </span>
-                          )}
-                          {(b.departments && b.departments.includes("TRD")) || b.department_id === "TRD" ? (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-200">
-                              TRD MAINTENANCE WORK
-                            </span>
-                          ) : b.power_isolation_required || b.trd_coordination_required ? (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                              ⚡ POWER ISOLATION ONLY
-                            </span>
-                          ) : null}
-                          <span>·</span>
-                          <span>Protection: {b.protection_type}</span>
-                          <span>·</span>
-                          <span>Power Isolation: {b.power_isolation_required ? "YES (TRD 25kV)" : "NO"}</span>
-                          <span>·</span>
-                          <span>Machine: {b.assigned_machine || "Manual Squad"}</span>
-                        </div>
-
-                        {/* Coordinated Tasks Breakdown */}
-                        {renderMultiDepartmentTasks(b)}
-                      </div>
-
-                      {/* Actions & Notes */}
-                      <div className="flex flex-col items-end space-y-2 flex-shrink-0 min-w-[280px]">
-                        <input
-                          type="text"
-                          placeholder={`${currentRole.name} remarks...`}
-                          value={activeNotes[b.id] || ""}
-                          onChange={(e) => setActiveNotes({ ...activeNotes, [b.id]: e.target.value })}
-                          className="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50"
-                        />
-
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => setReasoningBlockId(b.id)}
-                            className="px-2.5 py-1.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-colors shadow-2xs"
-                            title="View Explainable Decision Support & Train Impact"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                            <span>Reasoning</span>
-                          </button>
-
-                          {canApprove ? (
-                            <>
-                              <button
-                                onClick={() => handleAction(b.id, "REJECT")}
-                                disabled={submitting === b.id}
-                                className="px-3 py-1.5 rounded border border-red-300 hover:bg-red-50 text-red-700 text-xs font-semibold flex items-center space-x-1 cursor-pointer"
+                            {canApprove ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleAction(b.id, "REJECT")}
+                                  disabled={submitting === b.id}
+                                  leftIcon={<XCircle className="w-3.5 h-3.5" />}
+                                >
+                                  Reject
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleAction(b.id, "RESCHEDULE")}
+                                  disabled={submitting === b.id}
+                                  leftIcon={<Clock className="w-3.5 h-3.5" />}
+                                >
+                                  Reschedule
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="success"
+                                  onClick={() => handleAction(b.id, "APPROVE")}
+                                  disabled={submitting === b.id}
+                                  isLoading={submitting === b.id}
+                                  leftIcon={<CheckCircle className="w-3.5 h-3.5" />}
+                                >
+                                  Sanction Block
+                                </Button>
+                              </>
+                            ) : (
+                              <div
+                                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded text-[11px] border"
+                                style={{
+                                  backgroundColor: "var(--status-warning-bg)",
+                                  color: "var(--status-warning-text)",
+                                  borderColor: "var(--status-warning-border)",
+                                }}
                               >
-                                <XCircle className="w-3.5 h-3.5" />
-                                <span>Reject</span>
-                              </button>
-                              <button
-                                onClick={() => handleAction(b.id, "RESCHEDULE")}
-                                disabled={submitting === b.id}
-                                className="px-3 py-1.5 rounded border border-amber-300 hover:bg-amber-50 text-amber-800 text-xs font-semibold flex items-center space-x-1 cursor-pointer"
-                              >
-                                <Clock className="w-3.5 h-3.5" />
-                                <span>Reschedule</span>
-                              </button>
-                              <button
-                                onClick={() => handleAction(b.id, "APPROVE")}
-                                disabled={submitting === b.id}
-                                className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center space-x-1 cursor-pointer"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                <span>Sanction Block</span>
-                              </button>
-                            </>
-                          ) : (
-                            <div className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded text-amber-900 text-[11px]">
-                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                              <span>Requires Chief of Block Officer (COBO) Sanction</span>
-                            </div>
-                          )}
+                                <AlertTriangle className="w-3.5 h-3.5 text-[var(--status-warning)] flex-shrink-0" />
+                                <span>Requires Chief of Block Officer (COBO) Sanction</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400 text-xs font-mono">
-                No pending block clearance requests matching search criteria.
+              /* Positive/Success EmptyState when zero pending requests remain */
+              <div className="p-6">
+                <EmptyState
+                  icon={<CheckCircle2 className="w-8 h-8 text-[var(--status-success)]" />}
+                  title="All Clear — Zero Pending Clearance Requests"
+                  description={
+                    searchQuery
+                      ? `No pending block requests match "${searchQuery}". Clear search or switch filters.`
+                      : "All submitted multi-department maintenance and traffic block requests have been reviewed and sanctioned. The division's operational headway remains fully protected."
+                  }
+                  actionLabel={searchQuery ? "Clear Search" : undefined}
+                  onAction={searchQuery ? () => setSearchQuery("") : undefined}
+                  className="my-2 border-[var(--status-success-border)] bg-[var(--status-success-bg)]/10"
+                />
               </div>
             )}
           </div>
 
-          {/* Approved Blocks Ready for Operational Selection */}
+          {/* 8. APPROVED BLOCKS READY FOR OPERATIONAL SELECTION */}
           {approvedBlocks.length > 0 && (
-            <div className="bg-white rounded-lg border border-emerald-300 shadow-xs overflow-hidden">
-              <div className="p-3 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between">
-                <span className="font-bold text-emerald-950 text-xs tracking-wide flex items-center space-x-1.5">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+            <div className="bg-[var(--surface-card)] rounded-xl border border-[var(--status-success-border)] shadow-xs overflow-hidden">
+              <div
+                className="p-3 border-b flex items-center justify-between"
+                style={{
+                  backgroundColor: "var(--status-success-bg)",
+                  borderColor: "var(--status-success-border)",
+                  color: "var(--status-success-text)",
+                }}
+              >
+                <span className="font-bold text-xs tracking-wide flex items-center space-x-1.5">
+                  <CheckCircle className="w-4 h-4 text-[var(--status-success)]" />
                   <span>APPROVED BLOCKS READY FOR OPERATIONAL SELECTION ({approvedBlocks.length})</span>
                 </span>
-                <span className="text-[11px] text-emerald-800 font-medium">Controller Sanctioned · Select for Operational Planning</span>
+                <span className="text-[11px] font-medium opacity-90">Controller Sanctioned · Select for Operational Planning</span>
               </div>
 
-              <div className="divide-y divide-emerald-100">
-                {approvedBlocks.map((b) => (
-                  <div key={b.id} className="p-4 hover:bg-emerald-50/40 transition-colors">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold font-mono text-slate-900 text-sm">{b.id}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center space-x-1">
-                            <CheckCircle className="w-3 h-3 text-emerald-600" />
-                            <span>SANCTIONED</span>
-                          </span>
-                          {b.block_type && (
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200 uppercase">
-                              {b.block_type} BLOCK
+              <div className="divide-y divide-[var(--border-subtle)]">
+                {approvedBlocks.map((b) => {
+                  const lockStyle = getLockTypeBadgeStyle(b.block_type);
+                  const deptStyle = getDepartmentBadgeStyle(b.participating_departments || b.department_id);
+                  const priorityStyle = getPriorityBadgeStyle(b.task_priority);
+
+                  return (
+                    <div key={b.id} className="p-4 hover:bg-[var(--surface-secondary)]/40 transition-colors">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold font-mono text-[var(--text-primary)] text-sm">{b.id}</span>
+                            <span
+                              className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border flex items-center space-x-1"
+                              style={{
+                                backgroundColor: "var(--status-success-bg)",
+                                color: "var(--status-success-text)",
+                                borderColor: "var(--status-success-border)",
+                              }}
+                            >
+                              <CheckCircle className="w-3 h-3 text-[var(--status-success)]" />
+                              <span>SANCTIONED</span>
                             </span>
-                          )}
-                          {b.task_priority && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-800">
-                              {b.task_priority}
+                            {b.block_type && (
+                              <span
+                                className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase"
+                                style={{
+                                  backgroundColor: lockStyle.bg,
+                                  color: lockStyle.text,
+                                  borderColor: lockStyle.border,
+                                }}
+                              >
+                                {lockStyle.label}
+                              </span>
+                            )}
+                            {b.task_priority && (
+                              <span
+                                className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                                style={{
+                                  backgroundColor: priorityStyle.bg,
+                                  color: priorityStyle.text,
+                                  borderColor: priorityStyle.border,
+                                }}
+                              >
+                                {b.task_priority}
+                              </span>
+                            )}
+                            <span className="text-xs text-[var(--text-muted)] font-mono">
+                              Approved by {b.approved_by || "Controller"}
                             </span>
-                          )}
-                          <span className="text-xs text-slate-500 font-mono">Approved by {b.approved_by || "Controller"}</span>
+                          </div>
+
+                          <div className="text-xs text-[var(--text-primary)] mt-1.5 font-semibold">
+                            Corridor: {b.corridor_id} · Track: {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time} ({b.duration_mins} mins)
+                          </div>
+
+                          <div className="mt-2 text-[11px] text-[var(--text-muted)] flex flex-wrap items-center gap-3 font-mono">
+                            <span>
+                              Dept:{" "}
+                              <strong
+                                className="font-bold px-1.5 py-0.2 rounded border"
+                                style={{
+                                  backgroundColor: deptStyle.bg,
+                                  color: deptStyle.text,
+                                  borderColor: deptStyle.border,
+                                }}
+                              >
+                                {deptStyle.label}
+                              </strong>
+                            </span>
+                            <span>·</span>
+                            <span>Machine: {b.assigned_machine || "Manual Squad"}</span>
+                            {b.approval_notes && !b.approval_notes.trim().startsWith("{") && (
+                              <>
+                                <span>·</span>
+                                <span>Remarks: {b.approval_notes}</span>
+                              </>
+                            )}
+                          </div>
+
+                          {renderMultiDepartmentTasks(b)}
                         </div>
 
-                        <div className="text-xs text-slate-800 mt-1.5 font-semibold">
-                          Corridor: {b.corridor_id} · Track: {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time} ({b.duration_mins} mins)
+                        <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setReasoningBlockId(b.id)}
+                            leftIcon={<Sparkles className="w-3.5 h-3.5 text-indigo-500" />}
+                            title="View Explainable Decision Support & Train Impact"
+                          >
+                            Reasoning
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleAction(b.id, "RESCHEDULE")}
+                            disabled={submitting === b.id}
+                            leftIcon={<Clock className="w-3.5 h-3.5" />}
+                          >
+                            Re-plan
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="primary"
+                            onClick={() => handleAction(b.id, "SELECT")}
+                            disabled={submitting === b.id}
+                            isLoading={submitting === b.id}
+                            leftIcon={<FileCheck className="w-3.5 h-3.5" />}
+                          >
+                            Select Block Plan
+                          </Button>
                         </div>
-
-                        <div className="mt-2 text-[11px] text-slate-600 flex flex-wrap items-center gap-3 font-mono">
-                          <span>
-                            Dept: <strong className="text-slate-800">{b.participating_departments || b.department_id || "PWAY"}</strong>
-                          </span>
-                          <span>·</span>
-                          <span>Machine: {b.assigned_machine || "Manual Squad"}</span>
-                          {b.approval_notes && !b.approval_notes.trim().startsWith("{") && (
-                            <>
-                              <span>·</span>
-                              <span>Remarks: {b.approval_notes}</span>
-                            </>
-                          )}
-                        </div>
-
-                        {renderMultiDepartmentTasks(b)}
-                      </div>
-
-                      <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
-                        <button
-                          onClick={() => setReasoningBlockId(b.id)}
-                          className="px-2.5 py-1.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-colors shadow-2xs"
-                          title="View Explainable Decision Support & Train Impact"
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>Reasoning</span>
-                        </button>
-                        <button
-                          onClick={() => handleAction(b.id, "RESCHEDULE")}
-                          disabled={submitting === b.id}
-                          className="px-3 py-1.5 rounded border border-purple-300 hover:bg-purple-50 text-purple-800 text-xs font-semibold flex items-center space-x-1 cursor-pointer"
-                        >
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>Re-plan</span>
-                        </button>
-                        <button
-                          onClick={() => handleAction(b.id, "SELECT")}
-                          disabled={submitting === b.id}
-                          className="px-3.5 py-1.5 rounded bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold shadow-xs flex items-center space-x-1 cursor-pointer"
-                        >
-                          <FileCheck className="w-3.5 h-3.5" />
-                          <span>Select Block Plan</span>
-                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Selected Blocks Cleared for Operational Master Schedule */}
+          {/* 9. SELECTED BLOCKS CLEARED FOR OPERATIONAL MASTER SCHEDULE */}
           {selectedBlocks.length > 0 && (
-            <div className="bg-white rounded-lg border border-sky-300 shadow-xs overflow-hidden">
-              <div className="p-3 bg-sky-50 border-b border-sky-200 flex items-center justify-between">
-                <span className="font-bold text-sky-950 text-xs tracking-wide flex items-center space-x-1.5">
-                  <FileCheck className="w-4 h-4 text-sky-700" />
+            <div className="bg-[var(--surface-card)] rounded-xl border border-[var(--status-info-border)] shadow-xs overflow-hidden">
+              <div
+                className="p-3 border-b flex items-center justify-between"
+                style={{
+                  backgroundColor: "var(--status-info-bg)",
+                  borderColor: "var(--status-info-border)",
+                  color: "var(--status-info-text)",
+                }}
+              >
+                <span className="font-bold text-xs tracking-wide flex items-center space-x-1.5">
+                  <FileCheck className="w-4 h-4 text-[var(--status-info)]" />
                   <span>SELECTED BLOCKS CLEARED FOR OPERATIONAL PLANNING ({selectedBlocks.length})</span>
                 </span>
-                <span className="text-[11px] text-sky-800 font-medium">Selected into Master Schedule · Multi-Department Synchronized</span>
+                <span className="text-[11px] font-medium opacity-90">Selected into Master Schedule · Multi-Department Synchronized</span>
               </div>
 
-              <div className="divide-y divide-sky-100">
-                {selectedBlocks.map((b) => (
-                  <div key={b.id} className="p-4 hover:bg-sky-50/40 transition-colors">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold font-mono text-slate-900 text-sm">{b.id}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-100 text-sky-800 border border-sky-300 flex items-center space-x-1">
-                            <CheckCircle className="w-3 h-3 text-sky-600 inline" />
-                            <span>SELECTED PLAN</span>
+              <div className="divide-y divide-[var(--border-subtle)]">
+                {selectedBlocks.map((b) => {
+                  const lockStyle = getLockTypeBadgeStyle(b.block_type);
+                  const deptStyle = getDepartmentBadgeStyle(b.participating_departments || b.department_id);
+                  const priorityStyle = getPriorityBadgeStyle(b.task_priority);
+
+                  return (
+                    <div key={b.id} className="p-4 hover:bg-[var(--surface-secondary)]/40 transition-colors">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold font-mono text-[var(--text-primary)] text-sm">{b.id}</span>
+                            <span
+                              className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border flex items-center space-x-1"
+                              style={{
+                                backgroundColor: "var(--status-info-bg)",
+                                color: "var(--status-info-text)",
+                                borderColor: "var(--status-info-border)",
+                              }}
+                            >
+                              <CheckCircle className="w-3 h-3 text-[var(--status-info)]" />
+                              <span>SELECTED PLAN</span>
+                            </span>
+                            {b.block_type && (
+                              <span
+                                className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase"
+                                style={{
+                                  backgroundColor: lockStyle.bg,
+                                  color: lockStyle.text,
+                                  borderColor: lockStyle.border,
+                                }}
+                              >
+                                {lockStyle.label}
+                              </span>
+                            )}
+                            {b.task_priority && (
+                              <span
+                                className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                                style={{
+                                  backgroundColor: priorityStyle.bg,
+                                  color: priorityStyle.text,
+                                  borderColor: priorityStyle.border,
+                                }}
+                              >
+                                {b.task_priority}
+                              </span>
+                            )}
+                            <span className="text-xs text-[var(--text-muted)] font-mono">By {b.approved_by || "Controller"}</span>
+                          </div>
+
+                          <div className="text-xs text-[var(--text-primary)] mt-1.5 font-semibold">
+                            Corridor: {b.corridor_id} · Track: {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time} ({b.duration_mins} mins)
+                          </div>
+
+                          <div className="mt-2 text-[11px] text-[var(--text-muted)] flex flex-wrap items-center gap-3 font-mono">
+                            <span>
+                              Dept:{" "}
+                              <strong
+                                className="font-bold px-1.5 py-0.2 rounded border"
+                                style={{
+                                  backgroundColor: deptStyle.bg,
+                                  color: deptStyle.text,
+                                  borderColor: deptStyle.border,
+                                }}
+                              >
+                                {deptStyle.label}
+                              </strong>
+                            </span>
+                            {b.is_multi_department && (
+                              <span
+                                className="px-1.5 py-0.2 rounded text-[10px] font-bold border"
+                                style={{
+                                  backgroundColor: "var(--lock-shadow-bg)",
+                                  color: "var(--lock-shadow-text)",
+                                  borderColor: "var(--lock-shadow-border)",
+                                }}
+                              >
+                                Multi-Department Block
+                              </span>
+                            )}
+                            <span>·</span>
+                            <span>Machine: {b.assigned_machine || "Manual Squad"}</span>
+                            {b.approval_notes && !b.approval_notes.trim().startsWith("{") && (
+                              <>
+                                <span>·</span>
+                                <span>Remarks: {b.approval_notes}</span>
+                              </>
+                            )}
+                          </div>
+
+                          {renderMultiDepartmentTasks(b)}
+                        </div>
+
+                        <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setReasoningBlockId(b.id)}
+                            leftIcon={<Sparkles className="w-3.5 h-3.5 text-indigo-500" />}
+                            title="View AI Decision Rationale & Train Impact"
+                          >
+                            Reasoning
+                          </Button>
+                          <span
+                            className="text-xs font-mono font-bold px-3 py-1.5 rounded border"
+                            style={{
+                              backgroundColor: "var(--status-info-bg)",
+                              color: "var(--status-info-text)",
+                              borderColor: "var(--status-info-border)",
+                            }}
+                          >
+                            Cleared for Execution
                           </span>
-                          {b.block_type && (
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200 uppercase">
-                              {b.block_type} BLOCK
-                            </span>
-                          )}
-                          {b.task_priority && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-800">
-                              {b.task_priority}
-                            </span>
-                          )}
-                          <span className="text-xs text-slate-500 font-mono">By {b.approved_by || "Controller"}</span>
                         </div>
-
-                        <div className="text-xs text-slate-800 mt-1.5 font-semibold">
-                          Corridor: {b.corridor_id} · Track: {b.track_name} ({formatDistanceKm(b.location_km)}) · Slot: {b.requested_start_time}–{b.requested_end_time} ({b.duration_mins} mins)
-                        </div>
-
-                        <div className="mt-2 text-[11px] text-slate-600 flex flex-wrap items-center gap-3 font-mono">
-                          <span>
-                            Dept: <strong className="text-slate-800">{b.participating_departments || b.department_id || "PWAY"}</strong>
-                          </span>
-                          {b.is_multi_department && (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-200">
-                              Multi-Department Block
-                            </span>
-                          )}
-                          <span>·</span>
-                          <span>Machine: {b.assigned_machine || "Manual Squad"}</span>
-                          {b.approval_notes && !b.approval_notes.trim().startsWith("{") && (
-                            <>
-                              <span>·</span>
-                              <span>Remarks: {b.approval_notes}</span>
-                            </>
-                          )}
-                        </div>
-
-                        {renderMultiDepartmentTasks(b)}
-                      </div>
-
-                      <div className="flex items-center space-x-2 flex-shrink-0 self-end md:self-center">
-                        <button
-                          onClick={() => setReasoningBlockId(b.id)}
-                          className="px-2.5 py-1.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-colors"
-                          title="View AI Decision Rationale & Train Impact"
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>Reasoning</span>
-                        </button>
-                        <span className="text-xs font-mono font-bold text-sky-800 bg-sky-100 px-3 py-1.5 rounded border border-sky-300">
-                          Cleared for Execution
-                        </span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Historical Processed Blocks */}
+          {/* 10. HISTORICAL PROCESSED BLOCKS */}
           {historicalBlocks.length > 0 && (
-            <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
-              <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                <span className="font-bold text-slate-800 text-xs tracking-wide">
+            <div className="bg-[var(--surface-card)] rounded-xl border border-[var(--border-subtle)] shadow-xs overflow-hidden">
+              <div className="p-3 bg-[var(--surface-secondary)] border-b border-[var(--border-subtle)] flex items-center justify-between">
+                <span className="font-bold text-[var(--text-primary)] text-xs tracking-wide">
                   HISTORICAL & RE-PLAN LEDGER ({historicalBlocks.length})
                 </span>
                 <ProvenanceBadge type="REAL_PUBLIC" size="sm" />
@@ -1110,7 +1729,7 @@ export const CoordinationPage: React.FC = () => {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100/75 border-b border-slate-200 text-slate-600 font-mono uppercase text-[11px]">
+                  <thead className="bg-[var(--surface-secondary)]/70 border-b border-[var(--border-subtle)] text-[var(--text-muted)] font-mono uppercase text-[11px]">
                     <tr>
                       <th className="p-2.5 pl-4">Block ID</th>
                       <th className="p-2.5">Dept</th>
@@ -1121,36 +1740,64 @@ export const CoordinationPage: React.FC = () => {
                       <th className="p-2.5 pr-4">Notes</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {historicalBlocks.map((b) => (
-                      <tr key={b.id} className="hover:bg-slate-50">
-                        <td className="p-2.5 pl-4 font-mono font-bold text-slate-900">{b.id}</td>
-                        <td className="p-2.5 font-mono text-slate-600 font-semibold">{b.department_id || "PWAY"}</td>
-                        <td className="p-2.5 font-mono text-slate-700">
-                          {b.track_name} ({formatDistanceKm(b.location_km)})
-                        </td>
-                        <td className="p-2.5 font-mono text-slate-900">
-                          {b.requested_start_time} – {b.requested_end_time}
-                        </td>
-                        <td className="p-2.5">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                              b.status === "REJECTED"
-                                ? "bg-red-100 text-red-800 border border-red-300"
-                                : b.status === "RE_PLAN"
-                                ? "bg-purple-100 text-purple-800 border border-purple-300"
-                                : "bg-slate-100 text-slate-700 border border-slate-300"
-                            }`}
-                          >
-                            {b.status}
-                          </span>
-                        </td>
-                        <td className="p-2.5 font-medium text-slate-700">{b.approved_by || "System"}</td>
-                        <td className="p-2.5 pr-4 text-slate-500 text-[11px]">
-                          {b.approval_notes && !b.approval_notes.trim().startsWith("{") ? b.approval_notes : "—"}
-                        </td>
-                      </tr>
-                    ))}
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
+                    {historicalBlocks.map((b) => {
+                      const deptStyle = getDepartmentBadgeStyle(b.department_id);
+                      return (
+                        <tr key={b.id} className="hover:bg-[var(--surface-secondary)]/40 transition-colors">
+                          <td className="p-2.5 pl-4 font-mono font-bold text-[var(--text-primary)]">{b.id}</td>
+                          <td className="p-2.5 font-mono font-semibold">
+                            <span
+                              className="px-1.5 py-0.2 rounded border text-[10px]"
+                              style={{
+                                backgroundColor: deptStyle.bg,
+                                color: deptStyle.text,
+                                borderColor: deptStyle.border,
+                              }}
+                            >
+                              {b.department_id || "PWAY"}
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-mono text-[var(--text-secondary)]">
+                            {b.track_name} ({formatDistanceKm(b.location_km)})
+                          </td>
+                          <td className="p-2.5 font-mono text-[var(--text-primary)]">
+                            {b.requested_start_time} – {b.requested_end_time}
+                          </td>
+                          <td className="p-2.5">
+                            <span
+                              className="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                              style={{
+                                backgroundColor:
+                                  b.status === "REJECTED"
+                                    ? "var(--status-danger-bg)"
+                                    : b.status === "RE_PLAN"
+                                    ? "var(--status-warning-bg)"
+                                    : "var(--surface-secondary)",
+                                color:
+                                  b.status === "REJECTED"
+                                    ? "var(--status-danger-text)"
+                                    : b.status === "RE_PLAN"
+                                    ? "var(--status-warning-text)"
+                                    : "var(--text-secondary)",
+                                borderColor:
+                                  b.status === "REJECTED"
+                                    ? "var(--status-danger-border)"
+                                    : b.status === "RE_PLAN"
+                                    ? "var(--status-warning-border)"
+                                    : "var(--border-subtle)",
+                              }}
+                            >
+                              {b.status}
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-medium text-[var(--text-secondary)]">{b.approved_by || "System"}</td>
+                          <td className="p-2.5 pr-4 text-[var(--text-muted)] text-[11px]">
+                            {b.approval_notes && !b.approval_notes.trim().startsWith("{") ? b.approval_notes : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1159,6 +1806,7 @@ export const CoordinationPage: React.FC = () => {
         </>
       )}
 
+      {/* REASONING MODAL */}
       <BlockReasoningModal
         isOpen={!!reasoningBlockId}
         onClose={() => setReasoningBlockId(null)}
@@ -1167,3 +1815,5 @@ export const CoordinationPage: React.FC = () => {
     </div>
   );
 };
+
+export default CoordinationPage;

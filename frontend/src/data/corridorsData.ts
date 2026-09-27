@@ -705,7 +705,7 @@ export const CORRIDORS_DATABASE: Record<string, DetailedCorridor> = {
       { code: "BHV", name: "Bhirangi", sequence: 19, km: 165.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 110, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
       { code: "DRA", name: "Dharamkundi", sequence: 20, km: 171.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 110, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
       { code: "DQL", name: "Dolariya", sequence: 21, km: 178.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 110, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
-      { code: "ET", name: "Itarsi Junction", sequence: 22, km: 184.0, category: "MAJOR_JUNCTION", is_major: true, platforms: 8, tracks: 14, loops: 6, sidings: 4, electrified: true, speed_kmph: 110, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR-ET", source_type: "REAL_PUBLIC" },
+      { code: "ET", name: "Itarsi Junction", hindiName: "इटारसी जंक्शन", sequence: 22, km: 184.0, category: "MAJOR_JUNCTION", is_major: true, platforms: 8, tracks: 14, loops: 6, sidings: 4, turnoutsCount: 42, electrified: true, speed_kmph: 110, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR Official Station Working Rules (SWR-ET) & Signal Interlocking Plan", source_type: "REAL_PUBLIC", notes: "Grand Central Junction of Indian Railways; four-way interchange handling 200+ passenger and freight trains daily." },
     ],
   },
 
@@ -730,7 +730,7 @@ export const CORRIDORS_DATABASE: Record<string, DetailedCorridor> = {
       verification_status: "VERIFIED",
     },
     locations: [
-      { code: "BINA", name: "Bina Junction", sequence: 1, km: 0.0, category: "MAJOR_JUNCTION", is_major: true, platforms: 6, tracks: 12, loops: 6, sidings: 5, electrified: true, speed_kmph: 110, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
+      { code: "BINA", name: "Bina Junction", hindiName: "बीना जंक्शन", sequence: 1, km: 0.0, category: "MAJOR_JUNCTION", is_major: true, platforms: 6, tracks: 12, loops: 6, sidings: 5, turnoutsCount: 38, electrified: true, speed_kmph: 110, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC", notes: "Major 4-way trunk junction gateway connecting Delhi, Mumbai, Katni, and Kota." },
       { code: "MDVK", name: "Mahadev Khedi", sequence: 2, km: 8.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
       { code: "SMDK", name: "Semarkhedi", sequence: 3, km: 16.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
       { code: "KNJ", name: "Kanjia", sequence: 4, km: 24.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
@@ -743,7 +743,7 @@ export const CORRIDORS_DATABASE: Record<string, DetailedCorridor> = {
       { code: "RTAH", name: "Ratikheda", sequence: 11, km: 88.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
       { code: "SHDR", name: "Shadhoragaon", sequence: 12, km: 98.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
       { code: "PGI", name: "Pilighat", sequence: 13, km: 108.0, category: "HALT", is_major: false, platforms: 1, tracks: 1, loops: 0, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR Timetable", source_type: "REAL_PUBLIC" },
-      { code: "GUNA", name: "Guna Junction", sequence: 14, km: 119.0, category: "MAJOR_JUNCTION", is_major: true, platforms: 3, tracks: 7, loops: 4, sidings: 3, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
+      { code: "GUNA", name: "Guna Junction", hindiName: "गुना जंक्शन", sequence: 14, km: 119.0, category: "MAJOR_JUNCTION", is_major: true, platforms: 3, tracks: 7, loops: 4, sidings: 3, turnoutsCount: 16, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC", notes: "Key interchange connecting West Central trunk with Gwalior, Ruthiyai, and Kota." },
     ],
   },
 
@@ -768,7 +768,7 @@ export const CORRIDORS_DATABASE: Record<string, DetailedCorridor> = {
       verification_status: "VERIFIED",
     },
     locations: [
-      { code: "GUNA", name: "Guna Junction", sequence: 1, km: 0.0, category: "MAJOR_JUNCTION", is_major: true, platforms: 3, tracks: 7, loops: 4, sidings: 3, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
+      { code: "GUNA", name: "Guna Junction", hindiName: "गुना जंक्शन", sequence: 1, km: 0.0, category: "MAJOR_JUNCTION", is_major: true, platforms: 3, tracks: 7, loops: 4, sidings: 3, turnoutsCount: 16, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC", notes: "Key interchange connecting West Central trunk with Gwalior, Ruthiyai, and Kota." },
       { code: "TRVT", name: "Taravata", sequence: 2, km: 12.0, category: "HALT", is_major: false, platforms: 1, tracks: 1, loops: 0, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR Timetable", source_type: "REAL_PUBLIC" },
       { code: "MYN", name: "Miyana", sequence: 3, km: 26.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },
       { code: "BDWS", name: "Badarwas", sequence: 4, km: 48.0, category: "INTERMEDIATE_STATION", is_major: false, platforms: 2, tracks: 3, loops: 1, sidings: 0, electrified: true, speed_kmph: 100, verification_status: "VERIFIED", confidence: "HIGH", source: "WCR SWR", source_type: "REAL_PUBLIC" },

@@ -62,13 +62,16 @@ pnpm-debug.log*
 *.db
 *.sqlite
 *.sqlite3
-!krayasetu.db
 
 # --- Database Journals & Locks ---
 *.db-journal
 *.db-wal
 *.db-shm
 *.sqlite3-journal
+
+# --- Test Screenshots & Large Media Artifacts ---
+phase_*_screenshots/
+ui_audit_screenshots/
 
 # --- Backups & Temporary Artifacts ---
 *.bak

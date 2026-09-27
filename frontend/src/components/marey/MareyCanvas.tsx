@@ -110,12 +110,13 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
     return (parts[0] || 0) + (parts[1] || 0) / 60 + (parts[2] || 0) / 3600;
   }, [referenceTimeStr]);
 
-  // Color Palette depending on Theme
+  // Color Palette depending on Theme - sourced from tokens.css
   const colors = useMemo(() => {
     const isDark = theme === "dark";
+
     return {
       bg: isDark ? "#090d16" : "#fcfaf2",
-      headerBg: isDark ? "#050811" : "#f4efe4",
+      headerBg: isDark ? "#070b14" : "#f4eee1",
       stationText: isDark ? "#cbd5e1" : "#1e293b",
       stationMajorText: isDark ? "#f8fafc" : "#0f172a",
       stationKmText: isDark ? "#94a3b8" : "#64748b",
@@ -123,13 +124,45 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
       minorGridLine: isDark ? "rgba(71, 85, 105, 0.25)" : "rgba(148, 163, 184, 0.25)",
       timeGridLine: isDark ? "rgba(71, 85, 105, 0.22)" : "rgba(148, 163, 184, 0.22)",
       hourText: isDark ? "#94a3b8" : "#475569",
-      redMarker: "#ef4444",
+      redMarker: isDark ? "#f87171" : "#ef4444",
       border: isDark ? "#1e293b" : "#cbd5e1",
       tooltipBg: isDark ? "rgba(15, 23, 42, 0.95)" : "rgba(255, 255, 255, 0.98)",
       tooltipBorder: isDark ? "#334155" : "#cbd5e1",
       tooltipText: isDark ? "#f1f5f9" : "#0f172a",
+      // 5 train category trajectory colors sourced from tokens.css
+      trainPrestige: isDark ? "#ef4444" : "#b91c1c",
+      trainSuperfast: isDark ? "#3b82f6" : "#1d4ed8",
+      trainMail: isDark ? "#14b8a6" : "#0f766e",
+      trainPassenger: isDark ? "#f59e0b" : "#b45309",
+      trainFreight: isDark ? "#94a3b8" : "#334155",
+      // 4 block lock-type tokens
+      lockPlanned: isDark ? "#60a5fa" : "#2563eb",
+      lockPlannedFill: isDark ? "rgba(59, 130, 246, 0.22)" : "rgba(59, 130, 246, 0.16)",
+      lockRuling: isDark ? "#c084fc" : "#9333ea",
+      lockRulingFill: isDark ? "rgba(147, 51, 234, 0.25)" : "rgba(147, 51, 234, 0.18)",
+      lockEmergent: isDark ? "#fb7185" : "#dc2626",
+      lockEmergentFill: isDark ? "rgba(239, 68, 68, 0.28)" : "rgba(239, 68, 68, 0.22)",
+      lockShadow: isDark ? "#818cf8" : "#4f46e5",
+      lockShadowFill: isDark ? "rgba(79, 70, 229, 0.25)" : "rgba(79, 70, 229, 0.20)",
     };
   }, [theme]);
+
+  const getCategoryColor = useCallback((catKey?: string) => {
+    switch (catKey) {
+      case "VANDE_BHARAT":
+      case "RAJDHANI_SHATABDI":
+        return colors.trainPrestige;
+      case "SUPERFAST":
+        return colors.trainSuperfast;
+      case "MAIL_EXPRESS":
+        return colors.trainMail;
+      case "FREIGHT":
+        return colors.trainFreight;
+      case "OTHER":
+      default:
+        return colors.trainPassenger;
+    }
+  }, [colors]);
 
   // Coordinate Transformations Constants
   const LEFT_AXIS_WIDTH = 180;
@@ -254,18 +287,18 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
         const boxHeight = Math.max(18, y2 - y1);
 
         const bType = (blk.block_type || "PLANNED").toUpperCase();
-        let fillStyle = "rgba(59, 130, 246, 0.16)"; // Blue for planned
-        let strokeStyle = "#2563eb";
+        let fillStyle = colors.lockPlannedFill;
+        let strokeStyle = colors.lockPlanned;
 
         if (bType === "RULING") {
-          fillStyle = "rgba(147, 51, 234, 0.18)"; // Purple
-          strokeStyle = "#9333ea";
+          fillStyle = colors.lockRulingFill;
+          strokeStyle = colors.lockRuling;
         } else if (bType === "EMERGENT") {
-          fillStyle = "rgba(239, 68, 68, 0.22)"; // Red danger
-          strokeStyle = "#dc2626";
+          fillStyle = colors.lockEmergentFill;
+          strokeStyle = colors.lockEmergent;
         } else if (bType === "SHADOW") {
-          fillStyle = "rgba(79, 70, 229, 0.20)"; // Indigo multi-dept
-          strokeStyle = "#4f46e5";
+          fillStyle = colors.lockShadowFill;
+          strokeStyle = colors.lockShadow;
         }
 
         // Clip to graph plot area
@@ -308,13 +341,13 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
       filteredTrains.forEach((t) => {
         if (!t.scheduledPath || t.scheduledPath.length < 2) return;
 
-        const cat = TRAIN_CATEGORIES[t.category] || TRAIN_CATEGORIES.OTHER;
+        const strokeColor = getCategoryColor(t.category);
         ctx.save();
         ctx.rect(LEFT_AXIS_WIDTH, TOP_AXIS_HEIGHT, width - LEFT_AXIS_WIDTH - RIGHT_AXIS_WIDTH, plotHeight);
         ctx.clip();
 
         ctx.beginPath();
-        ctx.strokeStyle = cat.stroke || cat.color;
+        ctx.strokeStyle = strokeColor;
         ctx.globalAlpha = 0.40;
         ctx.lineWidth = 1.2;
         ctx.setLineDash([4, 4]);
@@ -334,7 +367,7 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
     // 6. Draw Confirmed Travelled Train Trajectories (Bold solid lines up to latest confirmed position)
     filteredTrains.forEach((t) => {
       const isSelected = selectedTrain?.trainNumber === t.trainNumber;
-      const cat = TRAIN_CATEGORIES[t.category] || TRAIN_CATEGORIES.OTHER;
+      const strokeColor = getCategoryColor(t.category);
       const history = t.historicalPositions;
 
       if (!history || history.length === 0) return;
@@ -344,7 +377,7 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
       ctx.clip();
 
       ctx.beginPath();
-      ctx.strokeStyle = cat.stroke;
+      ctx.strokeStyle = strokeColor;
       ctx.globalAlpha = t.is_active ? 1.0 : 0.70;
       ctx.lineWidth = isSelected ? 3.5 : t.is_active ? 2.5 : 1.7;
       ctx.setLineDash([]);
@@ -383,7 +416,7 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
           ctx.rotate(labelAngle);
 
           ctx.font = isSelected ? "bold 11px 'Roboto Mono', monospace" : "bold 9.5px 'Roboto Mono', monospace";
-          ctx.fillStyle = cat.stroke;
+          ctx.fillStyle = strokeColor;
           const displayLabel = t.trainDisplayName || `${t.trainNumber} — ${t.trainName}`;
           ctx.fillText(displayLabel, -20, -5);
           ctx.restore();
@@ -399,16 +432,17 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
         // Glowing outer pulse
         ctx.beginPath();
         ctx.arc(mx, my, isSelected ? 10 : 7.5, 0, Math.PI * 2);
-        ctx.fillStyle = cat.stroke;
+        ctx.fillStyle = strokeColor;
         ctx.globalAlpha = 0.3;
         ctx.fill();
 
         // Solid inner beacon
         ctx.beginPath();
         ctx.arc(mx, my, isSelected ? 5.5 : 4.5, 0, Math.PI * 2);
-        ctx.fillStyle = cat.stroke;
+        ctx.fillStyle = strokeColor;
         ctx.globalAlpha = 1.0;
         ctx.fill();
+
         ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 1.8;
         ctx.stroke();
@@ -424,11 +458,11 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
 
         ctx.fillStyle = theme === "dark" ? "rgba(15, 23, 42, 0.92)" : "rgba(255, 255, 255, 0.95)";
         ctx.fillRect(tagX - 4, tagY - 10, textWidth + 8, 15);
-        ctx.strokeStyle = cat.stroke;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.0;
         ctx.strokeRect(tagX - 4, tagY - 10, textWidth + 8, 15);
 
-        ctx.fillStyle = cat.stroke;
+        ctx.fillStyle = strokeColor;
         ctx.fillText(tagText, tagX, tagY + 2);
       }
 
@@ -630,6 +664,7 @@ export const MareyCanvas: React.FC<MareyCanvasProps> = ({
     referenceTimeStr,
     zoomLevel,
     panOffset,
+    getCategoryColor,
   ]);
 
   // Handle Dragging (Pan)

@@ -96,10 +96,10 @@ export const VERIFIED_JUNCTION_HUBS: JunctionHubData[] = [
     code: "BINA",
     name: "Bina Junction",
     hindiName: "बीना जंक्शन",
-    platforms: 5,
-    tracks: 11,
-    loops: 5,
-    sidings: 4,
+    platforms: 6,
+    tracks: 12,
+    loops: 6,
+    sidings: 5,
     category: "NSG-2",
     electrified: true,
     corridors: ["CORR-02 (Bhopal–Bina)", "CORR-04 (Bina–Guna)"],
@@ -107,7 +107,7 @@ export const VERIFIED_JUNCTION_HUBS: JunctionHubData[] = [
     routes: "South: Bhopal / Mumbai · North: Jhansi / New Delhi · East: Katni / Bilaspur · West: Guna / Kota",
     description: "Strategic 4-way trunk junction serving as the gateway between North Central Railway, West Central Railway, and Western Railway corridors. Large marshalling yard and refinery siding.",
     specialFeatures: [
-      "5 Berthing Platforms with heavy freight bypass loops",
+      "6 Berthing Platforms with heavy freight bypass loops",
       "Bharat Petroleum Corporation (BPCL) Bina Refinery dedicated siding",
       "Interchange point for coal freight from Katni towards Northern Thermal plants",
       "100% 25 kV AC 50 Hz Traction with automated section post (SP) isolators"
@@ -119,8 +119,8 @@ export const VERIFIED_JUNCTION_HUBS: JunctionHubData[] = [
     hindiName: "गुना जंक्शन",
     platforms: 3,
     tracks: 7,
-    loops: 3,
-    sidings: 2,
+    loops: 4,
+    sidings: 3,
     category: "NSG-3",
     electrified: true,
     corridors: ["CORR-04 (Bina–Guna)", "CORR-05 (Guna–Gwalior)"],
@@ -185,7 +185,7 @@ export const VisualJunctionHubs: React.FC = () => {
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-[#0b2545] text-white">
+            <div className="p-2.5 rounded-xl bg-[var(--brand-navy)] text-white">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
@@ -238,7 +238,7 @@ export const VisualJunctionHubs: React.FC = () => {
               {/* Header: Code, Category, Platforms */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-black bg-[#0b2545] text-white">
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-black bg-[var(--brand-navy)] text-white">
                     {j.code}
                   </span>
                   <span className="text-xs font-mono font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
@@ -304,10 +304,10 @@ export const VisualJunctionHubs: React.FC = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+            <div className="pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
               <Link
                 to={`/station-master/${j.code}`}
-                className="flex-1 py-2 px-3 bg-[#0b2545] hover:bg-sky-900 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+                className="flex-1 py-2 px-3 bg-[var(--brand-navy)] hover:bg-[var(--brand-navy-hover)] text-[var(--text-inverse)] rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
               >
                 <span>Inspect Station Yard</span>
                 <ExternalLink className="w-3.5 h-3.5" />

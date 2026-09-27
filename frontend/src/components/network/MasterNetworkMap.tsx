@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ProvenanceBadge } from "../common/ProvenanceBadge";
+import { Button } from "../ui";
 import { StationSchematicCanvas } from "../station/StationSchematicCanvas";
 import { StationDetailsDrawer } from "../station/StationDetailsDrawer";
 import {
@@ -249,7 +250,7 @@ export const VERIFIED_NETWORK_STATIONS: Record<string, StationNode> = {
     hindiName: "बीना जंक्शन",
     x: 710,
     y: 110,
-    platforms: 5,
+    platforms: 6,
     category: "NSG-2",
     isJunction: true,
     corridors: ["CORR-02", "CORR-04"],
@@ -424,6 +425,7 @@ export const VERIFIED_CORRIDORS: CorridorPath[] = [
 export const MasterNetworkMap: React.FC = () => {
   const [selectedCorridorId, setSelectedCorridorId] = useState<string | null>(null);
   const [selectedStationCode, setSelectedStationCode] = useState<string | null>("BPL");
+  const [isDefaultSelection, setIsDefaultSelection] = useState<boolean>(true);
   const [hoveredStationCode, setHoveredStationCode] = useState<string | null>(null);
   const [filterJunctionsOnly, setFilterJunctionsOnly] = useState(false);
   const [selectedElement, setSelectedElement] = useState<any | null>(null);
@@ -459,12 +461,14 @@ export const MasterNetworkMap: React.FC = () => {
   };
 
   const handleClearSelection = () => {
+    setIsDefaultSelection(false);
     setSelectedStationCode(null);
     setSelectedCorridorId(null);
     setSelectedElement(null);
   };
 
   const handleSelectStation = (code: string | null, shouldScroll = true) => {
+    setIsDefaultSelection(false);
     setSelectedStationCode(code);
     setSelectedElement(null);
     if (code && shouldScroll) {
@@ -541,28 +545,26 @@ export const MasterNetworkMap: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           {/* Clear Selection Button */}
           {(selectedStationCode !== null || selectedCorridorId !== null) && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={handleClearSelection}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border-slate-200 hover:border-rose-200 flex items-center space-x-1.5"
+              className="text-xs h-8 text-[var(--text-secondary)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-bg)] hover:border-[var(--status-danger-border)] cursor-pointer"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3.5 h-3.5 mr-1" />
               <span>Clear Selection</span>
-            </button>
+            </Button>
           )}
 
           {/* Filter: Junctions Only */}
-          <button
-            type="button"
+          <Button
+            variant={filterJunctionsOnly ? "primary" : "secondary"}
+            size="sm"
             onClick={() => setFilterJunctionsOnly(!filterJunctionsOnly)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-              filterJunctionsOnly
-                ? "bg-[#0b2545] text-white border-[#0b2545] shadow-xs"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200"
-            }`}
+            className="text-xs h-8 cursor-pointer"
           >
             {filterJunctionsOnly ? "✓ Showing Major Junctions" : "Filter: Major Junctions Only"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -577,7 +579,7 @@ export const MasterNetworkMap: React.FC = () => {
           onClick={() => setSelectedCorridorId(null)}
           className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
             selectedCorridorId === null
-              ? "bg-[#0b2545] text-white shadow-xs"
+              ? "bg-[var(--brand-navy)] text-white shadow-xs"
               : "bg-slate-100 text-slate-700 hover:bg-slate-200"
           }`}
         >
@@ -591,7 +593,7 @@ export const MasterNetworkMap: React.FC = () => {
             onClick={() => setSelectedCorridorId(c.id === selectedCorridorId ? null : c.id)}
             className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center space-x-1.5 ${
               selectedCorridorId === c.id
-                ? "bg-[#0b2545] text-white shadow-xs"
+                ? "bg-[var(--brand-navy)] text-white shadow-xs"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200"
             }`}
           >
@@ -696,6 +698,13 @@ export const MasterNetworkMap: React.FC = () => {
                 </button>
               </div>
 
+              {isDefaultSelection && selectedStationCode === "BPL" && (
+                <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[var(--status-info-bg)] border border-[var(--status-info-border)] text-[var(--status-info-text)] text-[11px] font-mono font-medium">
+                  <Info className="w-3.5 h-3.5 text-[var(--status-info)] flex-shrink-0" />
+                  <span>Showing: Bhopal Junction (BPL) — default view</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <div className="font-black text-slate-900 text-sm">
@@ -705,7 +714,7 @@ export const MasterNetworkMap: React.FC = () => {
                     {selectedStation.isJunction ? "Major Junction Hub" : "Block Station"} · {selectedStation.platforms} PF
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-[#0b2545] text-white">
+                <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-[var(--brand-navy)] text-white">
                   {selectedStation.code}
                 </span>
               </div>
@@ -1082,7 +1091,7 @@ export const MasterNetworkMap: React.FC = () => {
                     <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                       {stationInfra.name}
                     </h2>
-                    <span className="px-2.5 py-0.5 rounded-lg text-sm font-mono font-bold bg-[#0b2545] text-white">
+                    <span className="px-2.5 py-0.5 rounded-lg text-sm font-mono font-bold bg-[var(--brand-navy)] text-white">
                       {stationInfra.code}
                     </span>
                     {stationInfra.hindiName && (
@@ -1092,20 +1101,28 @@ export const MasterNetworkMap: React.FC = () => {
                     )}
                   </div>
 
+                  {isDefaultSelection && selectedStationCode === "BPL" && (
+                    <div className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-[var(--status-info-bg)] border border-[var(--status-info-border)] text-[var(--status-info-text)] text-xs font-mono font-semibold mt-1">
+                      <Info className="w-4 h-4 text-[var(--status-info)] flex-shrink-0" />
+                      <span>Showing: Bhopal Junction (BPL) — default view</span>
+                    </div>
+                  )}
+
                   <p className="text-xs text-slate-500 font-mono mt-1">
                     {selectedStation?.isJunction ? "Major Interchange Junction Hub" : "Permanent Way Block Station"} · Category: {stationInfra.category} · Chainage: {stationInfra.chainageKm} KM
                   </p>
                 </div>
 
                 <div>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={handleClearSelection}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer flex items-center space-x-1.5"
+                    className="text-xs h-8 text-[var(--text-secondary)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-bg)] hover:border-[var(--status-danger-border)] cursor-pointer"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3.5 h-3.5 mr-1" />
                     <span>Clear Selection</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -1321,7 +1338,7 @@ export const MasterNetworkMap: React.FC = () => {
                     key={`quick-${stn.code}`}
                     type="button"
                     onClick={() => handleSelectStation(stn.code)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-50 hover:bg-[#0b2545] hover:text-white text-slate-800 border border-slate-200 hover:border-[#0b2545] transition-all cursor-pointer flex items-center space-x-1.5 shadow-2xs"
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-50 hover:bg-[var(--brand-navy)] hover:text-white text-slate-800 border border-slate-200 hover:border-[var(--brand-navy)] transition-all cursor-pointer flex items-center space-x-1.5 shadow-2xs"
                   >
                     <span className="font-mono text-sky-700 font-bold">[{stn.code}]</span>
                     <span>{stn.name}</span>

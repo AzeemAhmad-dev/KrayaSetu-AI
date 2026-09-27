@@ -12,13 +12,15 @@ import {
   RotateCcw,
   ArrowRight,
   ShieldAlert,
-  FileText
+  FileText,
+  ShieldCheck
 } from "lucide-react";
 import { DepartmentTask, TaskWorkflowStatus } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { api } from "../../services/api";
 import { formatDistanceKm, formatKmValue } from "../../utils/formatDistance";
 import { isDailyBlock, isWeeklyBlock, isMonthlyBlock } from "../../utils/plannedBlocksHelper";
+import { Button, EmptyState } from "../ui";
 
 const TASK_EXECUTION_STEPS: TaskWorkflowStatus[] = [
   "Block Approved",
@@ -305,23 +307,13 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
 
       {/* Task List / Empty State (Strictly Empty by default, No Add Option) */}
       {tasks.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-xs">
-          <div className="w-14 h-14 mx-auto rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
-            {cadence === "WEEKLY" ? <Calendar className="w-7 h-7" /> : <CalendarRange className="w-7 h-7" />}
-          </div>
-          <h3 className="text-sm font-bold text-slate-800">
-            No {cadence === "WEEKLY" ? "Weekly" : "Monthly"} Tasks Assigned
-          </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-            There are currently no {cadence.toLowerCase()} maintenance tasks assigned to the{" "}
-            <strong>{departmentName}</strong> department. Tasks issued by central division control will appear here for workflow tracking and field execution.
-          </p>
-          <div className="mt-4">
-            <span className="inline-block text-[11px] font-mono text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-              Department users cannot manually create {cadence.toLowerCase()} tasks · Assigned by Division
-            </span>
-          </div>
-        </div>
+        <EmptyState
+          className="border-[var(--status-success-border)] bg-[var(--status-success-bg)]/20"
+          icon={<ShieldCheck className="w-8 h-8 text-[var(--status-success)]" />}
+          title={`No ${cadence === "WEEKLY" ? "Weekly" : "Monthly"} Tasks Assigned`}
+          description={`There are currently no ${cadence.toLowerCase()} maintenance tasks assigned to the ${departmentName} department. All periodic schedules are clear.`}
+          advisoryNote={`Department register · Central Divisional Schedule`}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tasks.map((task) => {
@@ -338,7 +330,7 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
               <div
                 key={task.id}
                 onClick={() => setSelectedTask(task)}
-                className="bg-white rounded-xl border border-slate-200 hover:border-slate-400 p-4 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-3 flex flex-col justify-between"
+                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-400 p-4 shadow-xs hover:shadow-sm transition-all cursor-pointer space-y-3 flex flex-col justify-between"
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-1 text-[11px] font-mono">
@@ -348,22 +340,22 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-slate-900 text-sm leading-snug">
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug">
                     {task.title}
                   </h3>
 
-                  <div className="flex items-center space-x-1.5 text-xs text-slate-600">
+                  <div className="flex items-center space-x-1.5 text-xs text-slate-600 dark:text-slate-400">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                     <span className="truncate">{task.sectionOrLocation}</span>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 font-mono">
                   <div className="flex items-center space-x-1">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
                     <span>{task.targetDate || "No target date"}</span>
                   </div>
-                  <div className="flex items-center space-x-1 font-bold text-[#0b2545]">
+                  <div className="flex items-center space-x-1 font-bold text-[var(--brand-navy)] dark:text-sky-400">
                     <span>Manage</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </div>
@@ -430,7 +422,7 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
                         key={step}
                         className={`p-2 rounded-lg border text-xs flex flex-col items-center justify-center transition-all ${
                           isCurrent
-                            ? "bg-[#0b2545] text-white border-[#0b2545] font-bold shadow-xs"
+                            ? "bg-[var(--brand-navy)] text-white border-[var(--brand-navy-border)] font-bold shadow-xs"
                             : isPassed
                             ? "bg-emerald-50 text-emerald-900 border-emerald-300 font-semibold"
                             : "bg-slate-50 text-slate-400 border-slate-200"
@@ -524,37 +516,38 @@ export const DepartmentTaskSection: React.FC<DepartmentTaskSectionProps> = ({
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Advance to next workflow step */}
                     {getNextStatus(selectedTask.status, true) && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => handleUpdateStatus(selectedTask.id, getNextStatus(selectedTask.status, true)!)}
-                        className="px-4 py-2 rounded-lg bg-[#0b2545] hover:bg-[#134074] text-white text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                        leftIcon={<ArrowRight className="w-4 h-4" />}
                       >
-                        <ArrowRight className="w-4 h-4" />
                         <span>Dispatch / Advance: {getNextStatus(selectedTask.status, true)}</span>
-                      </button>
+                      </Button>
                     )}
 
                     {/* Reschedule Button */}
                     {selectedTask.status !== "Completed" && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setShowRescheduleInput(!showRescheduleInput)}
-                        className="px-3 py-2 rounded-lg border border-purple-300 text-purple-900 bg-purple-50 hover:bg-purple-100 text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
+                        leftIcon={<RotateCcw className="w-3.5 h-3.5 text-purple-600" />}
+                        className="border-purple-300 text-purple-900 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
                         <span>Request Re-plan / Reschedule</span>
-                      </button>
+                      </Button>
                     )}
 
                     {/* If already completed or rescheduled, option to re-open */}
                     {(selectedTask.status === "Completed" || selectedTask.status === "Rescheduled") && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => handleUpdateStatus(selectedTask.id, "Block Approved")}
-                        className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                       >
                         Re-open / Set to Approved
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}

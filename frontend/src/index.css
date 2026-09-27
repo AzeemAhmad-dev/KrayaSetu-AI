@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "./tokens.css";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, .dark, .dark *));
 
 @layer base {
   :root {
@@ -87,8 +90,8 @@
   .text-\[9px\],
   .text-\[9\.5px\],
   .text-\[10px\] {
-    font-size: 0.75rem !important; /* 12px minimum comfortable UI size */
-    line-height: 1.05rem !important;
+    font-size: var(--text-floor, 0.75rem) !important; /* 12px minimum comfortable UI size preserved as token */
+    line-height: var(--text-floor-leading, 1.05rem) !important;
   }
 
   .text-\[11px\] {

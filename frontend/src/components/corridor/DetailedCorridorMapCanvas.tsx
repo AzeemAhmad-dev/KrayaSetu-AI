@@ -13,13 +13,15 @@ import {
   Compass,
   ArrowLeft,
   ArrowRight,
-  Move
+  Move,
+  Info,
 } from "lucide-react";
 
 interface DetailedCorridorMapCanvasProps {
   corridor: DetailedCorridor;
   selectedLocation: CorridorLocation | null;
   onSelectLocation: (loc: CorridorLocation) => void;
+  isDefaultSelection?: boolean;
 }
 
 interface Sleeper {
@@ -29,10 +31,41 @@ interface Sleeper {
   y2: number;
 }
 
+const MAP_THEME = {
+  bg: "var(--surface-card)",
+  grid: "var(--border-subtle)",
+  badgeBg: "var(--surface-card)",
+  badgeStroke: "var(--border-medium)",
+  badgeText: "var(--text-primary)",
+  leaderStroke: "var(--border-strong)",
+  ballastFill: "var(--surface-secondary)",
+  ballastStroke: "var(--border-medium)",
+  railNormal: "var(--text-primary)",
+  railSelected: "var(--status-info)",
+  sleeper: "var(--text-muted)",
+  thirdLineRail: "var(--status-info)",
+  stationBg: "var(--surface-card)",
+  stationBgSelected: "var(--status-info-bg)",
+  stationStroke: "var(--border-medium)",
+  stationStrokeMajor: "var(--border-strong)",
+  stationStrokeSelected: "var(--status-info)",
+  stationText: "var(--text-primary)",
+  stationTextSelected: "var(--status-info-text)",
+  stationKmText: "var(--text-muted)",
+  tactileBand: "var(--status-warning)",
+  platformDeckBg: "var(--surface-card)",
+  platformDeckSelectedBg: "var(--status-info-bg)",
+  specPillBg: "var(--surface-body)",
+  specPillSelectedBg: "var(--status-info-bg)",
+  specPillText: "var(--text-secondary)",
+  specPillSelectedText: "var(--status-info-text)",
+};
+
 export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps> = ({
   corridor,
   selectedLocation,
   onSelectLocation,
+  isDefaultSelection = false,
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -279,6 +312,13 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
             <div className="text-[11px] text-slate-500 font-mono mt-0.5">
               {corridor.track_configuration.replace(/_/g, " ")} · {corridor.total_distance_km} KM · {corridor.voltage}
             </div>
+
+            {isDefaultSelection && selectedLocation && (
+              <div className="mt-1.5 inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[var(--status-info-bg)] border border-[var(--status-info-border)] text-[var(--status-info-text)] text-xs font-mono font-semibold">
+                <Info className="w-3.5 h-3.5 text-[var(--status-info)] flex-shrink-0" />
+                <span>Showing: {selectedLocation.name} ({selectedLocation.code}) — default view</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -363,15 +403,15 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="w-full overflow-auto bg-[#ffffff] relative h-[600px] sm:h-[660px] lg:h-[720px] min-h-[580px] cursor-grab active:cursor-grabbing select-none"
+        className="w-full overflow-auto bg-[var(--surface-card)] relative h-[600px] sm:h-[660px] lg:h-[720px] min-h-[580px] cursor-grab active:cursor-grabbing select-none"
       >
         {/* Engineering Blueprint Faint Grid Pattern */}
         <div
           className="absolute inset-0 pointer-events-none opacity-45"
           style={{
             backgroundImage: `
-              linear-gradient(to right, #e2e8f0 1px, transparent 1px),
-              linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
+              linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
+              linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px)
             `,
             backgroundSize: "40px 40px",
           }}
@@ -401,14 +441,14 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
               width={LABEL_COL_WIDTH}
               height={26}
               rx={4}
-              fill="#ffffff"
-              stroke="#cbd5e1"
+              fill={MAP_THEME.badgeBg}
+              stroke={MAP_THEME.badgeStroke}
               strokeWidth={1}
             />
             <text
               x={LABEL_COL_X + 10}
               y={UP_MAIN_Y + 4}
-              fill="#0f172a"
+              fill={MAP_THEME.badgeText}
               fontSize="11.5"
               fontFamily="'Inter', sans-serif"
               fontWeight="600"
@@ -422,7 +462,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
               y1={UP_MAIN_Y}
               x2={TRACK_START_X}
               y2={UP_MAIN_Y}
-              stroke="#94a3b8"
+              stroke={MAP_THEME.leaderStroke}
               strokeWidth={1}
               strokeDasharray="3 2"
             />
@@ -436,14 +476,14 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   width={LABEL_COL_WIDTH}
                   height={26}
                   rx={4}
-                  fill="#ffffff"
-                  stroke="#cbd5e1"
+                  fill={MAP_THEME.badgeBg}
+                  stroke={MAP_THEME.badgeStroke}
                   strokeWidth={1}
                 />
                 <text
                   x={LABEL_COL_X + 10}
                   y={DOWN_MAIN_Y + 4}
-                  fill="#0f172a"
+                  fill={MAP_THEME.badgeText}
                   fontSize="11.5"
                   fontFamily="'Inter', sans-serif"
                   fontWeight="600"
@@ -456,7 +496,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   y1={DOWN_MAIN_Y}
                   x2={TRACK_START_X}
                   y2={DOWN_MAIN_Y}
-                  stroke="#94a3b8"
+                  stroke={MAP_THEME.leaderStroke}
                   strokeWidth={1}
                   strokeDasharray="3 2"
                 />
@@ -472,14 +512,14 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   width={LABEL_COL_WIDTH}
                   height={26}
                   rx={4}
-                  fill="#f0f9ff"
-                  stroke="#0284c7"
+                  fill={MAP_THEME.stationBgSelected}
+                  stroke={MAP_THEME.railSelected}
                   strokeWidth={1}
                 />
                 <text
                   x={LABEL_COL_X + 8}
                   y={THIRD_LINE_Y + 4}
-                  fill="#0369a1"
+                  fill={MAP_THEME.stationTextSelected}
                   fontSize="11"
                   fontFamily="'Inter', sans-serif"
                   fontWeight="600"
@@ -492,7 +532,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   y1={THIRD_LINE_Y}
                   x2={TRACK_START_X}
                   y2={THIRD_LINE_Y}
-                  stroke="#0284c7"
+                  stroke={MAP_THEME.railSelected}
                   strokeWidth={1}
                   strokeDasharray="3 2"
                 />
@@ -514,8 +554,8 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
               width={END_X - TRACK_START_X}
               height={22}
               rx={3}
-              fill="#f1f5f9"
-              stroke="#cbd5e1"
+              fill={MAP_THEME.ballastFill}
+              stroke={MAP_THEME.ballastStroke}
               strokeWidth={0.8}
             />
 
@@ -527,7 +567,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                 y1={s.y1}
                 x2={s.x2}
                 y2={s.y2}
-                stroke="#64748b"
+                stroke={MAP_THEME.sleeper}
                 strokeWidth={2}
                 strokeLinecap="round"
               />
@@ -539,7 +579,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
               y1={UP_MAIN_Y - HALF_GAUGE}
               x2={END_X}
               y2={UP_MAIN_Y - HALF_GAUGE}
-              stroke="#1e293b"
+              stroke={MAP_THEME.railNormal}
               strokeWidth={2}
             />
             <line
@@ -547,7 +587,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
               y1={UP_MAIN_Y + HALF_GAUGE}
               x2={END_X}
               y2={UP_MAIN_Y + HALF_GAUGE}
-              stroke="#1e293b"
+              stroke={MAP_THEME.railNormal}
               strokeWidth={2}
             />
           </g>
@@ -562,8 +602,8 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                 width={END_X - TRACK_START_X}
                 height={22}
                 rx={3}
-                fill="#f1f5f9"
-                stroke="#cbd5e1"
+                fill={MAP_THEME.ballastFill}
+                stroke={MAP_THEME.ballastStroke}
                 strokeWidth={0.8}
               />
 
@@ -575,7 +615,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   y1={s.y1}
                   x2={s.x2}
                   y2={s.y2}
-                  stroke="#64748b"
+                  stroke={MAP_THEME.sleeper}
                   strokeWidth={2}
                   strokeLinecap="round"
                 />
@@ -587,7 +627,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                 y1={DOWN_MAIN_Y - HALF_GAUGE}
                 x2={END_X}
                 y2={DOWN_MAIN_Y - HALF_GAUGE}
-                stroke="#1e293b"
+                stroke={MAP_THEME.railNormal}
                 strokeWidth={2}
               />
               <line
@@ -595,7 +635,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                 y1={DOWN_MAIN_Y + HALF_GAUGE}
                 x2={END_X}
                 y2={DOWN_MAIN_Y + HALF_GAUGE}
-                stroke="#1e293b"
+                stroke={MAP_THEME.railNormal}
                 strokeWidth={2}
               />
             </g>
@@ -610,8 +650,8 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                 width={END_X - TRACK_START_X}
                 height={22}
                 rx={3}
-                fill="#f1f5f9"
-                stroke="#cbd5e1"
+                fill={MAP_THEME.ballastFill}
+                stroke={MAP_THEME.ballastStroke}
                 strokeWidth={0.8}
               />
               {thirdLineSleepers.map((s, idx) => (
@@ -621,7 +661,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   y1={s.y1}
                   x2={s.x2}
                   y2={s.y2}
-                  stroke="#64748b"
+                  stroke={MAP_THEME.sleeper}
                   strokeWidth={2}
                   strokeLinecap="round"
                 />
@@ -631,7 +671,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                 y1={THIRD_LINE_Y - HALF_GAUGE}
                 x2={END_X}
                 y2={THIRD_LINE_Y - HALF_GAUGE}
-                stroke="#0284c7"
+                stroke={MAP_THEME.thirdLineRail}
                 strokeWidth={2}
                 strokeDasharray="8 2"
               />
@@ -640,7 +680,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                 y1={THIRD_LINE_Y + HALF_GAUGE}
                 x2={END_X}
                 y2={THIRD_LINE_Y + HALF_GAUGE}
-                stroke="#0284c7"
+                stroke={MAP_THEME.thirdLineRail}
                 strokeWidth={2}
                 strokeDasharray="8 2"
               />
@@ -692,15 +732,15 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                     width={136}
                     height={38}
                     rx={6}
-                    fill={isSelected ? "#f0f9ff" : "#ffffff"}
-                    stroke={isSelected ? "#0284c7" : isMajor ? "#94a3b8" : "#cbd5e1"}
+                    fill={isSelected ? MAP_THEME.stationBgSelected : MAP_THEME.stationBg}
+                    stroke={isSelected ? MAP_THEME.stationStrokeSelected : isMajor ? MAP_THEME.stationStrokeMajor : MAP_THEME.stationStroke}
                     strokeWidth={isSelected ? 1.5 : 1}
                     className="transition-colors"
                   />
                   <text
                     x={0}
                     y={0}
-                    fill={isSelected ? "#0369a1" : isMajor ? "#0f172a" : "#1e293b"}
+                    fill={isSelected ? MAP_THEME.stationTextSelected : isMajor ? MAP_THEME.stationText : "var(--text-secondary)"}
                     fontSize={isJunction ? "12.5" : isMajor ? "12" : "11"}
                     fontWeight={isMajor || isSelected ? "700" : "600"}
                     fontFamily="'Inter', sans-serif"
@@ -712,7 +752,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   <text
                     x={0}
                     y={14}
-                    fill={isSelected ? "#0284c7" : "#64748b"}
+                    fill={isSelected ? MAP_THEME.stationStrokeSelected : MAP_THEME.stationKmText}
                     fontSize="9.5"
                     fontFamily="monospace"
                     textAnchor="middle"
@@ -728,7 +768,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   y1={76}
                   x2={sx}
                   y2={(isMajor || loc.loops > 0) ? LOOP_LINE_Y - 2 : PLATFORM_DECK_Y - 2}
-                  stroke={isSelected ? "#0284c7" : "#e2e8f0"}
+                  stroke={isSelected ? MAP_THEME.stationStrokeSelected : "var(--border-subtle)"}
                   strokeWidth={1}
                   strokeDasharray="2 2"
                 />
@@ -739,7 +779,7 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   y1={PLATFORM_DECK_Y + 18 + 2}
                   x2={sx}
                   y2={UP_MAIN_Y - nodeRadius - 2}
-                  stroke={isSelected ? "#0284c7" : "#e2e8f0"}
+                  stroke={isSelected ? MAP_THEME.stationStrokeSelected : "var(--border-subtle)"}
                   strokeWidth={1}
                   strokeDasharray="2 2"
                 />
@@ -753,19 +793,19 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                       y1={LOOP_LINE_Y}
                       x2={sx + 54}
                       y2={LOOP_LINE_Y}
-                      stroke={isSelected ? "#0284c7" : "#64748b"}
+                      stroke={isSelected ? MAP_THEME.stationStrokeSelected : MAP_THEME.sleeper}
                       strokeWidth={1.5}
                     />
                     {/* Turnout connector leads from UP Main (Y=245) to Loop Line (Y=140) */}
                     <path
                       d={`M ${sx - 88} ${UP_MAIN_Y} Q ${sx - 72} ${LOOP_LINE_Y} ${sx - 54} ${LOOP_LINE_Y}`}
-                      stroke={isSelected ? "#0284c7" : "#94a3b8"}
+                      stroke={isSelected ? MAP_THEME.stationStrokeSelected : MAP_THEME.leaderStroke}
                       strokeWidth={1.5}
                       fill="none"
                     />
                     <path
                       d={`M ${sx + 54} ${LOOP_LINE_Y} Q ${sx + 72} ${LOOP_LINE_Y} ${sx + 88} ${UP_MAIN_Y}`}
-                      stroke={isSelected ? "#0284c7" : "#94a3b8"}
+                      stroke={isSelected ? MAP_THEME.stationStrokeSelected : MAP_THEME.leaderStroke}
                       strokeWidth={1.5}
                       fill="none"
                     />
@@ -781,8 +821,8 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                     width={platformLength}
                     height={18}
                     rx={3}
-                    fill={isSelected ? "#e0f2fe" : "#ffffff"}
-                    stroke={isSelected ? "#0284c7" : isMajor ? "#64748b" : "#94a3b8"}
+                    fill={isSelected ? MAP_THEME.platformDeckSelectedBg : MAP_THEME.platformDeckBg}
+                    stroke={isSelected ? MAP_THEME.stationStrokeSelected : isMajor ? MAP_THEME.sleeper : MAP_THEME.leaderStroke}
                     strokeWidth={isSelected ? 2 : 1}
                     className="transition-colors group-hover:stroke-sky-500"
                   />
@@ -792,23 +832,23 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                     y1={16}
                     x2={platformLength - 2}
                     y2={16}
-                    stroke="#eab308"
+                    stroke={MAP_THEME.tactileBand}
                     strokeWidth={1.5}
                     strokeDasharray="4 2"
                   />
                   {/* Small Platform Canopy Columns */}
                   {isMajor && (
                     <>
-                      <rect x={platformLength * 0.25 - 2} y={3} width={4} height={4} fill="#94a3b8" rx={1} />
-                      <rect x={platformLength * 0.5 - 2} y={3} width={4} height={4} fill="#94a3b8" rx={1} />
-                      <rect x={platformLength * 0.75 - 2} y={3} width={4} height={4} fill="#94a3b8" rx={1} />
+                      <rect x={platformLength * 0.25 - 2} y={3} width={4} height={4} fill={MAP_THEME.leaderStroke} rx={1} />
+                      <rect x={platformLength * 0.5 - 2} y={3} width={4} height={4} fill={MAP_THEME.leaderStroke} rx={1} />
+                      <rect x={platformLength * 0.75 - 2} y={3} width={4} height={4} fill={MAP_THEME.leaderStroke} rx={1} />
                     </>
                   )}
                   {/* Platform Indicator */}
                   <text
                     x={platformLength / 2}
                     y={12.5}
-                    fill={isSelected ? "#0369a1" : "#0f172a"}
+                    fill={isSelected ? MAP_THEME.stationTextSelected : MAP_THEME.stationText}
                     fontSize="10"
                     fontWeight="700"
                     fontFamily="'Inter', sans-serif"
@@ -824,14 +864,14 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                   cx={sx}
                   cy={UP_MAIN_Y}
                   r={isSelected ? nodeRadius + 4 : nodeRadius}
-                  fill={isSelected ? "#0284c7" : isJunction ? "#0f172a" : isMajor ? "#0369a1" : "#ffffff"}
-                  stroke={isSelected ? "#38bdf8" : "#0f172a"}
+                  fill={isSelected ? MAP_THEME.stationStrokeSelected : isJunction ? MAP_THEME.stationText : isMajor ? MAP_THEME.stationTextSelected : MAP_THEME.stationBg}
+                  stroke={isSelected ? "var(--status-info)" : MAP_THEME.stationText}
                   strokeWidth={isSelected ? 2.5 : 2}
                 />
 
                 {/* Second node ring for Junctions */}
                 {isJunction && (
-                  <circle cx={sx} cy={UP_MAIN_Y} r={nodeRadius + 4} fill="none" stroke="#0284c7" strokeWidth={1.5} />
+                  <circle cx={sx} cy={UP_MAIN_Y} r={nodeRadius + 4} fill="none" stroke={MAP_THEME.stationStrokeSelected} strokeWidth={1.5} />
                 )}
 
                 {/* 5. BOTTOM ZONE: Infrastructure Spec Pill (Y: 440) */}
@@ -842,14 +882,14 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
                     width={112}
                     height={22}
                     rx={4}
-                    fill={isSelected ? "#e0f2fe" : "#f8fafc"}
-                    stroke={isSelected ? "#0284c7" : "#cbd5e1"}
+                    fill={isSelected ? MAP_THEME.specPillSelectedBg : MAP_THEME.specPillBg}
+                    stroke={isSelected ? MAP_THEME.stationStrokeSelected : MAP_THEME.stationStroke}
                     strokeWidth={1}
                   />
                   <text
                     x={56}
                     y={14.5}
-                    fill={isSelected ? "#0369a1" : "#334155"}
+                    fill={isSelected ? MAP_THEME.specPillSelectedText : MAP_THEME.specPillText}
                     fontSize="9.5"
                     fontFamily="'Inter', sans-serif"
                     textAnchor="middle"
@@ -872,23 +912,23 @@ export const DetailedCorridorMapCanvas: React.FC<DetailedCorridorMapCanvasProps>
       <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs font-mono text-slate-700">
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center space-x-2">
-            <span className="w-5 h-1 bg-[#1e293b] rounded-full inline-block" />
+            <span className="w-5 h-1 bg-[var(--text-primary)] rounded-full inline-block" />
             <span className="text-[11px] text-slate-700 font-bold">Dual Steel Rails & Sleepers</span>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="w-3.5 h-2 rounded-xs bg-white border border-[#94a3b8]" />
+            <span className="w-3.5 h-2 rounded-xs bg-white border border-[var(--border-strong)]" />
             <span className="text-[11px] text-slate-700 font-bold">Concrete Platform Bay</span>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#0f172a] border border-[#0284c7]" />
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--text-primary)] border border-[var(--status-info)]" />
             <span className="text-[11px] text-slate-700 font-bold">Major Junction Hub</span>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#0284c7]" />
-            <span className="text-[11px] text-[#0369a1] font-bold">Selected Station (Schematic Below)</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[var(--status-info)]" />
+            <span className="text-[11px] text-[var(--status-info-text)] font-bold">Selected Station (Schematic Below)</span>
           </div>
         </div>
 
